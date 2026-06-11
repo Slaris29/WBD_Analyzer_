@@ -28247,6 +28247,254 @@ function toggleGame(gid){
   document.head.appendChild(css);
 })();
 
+
+/* ━━━━━━━━━━ V10.1 SERVER TEAM NAME TAIL FIX ━━━━━━━━━━
+   - 파일명 뒤의 GitHub/업로더 랜덤 토큰, 복사본 번호가 팀명에 붙는 문제 보정
+   - 예: purple_neon_apex_vs_shiroko_bluebirds_9BVPYgBSbV (1)
+         → Purple Neon Apex vs Shiroko Bluebirds
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+(function(){
+  function pad2(n){return String(n).padStart(2,'0');}
+  function shortFile(v){return String(v||'').split(/[\\/]/).pop()||String(v||'');}
+  function noExt(v){return String(v||'').replace(/\.(csv|txt)$/i,'');}
+  function niceTeam(s){
+    s=String(s||'')
+      .replace(/^_+|_+$/g,'')
+      .replace(/[_\-]+/g,' ')
+      .replace(/\s+/g,' ')
+      .trim();
+    if(!s)return '';
+    return s.replace(/\b[a-z]/g,c=>c.toUpperCase());
+  }
+  function looksLikeNoiseToken(token){
+    const t=String(token||'').replace(/[^A-Za-z0-9]/g,'');
+    if(!/^[A-Za-z0-9]{8,24}$/.test(t))return false;
+    // WBD 파일 뒤에 붙는 랜덤 id는 보통 숫자가 섞이거나, 대소문자가 비정상적으로 섞임
+    if(/\d/.test(t))return true;
+    const upp=(t.match(/[A-Z]/g)||[]).length;
+    const low=(t.match(/[a-z]/g)||[]).length;
+    return upp>=2 && low>=2;
+  }
+  function cleanTail(raw){
+    let s=String(raw||'').trim();
+    // Windows/GitHub 중복 업로드 이름: " (1)", "_copy", "- copy 2" 같은 꼬리 제거
+    s=s.replace(/(?:[_\s\-]*\(\d+\))+$/g,'');
+    s=s.replace(/(?:[_\s\-]+copy(?:[_\s\-]*\d+)?)$/i,'');
+    s=s.replace(/(?:[_\s\-]+복사본(?:[_\s\-]*\d+)?)$/i,'');
+    // 마지막 단어/언더바 조각이 랜덤 토큰이면 제거. 팀명 단어는 최대한 보존.
+    let parts=s.split(/[_\s]+/).filter(Boolean);
+    while(parts.length>1 && looksLikeNoiseToken(parts[parts.length-1])) parts.pop();
+    return parts.join('_');
+  }
+
+  window._wbdCleanTeamTail = cleanTail;
+
+  window._parseGameName = function(filename){
+    const file=shortFile(filename);
+    const base=noExt(file).replace(/(?:[_\s\-]*\(\d+\))+$/g,'');
+
+    // league_2026_02_27_team_a_vs_team_b_RANDOMID(1)
+    let m=base.match(/^(?:league_)?(\d{4})[_\-](\d{1,2})[_\-](\d{1,2})[_\-]+(.+?)_vs_+(.+)$/i);
+    if(m){
+      const y=m[1], mo=pad2(+m[2]), d=pad2(+m[3]);
+      return {date:`${y}-${mo}-${d}`,teamA:niceTeam(cleanTail(m[4])),teamB:niceTeam(cleanTail(m[5]))};
+    }
+
+    // team_a_vs_team_b_2026_02_27_RANDOMID
+    m=base.match(/^(.+?)_vs_+(.+?)[_\-]+(\d{4})[_\-](\d{1,2})[_\-](\d{1,2})(.*)$/i);
+    if(m){
+      const y=m[3], mo=pad2(+m[4]), d=pad2(+m[5]);
+      return {date:`${y}-${mo}-${d}`,teamA:niceTeam(cleanTail(m[1])),teamB:niceTeam(cleanTail(m[2]))};
+    }
+
+    // 날짜만 있는 파일
+    m=base.match(/(?:league_)?(\d{4})[_\-]?(\d{2})[_\-]?(\d{2})/);
+    if(m){
+      const y=m[1], mo=m[2], d=m[3];
+      if(+mo>=1&&+mo<=12&&+d>=1&&+d<=31&&+y>=2020&&+y<=2099){
+        return {date:`${y}-${mo}-${d}`,teamA:'Team A',teamB:'Team B'};
+      }
+    }
+
+    // YYMMDD 시작
+    m=base.match(/^(\d{6,8})(?:[_\-]|$)/);
+    if(m){
+      const digits=m[1];
+      const yy=+digits.slice(0,2), mm=+digits.slice(2,4), dd=+digits.slice(4,6);
+      if(mm>=1&&mm<=12&&dd>=1&&dd<=31){
+        return {date:`${2000+yy}-${pad2(mm)}-${pad2(dd)}`,teamA:'Team A',teamB:'Team B'};
+      }
+    }
+    return {date:'',teamA:'Team A',teamB:'Team B'};
+  };
+
+  window._gameDisplayInfo = function(g){
+    const sourceName=(g&&((g.path&&shortFile(g.path))||g.name))||'';
+    const raw=window._parseGameName(sourceName);
+    let a=_normalizeTeam(raw.teamA), b=_normalizeTeam(raw.teamB);
+    const date=raw.date||'';
+    const file=noExt(shortFile(sourceName || (g&&g.name)||''));
+    const known=!!(a&&b&&raw.teamA!=='Team A'&&raw.teamB!=='Team B');
+    if(!a)a='레드';
+    if(!b)b='블루';
+    return {date,teamA:a,teamB:b,knownTeams:known,title:known?`${a} vs ${b}`:file};
+  };
+
+  window._getGameDateValue = function(g){
+    const sourceName=(g&&((g.path&&shortFile(g.path))||g.name))||'';
+    const d=(window._parseGameName(sourceName)||{}).date||'';
+    return /^\d{4}-\d{2}-\d{2}$/.test(d)?new Date(d+'T00:00:00').getTime():0;
+  };
+
+  // 이미 로드된 화면에서 캐시된 표시를 즉시 갱신할 수 있게 한 번 더 렌더
+  try{
+    if(typeof renderGameDashboard==='function') setTimeout(()=>renderGameDashboard(),0);
+    if(typeof renderDataHub==='function') setTimeout(()=>renderDataHub(),0);
+  }catch(e){}
+})();
+
+
+
+/* ━━━━━━━━━━ V10.1 SERVER UI LAG FIX ━━━━━━━━━━
+   - 그룹/세부 체크 클릭 시 즉시 전체 페이지를 재계산하지 않고 짧게 모아서 1번만 반영
+   - 홈 화면에서는 무거운 하단 통계 렌더를 한 박자 늦춰 클릭 끊김을 줄임
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+(function(){
+  let filterTimer=0;
+  let slowHomeTimer=0;
+  let refreshSeq=0;
+
+  function idleRun(fn){
+    if('requestIdleCallback' in window){
+      requestIdleCallback(fn,{timeout:650});
+    }else{
+      requestAnimationFrame(()=>setTimeout(fn,0));
+    }
+  }
+  function phaseLabelSafe(g){
+    try{return (window._gamePhaseLabel?window._gamePhaseLabel(g):(g.phaseName||g.phaseId||''))||'';}catch(e){return g.phaseName||g.phaseId||'';}
+  }
+  function matchScope(g, category, groupId, phaseId){
+    if(category && (g.category||'local')!==category) return false;
+    if(groupId && (g.groupId||'local')!==groupId) return false;
+    if(phaseId && (g.phaseId||'')!==phaseId) return false;
+    return true;
+  }
+  function setPending(on){
+    try{
+      document.body.classList.toggle('wbd-filter-pending',!!on);
+      const el=document.getElementById('dashboard-summary');
+      if(el && on) el.textContent='선택 반영 준비 중...';
+    }catch(e){}
+  }
+  function renderHomeFastThenSlow(){
+    // 데이터 컨트롤/경기 대시보드는 먼저 갱신해서 사용자가 선택 상태를 바로 확인하게 함
+    try{renderGamesOverview();}catch(e){console.warn(e);}
+    try{renderGameDashboard();}catch(e){console.warn(e);}
+
+    clearTimeout(slowHomeTimer);
+    slowHomeTimer=setTimeout(()=>{
+      try{renderFavoritesSection&&renderFavoritesSection();}catch(e){}
+      try{renderScoreboard&&renderScoreboard();}catch(e){}
+      try{renderStatCards&&renderStatCards();}catch(e){}
+      try{renderRosters&&renderRosters();}catch(e){}
+      try{renderTimeline&&renderTimeline();}catch(e){}
+    },180);
+  }
+  function applyActiveRefresh(){
+    const mySeq=++refreshSeq;
+    setPending(true);
+    idleRun(()=>{
+      // 더 최신 예약이 있으면 이번 작업은 버림
+      if(mySeq!==refreshSeq) return;
+      const active=document.querySelector('.page.active');
+      const isHome=active && active.id==='page-home';
+      try{
+        if(window._teamScoutLeagueCache) window._teamScoutLeagueCache=null;
+        rebuildG();
+        updateNavInfo();
+        renderGamesList();
+        populateSelects();
+        if(isHome) renderHomeFastThenSlow();
+        else renderActiveContent();
+      }catch(e){
+        console.error('active refresh failed',e);
+      }finally{
+        setPending(false);
+      }
+    });
+  }
+  window._wbdScheduleActiveRefresh=function(){
+    clearTimeout(filterTimer);
+    setPending(true);
+    filterTimer=setTimeout(applyActiveRefresh,120);
+  };
+
+  window.activateMetaScope=function(category, groupId, phaseId, on){
+    if(typeof phaseId==='boolean'){on=phaseId; phaseId='';}
+    GAMES.forEach(g=>{
+      if(matchScope(g,category,groupId,phaseId)){
+        if(on) activeGameIds.add(g.id);
+        else activeGameIds.delete(g.id);
+      }
+    });
+    window._wbdScheduleActiveRefresh();
+  };
+
+  window.activateOnlyMetaScope=function(category, groupId, phaseId){
+    activeGameIds.clear();
+    GAMES.forEach(g=>{if(matchScope(g,category,groupId,phaseId)) activeGameIds.add(g.id);});
+    window._wbdScheduleActiveRefresh();
+  };
+
+  window._toggleGroupActive=function(groupId, checked){window.activateMetaScope('',groupId,'',checked);};
+  window._toggleCategoryActive=function(category, checked){window.activateMetaScope(category,'','',checked);};
+
+  window.toggleGame=function(gid){
+    if(activeGameIds.has(gid)) activeGameIds.delete(gid);
+    else activeGameIds.add(gid);
+    window._wbdScheduleActiveRefresh();
+  };
+
+  window.dashActivateAll=function(on){
+    const catFilter=(document.getElementById('dash-category-filter')||{}).value||'';
+    const groupFilter=(document.getElementById('dash-group-filter')||{}).value||'';
+    const phaseFilter=(document.getElementById('dash-phase-filter')||{}).value||'';
+    const teamFilter=(document.getElementById('dash-team-filter')||{}).value||'';
+    const search=((document.getElementById('dash-search')||{}).value||'').toLowerCase().trim();
+    GAMES.forEach(g=>{
+      const info=_gameDisplayInfo(g);
+      let match=true;
+      if(catFilter&&(g.category||'local')!==catFilter)match=false;
+      if(groupFilter&&(g.groupId||'local')!==groupFilter)match=false;
+      if(phaseFilter&&(g.phaseId||'')!==phaseFilter)match=false;
+      if(teamFilter&&info.teamA!==teamFilter&&info.teamB!==teamFilter)match=false;
+      if(search&&!(info.teamA+' '+info.teamB+' '+info.title+' '+g.name+' '+_gameCategoryLabel(g)+' '+_gameGroupLabel(g)+' '+phaseLabelSafe(g)).toLowerCase().includes(search))match=false;
+      if(match){ if(on)activeGameIds.add(g.id); else activeGameIds.delete(g.id); }
+    });
+    window._wbdScheduleActiveRefresh();
+  };
+
+  window.activateRecentDays=function(days){
+    const dates=GAMES.map(_getGameDateValue).filter(Boolean);
+    if(!dates.length){
+      if(typeof _toast==='function') _toast('날짜 정보 없음','파일명에서 날짜를 찾지 못했어요.','#ffb833',3000);
+      return;
+    }
+    const max=Math.max(...dates), cut=max-days*24*3600*1000;
+    activeGameIds.clear();
+    GAMES.forEach(g=>{const t=_getGameDateValue(g); if(t&&t>=cut)activeGameIds.add(g.id);});
+    window._wbdScheduleActiveRefresh();
+  };
+
+  const css=document.createElement('style');
+  css.textContent=`
+    body.wbd-filter-pending .dhf-hub{position:relative}
+    body.wbd-filter-pending .dhf-hub:after{content:'선택 반영 중...';position:absolute;right:14px;top:12px;font-size:10px;font-family:var(--mono);color:var(--amber);background:rgba(0,0,0,.35);border:1px solid var(--border);border-radius:999px;padding:4px 9px;pointer-events:none}
+    body.wbd-filter-pending .dhf-group, body.wbd-filter-pending .dhf-cat{transition:none}
+  `;
+  document.head.appendChild(css);
+})();
 </script>
 </body>
 </html>
