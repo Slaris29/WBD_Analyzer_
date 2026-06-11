@@ -1,5 +1,19 @@
 {
-  "version": 1,
-  "generatedAt": null,
+  "version": 2,
+  "generatedAt": "",
+  "categoryOrder": [
+    "league",
+    "scrim",
+    "independent",
+    "event",
+    "etc"
+  ],
+  "categories": {
+    "league": "리그전",
+    "scrim": "일반 스크림",
+    "independent": "독립팀",
+    "event": "이벤트리그",
+    "etc": "기타"
+  },
   "groups": []
 }

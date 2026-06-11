@@ -2404,7 +2404,9 @@ function _normalizeServerManifest(raw){
       name:String(g.name||g.title||id),
       default:g.default!==false,
       files,
-      description:g.description||''
+      description:g.description||'',
+      category:g.category||'',
+      categoryName:g.categoryName||''
     };
   }).filter(g=>g.files.length>0);
   return result;
@@ -2412,12 +2414,14 @@ function _normalizeServerManifest(raw){
 
 function _serverGroupCheckboxHtml(g){
   const checked=window.SERVER_LIBRARY.selected.has(g.id)?'checked':'';
+  const category=g.categoryName||g.category||'';
+  const catBadge=category?`<span style="font-size:10px;color:var(--muted);border:1px solid var(--border);border-radius:3px;padding:1px 6px;margin-left:6px;white-space:nowrap">${category}</span>`:'';
   const desc=g.description?`<div style="font-size:10px;color:var(--muted);margin-top:2px">${g.description}</div>`:'';
   return `<label style="display:flex;align-items:flex-start;gap:9px;padding:9px 10px;border:1px solid var(--border);border-radius:5px;background:var(--card2);cursor:pointer">
     <input type="checkbox" data-server-group="${_serverSafeId(g.id)}" ${checked} onchange="toggleServerGroup('${String(g.id).replace(/'/g,"\\'")}',this.checked)" style="margin-top:2px">
     <span style="flex:1">
       <span style="display:flex;justify-content:space-between;gap:8px;align-items:center">
-        <b style="font-size:12px;color:var(--text)">${g.name}</b>
+        <b style="font-size:12px;color:var(--text)">${g.name}${catBadge}</b>
         <span style="font-size:11px;color:var(--amber);font-family:var(--mono)">${g.files.length}경기</span>
       </span>
       ${desc}
@@ -2434,7 +2438,7 @@ function renderServerLibraryPanel(){
   if(!groups.length){
     groupsEl.innerHTML=`<div style="font-size:11px;color:var(--muted);line-height:1.7;border:1px dashed var(--border);border-radius:6px;padding:10px">
       서버 목록이 아직 없습니다.<br>
-      GitHub 저장소에 <b>data/manifest.json</b>과 CSV 파일을 올리면 여기에 자동으로 표시됩니다.
+      GitHub 저장소에 CSV를 <b>data/league/FW_Season/</b> 같은 폴더에 넣고 manifest가 생성되면 여기에 자동 표시됩니다.
     </div>`;
     return;
   }
@@ -2536,16 +2540,11 @@ async function loadServerFiles(files, appendExisting){
 }
 
 function openServerLibraryModal(){
-  if(!window.SERVER_LIBRARY.manifest && !window.SERVER_LIBRARY.lastError && !window.SERVER_LIBRARY.loading){
-    openModal(`<div class="card-title" style="font-size:14px;color:var(--amber);margin-bottom:12px">☁ 서버 CSV 불러오기</div>
-      <div style="font-size:12px;color:var(--muted);line-height:1.8">서버 목록 확인 중...</div>`);
-    initServerLibrary(true).then(()=>{closeModal();openServerLibraryModal();});
-    return;
-  }
+  if(!window.SERVER_LIBRARY.groups.length)initServerLibrary(true).then(()=>openServerLibraryModal());
   const groups=window.SERVER_LIBRARY.groups||[];
   const total=groups.reduce((sum,g)=>sum+g.files.length,0);
   const body=groups.length?groups.map(_serverGroupCheckboxHtml).join(''):`<div style="font-size:12px;color:var(--muted);line-height:1.8;border:1px dashed var(--border);border-radius:6px;padding:12px">
-    아직 서버 목록이 없습니다. <b>data/manifest.json</b>을 올린 뒤 다시 새로고침하세요.<br>
+    아직 서버 목록이 없습니다. <b>data/league/시즌명/</b> 등에 CSV를 넣고 manifest를 생성한 뒤 새로고침하세요.<br>
     기존 방식대로 <b>+ 경기</b> 또는 첫 화면 파일 선택으로 CSV를 직접 추가할 수 있습니다.
   </div>`;
   openModal(`<div class="card-title" style="font-size:14px;color:var(--amber);margin-bottom:12px">☁ 서버 CSV 불러오기</div>
