@@ -372,7 +372,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
 <!-- ════ UPLOAD PAGE ════ -->
 <div id="upload-page">
   <div class="logo-big">WBD</div>
-  <div class="logo-sub">BASEBALL ANALYZER · V10.1-SERVER</div>
+  <div class="logo-sub">BASEBALL ANALYZER · V10.1-SERVER-AUTO</div>
   <div id="drop-zone">
     <svg width="48" height="48" viewBox="0 0 48 48" fill="none"><rect x="8" y="6" width="32" height="36" rx="3" stroke="#5a7a9a" stroke-width="2"/><path d="M16 18h16M16 24h16M16 30h10" stroke="#5a7a9a" stroke-width="1.5" stroke-linecap="round"/><path d="M30 34l4-4 4 4M34 30v10" stroke="#f5a623" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
     <div class="drop-title">CSV / TXT 파일을 드롭하세요</div>
@@ -391,8 +391,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
     </div>
     <div id="server-library-groups" style="display:grid;grid-template-columns:1fr;gap:6px;margin:10px 0"></div>
     <div class="btn-row" style="margin-top:12px;justify-content:flex-start">
-      <button class="btn-primary" onclick="loadSelectedServerGroups(false)" style="font-size:12px;padding:8px 14px">선택 불러오기</button>
-      <button class="btn-secondary" onclick="loadAllServerGroups(false)" style="font-size:12px;padding:8px 14px">전체 불러오기</button>
+      <button class="btn-primary" onclick="loadSelectedServerGroups(false)" style="font-size:12px;padding:8px 14px">선택 활성화</button>
+      <button class="btn-secondary" onclick="loadAllServerGroups(false)" style="font-size:12px;padding:8px 14px">전체 자동 불러오기</button>
       <button class="btn-secondary" onclick="document.getElementById('file-input').click()" style="font-size:12px;padding:8px 14px">내 CSV 사용</button>
     </div>
   </div>
@@ -406,7 +406,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
   <!-- 모바일 전용 상단 바 (햄버거) -->
   <div id="mobile-topbar" style="display:none">
     <button id="hamburger-btn" onclick="toggleMobileMenu()" aria-label="메뉴">☰</button>
-    <div class="mobile-logo">WBD <span style="font-size:10px;color:var(--muted);margin-left:2px">V10.1-SERVER</span></div>
+    <div class="mobile-logo">WBD <span style="font-size:10px;color:var(--muted);margin-left:2px">V10.1-SERVER-AUTO</span></div>
     <button class="mobile-icon-btn" onclick="openGlobalSearch()" title="검색">🔍</button>
     <button class="mobile-icon-btn" onclick="document.getElementById('add-file-input').click()" title="경기 추가" style="color:var(--amber)">+</button>
   </div>
@@ -471,7 +471,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
   </div>
 
   <div id="topnav">
-    <div class="nav-logo">WBD <span style="font-size:11px;color:var(--muted);letter-spacing:1px;margin-left:4px">V10.1-SERVER</span></div>
+    <div class="nav-logo">WBD <span style="font-size:11px;color:var(--muted);letter-spacing:1px;margin-left:4px">V10.1-SERVER-AUTO</span></div>
     <button class="nav-btn active" onclick="showPage('home')">🏠 홈</button>
     <button class="nav-btn" onclick="showPage('pitcher')">⚾ 투수</button>
     <button class="nav-btn" onclick="showPage('batter')">🏏 타자</button>
@@ -548,6 +548,10 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
         <div style="font-size:11px;color:var(--muted);font-family:var(--mono)" id="dashboard-summary"></div>
       </div>
       <div class="filter-row" style="margin-bottom:10px;flex-wrap:wrap">
+        <span class="filter-label">분류</span>
+        <select id="dash-category-filter" onchange="onDashCategoryFilterChange()"><option value="">전체</option></select>
+        <span class="filter-label">그룹</span>
+        <select id="dash-group-filter" onchange="renderGameDashboard()"><option value="">전체</option></select>
         <span class="filter-label">팀 필터</span>
         <select id="dash-team-filter" onchange="renderGameDashboard()"><option value="">전체</option></select>
         <span class="filter-label">정렬</span>
@@ -1839,7 +1843,7 @@ function _totalBases(arr){
   return tb;
 }
 
-function addGame(text,filename){
+function addGame(text,filename,meta){
   try{
     const pitches=parseCSV(text);
     if(!pitches.length)throw new Error('데이터 없음');
@@ -1875,8 +1879,25 @@ function addGame(text,filename){
     }
     
     const id='g'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
-    pitches.forEach(p=>{p._gameId=id;p._gameName=filename;});
-    const game={id,name:filename,pitches,_fp:fp};
+    meta=meta||{};
+    const serverMeta={
+      source:meta.source||'local',
+      category:meta.category||'',
+      categoryName:meta.categoryName||'',
+      groupId:meta.groupId||meta._groupId||'',
+      groupName:meta.groupName||meta._group||'',
+      path:meta.path||''
+    };
+    pitches.forEach(p=>{
+      p._gameId=id;p._gameName=filename;
+      p._source=serverMeta.source;
+      p._category=serverMeta.category;
+      p._categoryName=serverMeta.categoryName;
+      p._groupId=serverMeta.groupId;
+      p._groupName=serverMeta.groupName;
+      p._serverPath=serverMeta.path;
+    });
+    const game={id,name:filename,pitches,_fp:fp,...serverMeta};
     GAMES.push(game);
     activeGameIds.add(id);
     return game;
@@ -1985,10 +2006,10 @@ function parseCSV(text){
   return data;
 }
 
-function loadData(text,filename,append,deferRebuild){
+function loadData(text,filename,append,deferRebuild,meta){
   try{
     if(!append){GAMES=[];activeGameIds=new Set();}
-    const game=addGame(text,filename);
+    const game=addGame(text,filename,meta);
     if(deferRebuild)return;
     rebuildG();
     if(!G.length)throw new Error('데이터가 없습니다');
@@ -2127,7 +2148,7 @@ function renderGamesList(){
       +'<div class="gc-check">'+(active?'✓':'')+'</div>'
       +'<div>'
       +'<div class="gc-name">'+shortName+'</div>'
-      +'<div class="gc-meta">'+g.pitches.length+'투구  투수'+pitchers+'  타자'+batters+'</div>'
+      +'<div class="gc-meta">'+_gameSourceBadge(g)+' '+_gameCategoryLabel(g)+' · '+_gameGroupLabel(g)+' · '+g.pitches.length+'투구  투수'+pitchers+'  타자'+batters+'</div>'
       +'</div>'
       +'<button class="gc-del" onclick="event.stopPropagation();removeGame(\''+g.id+'\')" title="삭제">✕</button>'
       +'</div>';
@@ -2365,7 +2386,9 @@ function readMultipleFiles(files, appendFirst){
    - data/manifest.json이 없으면 조용히 비활성화
 ══════════════════════════════════════ */
 const SERVER_MANIFEST_URL = 'data/manifest.json';
-window.SERVER_LIBRARY = { manifest:null, groups:[], selected:new Set(), loading:false, lastError:null };
+window.SERVER_LIBRARY = { manifest:null, groups:[], selected:new Set(), loading:false, lastError:null, autoLoaded:false, autoLoading:false };
+window.SERVER_AUTO_LOAD_ALL = true;
+window.SERVER_CSV_CONCURRENCY = 8;
 
 function _serverSetStatus(msg, isError){
   const el=document.getElementById('server-library-status');
@@ -2438,7 +2461,7 @@ function renderServerLibraryPanel(){
   if(!groups.length){
     groupsEl.innerHTML=`<div style="font-size:11px;color:var(--muted);line-height:1.7;border:1px dashed var(--border);border-radius:6px;padding:10px">
       서버 목록이 아직 없습니다.<br>
-      GitHub 저장소에 CSV를 <b>data/league/FW_Season/</b> 같은 폴더에 넣고 manifest가 생성되면 여기에 자동 표시됩니다.
+      GitHub 저장소에 CSV를 <b>data/league/FW_Season/</b> 같은 폴더에 넣고 manifest가 생성되면 자동으로 전체 로드됩니다.
     </div>`;
     return;
   }
@@ -2489,48 +2512,106 @@ async function initServerLibrary(force){
 function _selectedServerFiles(all){
   const groups=window.SERVER_LIBRARY.groups||[];
   const chosen=all?groups:groups.filter(g=>window.SERVER_LIBRARY.selected.has(g.id));
-  return chosen.flatMap(g=>(g.files||[]).map(f=>({...f,_group:g.name,_groupId:g.id})));
+  return chosen.flatMap(g=>(g.files||[]).map(f=>({
+    ...f,
+    _group:g.name,_groupId:g.id,
+    category:g.category||'',
+    categoryName:g.categoryName||'',
+    groupName:g.name||'',
+    groupId:g.id||'',
+    source:'server'
+  })));
 }
 
-async function loadAllServerGroups(append){
+async function loadAllServerGroups(append, opts){
   if(!window.SERVER_LIBRARY.groups.length)await initServerLibrary(true);
-  await loadServerFiles(_selectedServerFiles(true), !!append);
+  await loadServerFiles(_selectedServerFiles(true), !!append, opts||{});
 }
 
-async function loadSelectedServerGroups(append){
+async function loadSelectedServerGroups(append, opts){
   if(!window.SERVER_LIBRARY.groups.length)await initServerLibrary(true);
-  await loadServerFiles(_selectedServerFiles(false), !!append);
+  await loadServerFiles(_selectedServerFiles(false), !!append, opts||{});
 }
 
-async function loadServerFiles(files, appendExisting){
+async function loadServerFiles(files, appendExisting, opts){
+  opts=opts||{};
   if(!files.length){alert('불러올 서버 경기 그룹을 선택해줘.');return;}
   if(window._serverLoading){alert('이미 서버 경기 불러오는 중입니다.');return;}
+
+  // 많은 서버 파일을 한 개씩 순차 다운로드하면 너무 느려서,
+  // 네트워크 다운로드는 병렬 처리하고 분석/병합은 기존 loadData 흐름대로 한 번에 처리한다.
+  const totalBytes=files.reduce((s,f)=>s+(Number(f.size)||0),0);
+  const mb=totalBytes/1024/1024;
+  if(!opts.auto && (files.length>=30 || mb>=80)){
+    const ok=confirm(`서버 경기 ${files.length}개${totalBytes?` / 약 ${mb.toFixed(1)}MB`:''}를 불러옵니다.\n파일이 많으면 시간이 걸릴 수 있어요. 계속할까요?`);
+    if(!ok)return;
+  }
+
   window._serverLoading=true;
   const uploadErr=document.getElementById('upload-error');
   if(uploadErr){uploadErr.style.display='none';uploadErr.textContent='';}
+
   const startedWithGames=GAMES.length>0;
-  let loaded=0, failed=[];
-  try{
-    _serverSetStatus(`서버 CSV 불러오는 중... 0 / ${files.length}`, false);
-    for(let i=0;i<files.length;i++){
+  const concurrency=Math.max(2, Math.min(8, Number(window.SERVER_CSV_CONCURRENCY)||6));
+  const results=new Array(files.length);
+  let nextIdx=0, done=0, okCount=0;
+  const t0=performance.now();
+
+  async function worker(){
+    while(nextIdx<files.length){
+      const i=nextIdx++;
       const f=files[i];
-      const label=f.name || (f.path.split('/').pop()||`server_${i+1}.csv`);
+      const label=f.name || (String(f.path||'').split('/').pop()||`server_${i+1}.csv`);
       try{
-        const res=await fetch(f.path,{cache:'no-store'});
+        // manifest는 no-store지만 CSV 본문은 브라우저/GitHub Pages 캐시를 활용한다.
+        // 같은 파일을 다시 불러올 때 체감 속도가 크게 좋아진다.
+        const res=await fetch(f.path,{cache:'default'});
         if(!res.ok)throw new Error(`HTTP ${res.status}`);
         const text=await res.text();
-        const append=!!appendExisting || startedWithGames || loaded>0;
-        loadData(text,label,append,true);
-        loaded++;
-        _serverSetStatus(`서버 CSV 불러오는 중... ${loaded} / ${files.length}`, false);
+        results[i]={ok:true,text,label,path:f.path,meta:f};
+        okCount++;
       }catch(e){
         console.error('[server csv load failed]',f.path,e);
-        failed.push(`${label}: ${e.message}`);
+        results[i]={ok:false,label,path:f.path,error:e};
+      }finally{
+        done++;
+        _serverSetStatus(`서버 CSV 다운로드 중... ${done} / ${files.length} (${okCount} 성공)`, false);
+        await new Promise(r=>setTimeout(r,0));
       }
-      await new Promise(r=>setTimeout(r,0));
     }
+  }
+
+  try{
+    _serverSetStatus(`서버 CSV 다운로드 시작... 0 / ${files.length}`, false);
+    const workers=Array.from({length:Math.min(concurrency,files.length)},()=>worker());
+    await Promise.all(workers);
+
+    let loaded=0;
+    const failed=[];
+    _serverSetStatus(`서버 CSV 분석 중... 0 / ${okCount}`, false);
+    for(let i=0;i<results.length;i++){
+      const r=results[i];
+      if(!r || !r.ok){
+        failed.push(`${r?.label||files[i]?.name||'unknown'}: ${r?.error?.message||'로드 실패'}`);
+        continue;
+      }
+      try{
+        const append=!!appendExisting || startedWithGames || loaded>0;
+        loadData(r.text,r.label,append,true,{...r.meta,path:r.path,source:'server'});
+        loaded++;
+        if(loaded%5===0 || loaded===okCount){
+          _serverSetStatus(`서버 CSV 분석 중... ${loaded} / ${okCount}`, false);
+          await new Promise(rr=>setTimeout(rr,0));
+        }
+      }catch(e){
+        console.error('[server csv parse failed]',r.path,e);
+        failed.push(`${r.label}: ${e.message}`);
+      }
+    }
+
     _finishBulkLoad();
-    const msg=`성공 ${loaded}개${failed.length?`, 실패 ${failed.length}개`:''}`;
+    const sec=((performance.now()-t0)/1000).toFixed(1);
+    const msg=`성공 ${loaded}개${failed.length?`, 실패 ${failed.length}개`:''} · ${sec}초`;
     _serverSetStatus(`서버 경기 로드 완료: ${msg}`, failed.length>0);
     _toast('☁ 서버 경기 불러오기 완료', msg+(failed.length?'\n'+failed.slice(0,3).join('\n'):''), failed.length?'#ffb833':'#88ccff', 5000);
     closeModal();
@@ -2547,20 +2628,37 @@ function openServerLibraryModal(){
     아직 서버 목록이 없습니다. <b>data/league/시즌명/</b> 등에 CSV를 넣고 manifest를 생성한 뒤 새로고침하세요.<br>
     기존 방식대로 <b>+ 경기</b> 또는 첫 화면 파일 선택으로 CSV를 직접 추가할 수 있습니다.
   </div>`;
-  openModal(`<div class="card-title" style="font-size:14px;color:var(--amber);margin-bottom:12px">☁ 서버 CSV 불러오기</div>
+  openModal(`<div class="card-title" style="font-size:14px;color:var(--amber);margin-bottom:12px">☁ 서버 CSV 관리</div>
     <div style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:12px">${groups.length?`${groups.length}개 그룹 / ${total}경기`:'서버 목록 없음'}</div>
     <div id="server-library-groups-modal" style="display:grid;grid-template-columns:1fr;gap:6px;margin-bottom:14px">${body}</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <button class="btn-primary" onclick="loadSelectedServerGroups(true)">선택 경기 추가</button>
-      <button class="btn-secondary" onclick="loadAllServerGroups(true)">전체 경기 추가</button>
+      <button class="btn-primary" onclick="loadSelectedServerGroups(true)">선택 경기 다시 추가</button>
+      <button class="btn-secondary" onclick="loadAllServerGroups(true)">전체 경기 다시 추가</button>
       <button class="btn-secondary" onclick="refreshServerLibrary().then(()=>{closeModal();openServerLibraryModal();})">목록 새로고침</button>
       <button class="btn-secondary" onclick="document.getElementById('add-file-input').click();closeModal()">내 CSV 추가</button>
     </div>
-    <div style="font-size:10px;color:var(--muted);margin-top:12px;line-height:1.6">※ 서버 CSV와 직접 추가 CSV는 같이 분석됩니다. 중복 경기는 기존 중복 처리 로직에 따라 자동 스킵됩니다.</div>`);
+    <div style="font-size:10px;color:var(--muted);margin-top:12px;line-height:1.6">※ 기본값은 서버 전체 자동 로드입니다. 이 창은 누락/갱신된 서버 경기만 다시 추가할 때 사용합니다. 중복 경기는 자동 스킵됩니다.</div>`);
 }
 
-// 페이지 열릴 때 서버 목록이 있으면 자동으로 표시만 해둠. CSV는 사용자가 버튼을 눌렀을 때만 다운로드.
-initServerLibrary(false);
+async function autoLoadAllServerFiles(){
+  if(!window.SERVER_AUTO_LOAD_ALL)return;
+  if(window.SERVER_LIBRARY.autoLoaded || window.SERVER_LIBRARY.autoLoading)return;
+  const groups=window.SERVER_LIBRARY.groups||[];
+  if(!groups.length)return;
+  const files=_selectedServerFiles(true);
+  if(!files.length)return;
+  window.SERVER_LIBRARY.autoLoading=true;
+  try{
+    _serverSetStatus(`전체 서버 경기 자동 로드 준비... ${files.length}경기`, false);
+    await loadServerFiles(files, GAMES.length>0, {auto:true});
+    window.SERVER_LIBRARY.autoLoaded=true;
+  }finally{
+    window.SERVER_LIBRARY.autoLoading=false;
+  }
+}
+
+// 페이지 열릴 때 manifest를 읽고, 서버 CSV는 기본적으로 전체 자동 로드한다.
+initServerLibrary(false).then(()=>autoLoadAllServerFiles());
 
 /* ══════════════════════════════════════
    NAVIGATION
@@ -2888,6 +2986,46 @@ function renderScoreboard(){
   if(wrap)wrap.innerHTML='';
 }
 
+
+function _gameCategoryLabel(g){return g.categoryName||g.category||'직접 추가';}
+function _gameGroupLabel(g){return g.groupName||g.groupId||'직접 추가';}
+function _gameSourceBadge(g){return g.source==='server'?'☁':'📁';}
+
+function _populateDashMetaFilters(){
+  const catSel=document.getElementById('dash-category-filter');
+  const groupSel=document.getElementById('dash-group-filter');
+  if(!catSel&&!groupSel)return;
+  const prevCat=catSel?catSel.value:'';
+  const prevGroup=groupSel?groupSel.value:'';
+  const cats=new Map();
+  const groups=new Map();
+  GAMES.forEach(g=>{
+    const cat=g.category||'local';
+    const catName=g.categoryName||'직접 추가';
+    cats.set(cat,catName);
+    if(!prevCat || cat===prevCat){
+      const gid=g.groupId||'local';
+      const gname=g.groupName||'직접 추가';
+      groups.set(gid,gname);
+    }
+  });
+  if(catSel){
+    const entries=[...cats.entries()].sort((a,b)=>String(a[1]).localeCompare(String(b[1]),'ko'));
+    catSel.innerHTML='<option value="">전체</option>'+entries.map(([id,name])=>`<option value="${id}">${name}</option>`).join('');
+    if(prevCat && cats.has(prevCat))catSel.value=prevCat;
+  }
+  if(groupSel){
+    const entries=[...groups.entries()].sort((a,b)=>String(a[1]).localeCompare(String(b[1]),'ko'));
+    groupSel.innerHTML='<option value="">전체</option>'+entries.map(([id,name])=>`<option value="${id}">${name}</option>`).join('');
+    if(prevGroup && groups.has(prevGroup))groupSel.value=prevGroup;
+  }
+}
+function onDashCategoryFilterChange(){
+  const groupSel=document.getElementById('dash-group-filter');
+  if(groupSel)groupSel.value='';
+  renderGameDashboard();
+}
+
 // 팀 필터 옵션 채우기
 function _populateDashTeamFilter(){
   const sel=document.getElementById('dash-team-filter');
@@ -2908,9 +3046,12 @@ function _populateDashTeamFilter(){
 
 // 대시보드 메인 렌더
 function renderGameDashboard(){
+  _populateDashMetaFilters();
   _populateDashTeamFilter();
   const grid=document.getElementById('dashboard-grid');
   if(!grid)return;
+  const catFilter=(document.getElementById('dash-category-filter')||{}).value||'';
+  const groupFilter=(document.getElementById('dash-group-filter')||{}).value||'';
   const teamFilter=document.getElementById('dash-team-filter').value;
   const sortMode=document.getElementById('dash-sort').value;
   const search=(document.getElementById('dash-search').value||'').toLowerCase().trim();
@@ -2920,8 +3061,10 @@ function renderGameDashboard(){
     const raw=_parseGameName(g.name);
     return {g,info:{date:raw.date,teamA:_normalizeTeam(raw.teamA),teamB:_normalizeTeam(raw.teamB)}};
   });
+  if(catFilter)list=list.filter(x=>(x.g.category||'local')===catFilter);
+  if(groupFilter)list=list.filter(x=>(x.g.groupId||'local')===groupFilter);
   if(teamFilter)list=list.filter(x=>x.info.teamA===teamFilter||x.info.teamB===teamFilter);
-  if(search)list=list.filter(x=>(x.info.teamA+' '+x.info.teamB).toLowerCase().includes(search));
+  if(search)list=list.filter(x=>(x.info.teamA+' '+x.info.teamB+' '+x.g.name+' '+_gameCategoryLabel(x.g)+' '+_gameGroupLabel(x.g)).toLowerCase().includes(search));
   // 정렬
   list.sort((a,b)=>{
     const da=a.info.date||'', db=b.info.date||'';
@@ -2943,6 +3086,7 @@ function renderGameDashboard(){
           <input type="checkbox" ${isActive?'checked':''} onchange="toggleGame('${g.id}')" style="cursor:pointer;accent-color:var(--amber)">
           ${info.date||'—'}
         </label>
+        <span title="${_gameCategoryLabel(g)} / ${_gameGroupLabel(g)}" style="font-size:9px;color:var(--muted);border:1px solid var(--border);border-radius:3px;padding:1px 5px;max-width:95px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_gameSourceBadge(g)} ${_gameCategoryLabel(g)} · ${_gameGroupLabel(g)}</span>
         <div style="display:flex;gap:4px">
           <button onclick="openGameScoreboard('${g.id}')" title="스코어보드 보기" style="background:transparent;border:1px solid var(--border);color:var(--muted);font-size:10px;padding:3px 8px;border-radius:3px;cursor:pointer;font-family:var(--cond)">📊 상세</button>
           <button onclick="removeGame('${g.id}')" title="삭제" style="background:transparent;border:1px solid var(--border);color:var(--muted);font-size:10px;padding:3px 6px;border-radius:3px;cursor:pointer">✕</button>
@@ -2995,14 +3139,18 @@ function clearAllGames(){
 
 // 전체 선택 / 해제 (현재 필터된 경기 대상)
 function dashActivateAll(on){
+  const catFilter=(document.getElementById('dash-category-filter')||{}).value||'';
+  const groupFilter=(document.getElementById('dash-group-filter')||{}).value||'';
   const teamFilter=document.getElementById('dash-team-filter').value;
   const search=(document.getElementById('dash-search').value||'').toLowerCase().trim();
   GAMES.forEach(g=>{
     const raw=_parseGameName(g.name);
     const info={teamA:_normalizeTeam(raw.teamA),teamB:_normalizeTeam(raw.teamB)};
     let match=true;
+    if(catFilter&&(g.category||'local')!==catFilter)match=false;
+    if(groupFilter&&(g.groupId||'local')!==groupFilter)match=false;
     if(teamFilter&&info.teamA!==teamFilter&&info.teamB!==teamFilter)match=false;
-    if(search&&!(info.teamA+' '+info.teamB).toLowerCase().includes(search))match=false;
+    if(search&&!(info.teamA+' '+info.teamB+' '+g.name+' '+_gameCategoryLabel(g)+' '+_gameGroupLabel(g)).toLowerCase().includes(search))match=false;
     if(match){
       if(on)activeGameIds.add(g.id);
       else activeGameIds.delete(g.id);

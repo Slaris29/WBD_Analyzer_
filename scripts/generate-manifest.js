@@ -10,6 +10,7 @@
 //
 // 1차 폴더는 고정 분류: league, scrim, independent, event, etc
 // 2차 폴더가 있으면 그 2차 폴더명을 분석기 화면의 그룹명으로 사용함.
+// default:true = 분석기 첫 실행 시 서버 전체를 자동 로드함. 내부 대시보드에서 활성/비활성을 전환함.
 
 const fs = require('fs');
 const path = require('path');
