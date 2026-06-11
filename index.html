@@ -27202,18 +27202,16 @@ function toggleGame(gid){
   // V10.2: 카드 미니칩 — 로드된 그룹/페이즈가 다양할 때만 노출 (단일 그룹이면 숨김)
   window._dashChipText = function(g){
     let ph = g.phaseName||'';
-    if(ph && window._dashPhaseVariety>1){
+    if(ph){
       // 축약: 정규시즌→정규, 포스트시즌/Postseason→포스트
-      ph = ph.replace(/정규\s*시즌/,'정규').replace(/포스트\s*시즌/,'포스트').replace(/Postseason/i,'포스트').replace(/Regular/i,'정규');
-      return ph;
+      return ph.replace(/정규\s*시즌/,'정규').replace(/포스트\s*시즌/,'포스트').replace(/Postseason/i,'포스트').replace(/Regular/i,'정규');
     }
     return g.groupName||g.categoryName||'';
   };
   renderGameDashboard = function(){
-    const _gset=new Set(GAMES.map(g=>g.groupId||'local'));
     const _pset=new Set(GAMES.map(g=>g.phaseId||'').filter(Boolean));
     window._dashPhaseVariety=_pset.size;
-    window._dashChip=(_gset.size>1)||(_pset.size>1);
+    window._dashChip=true;  // V10.2: 시즌/그룹 칩 항상 표시 (어떤 경기인지 식별)
     _populateDashMetaFilters();
     _populateDashTeamFilter();
     const grid=document.getElementById('dashboard-grid'); if(!grid)return;
@@ -27244,7 +27242,7 @@ function toggleGame(gid){
       const label=[_gameGroupLabel(g), phaseLabel(g)].filter(Boolean).join(' · ');
       return `<div title="${esc(_gameCategoryLabel(g)+' / '+label+' · '+title)}" style="background:var(--card);${activeStyle};border-radius:6px;padding:10px 12px;transition:all .15s;position:relative">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:6px">
-          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:10px;color:${isActive?'var(--amber)':'var(--muted)'};font-family:var(--mono)"><input type="checkbox" ${isActive?'checked':''} onchange="toggleGame('${g.id}')" style="cursor:pointer;accent-color:var(--amber)"><span style="white-space:nowrap">${info.date||'—'}</span>${window._dashChip?`<span style="font-size:9px;color:var(--muted);border:1px solid var(--border);border-radius:3px;padding:0 5px;max-width:56px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(window._dashChipText(g))}</span>`:''}</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:10px;color:${isActive?'var(--amber)':'var(--muted)'};font-family:var(--mono)"><input type="checkbox" ${isActive?'checked':''} onchange="toggleGame('${g.id}')" style="cursor:pointer;accent-color:var(--amber)"><span style="white-space:nowrap">${info.date||'—'}</span>${window._dashChip?`<span style="font-size:9px;color:var(--muted);border:1px solid var(--border);border-radius:3px;padding:0 5px;max-width:76px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(window._dashChipText(g))}</span>`:''}</label>
           <div style="display:flex;gap:4px;flex-shrink:0">
             <button onclick="openGameScoreboard('${g.id}')" title="스코어보드 보기" style="background:transparent;border:1px solid var(--border);color:var(--muted);font-size:10px;padding:3px 8px;border-radius:3px;cursor:pointer;font-family:var(--cond);white-space:nowrap">📊 상세</button>
             <button onclick="removeGame('${g.id}')" title="목록에서 제거" style="background:transparent;border:1px solid var(--border);color:var(--muted);font-size:10px;padding:3px 6px;border-radius:3px;cursor:pointer">✕</button>
