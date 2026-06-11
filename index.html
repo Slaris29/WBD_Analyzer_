@@ -27885,6 +27885,368 @@ function toggleGame(gid){
   _runAfterActiveChange();
 }
 
+
+
+/* ━━━━━━━━━━ V10.1 SERVER UI PHASE SUPPORT OVERRIDES ━━━━━━━━━━
+   data/league/FW_Season/*.txt            -> FW Season / 정규시즌
+   data/league/FW_Season/Postseason/*.txt -> FW Season / 포스트시즌
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+(function(){
+  function esc(s){
+    if(typeof _wbdEscHtml==='function') return _wbdEscHtml(s);
+    return String(s??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+  }
+  function js(s){ return String(s??'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\n/g,' '); }
+  function safeId(s){ return String(s||'').replace(/[^a-zA-Z0-9가-힣_-]+/g,'_') || 'x'; }
+  function phaseLabel(g){ return g.phaseName || g.phaseId || ''; }
+  window._gamePhaseLabel = phaseLabel;
+  window._gameGroupFullLabel = function(g){
+    const group = _gameGroupLabel(g);
+    const phase = phaseLabel(g);
+    return phase ? `${group} · ${phase}` : group;
+  };
+
+  const oldNormalize = window._normalizeServerManifest || _normalizeServerManifest;
+  _normalizeServerManifest = function(raw){
+    const result = oldNormalize(raw);
+    result.groups = (result.groups||[]).map(g=>{
+      const phases = Array.isArray(g.phases) ? g.phases : [];
+      g.phases = phases;
+      g.seasonId = g.seasonId || g.id;
+      g.seasonName = g.seasonName || g.name;
+      g.files = (g.files||[]).map(f=>({
+        ...f,
+        category: f.category || g.category || '',
+        categoryName: f.categoryName || g.categoryName || '',
+        groupId: f.groupId || g.id || '',
+        groupName: f.groupName || g.name || '',
+        seasonId: f.seasonId || g.seasonId || g.id || '',
+        seasonName: f.seasonName || g.seasonName || g.name || '',
+        phaseId: f.phaseId || '',
+        phaseName: f.phaseName || '',
+        phasePath: f.phasePath || '',
+        phaseKey: f.phaseKey || '',
+      }));
+      return g;
+    });
+    return result;
+  };
+
+  _fileMetaFromGroup = function(g,f){
+    return {
+      ...f,
+      _group:g.name,_groupId:g.id,
+      category:f.category||g.category||'',
+      categoryName:f.categoryName||g.categoryName||'',
+      groupName:f.groupName||g.name||'',
+      groupId:f.groupId||g.id||'',
+      seasonId:f.seasonId||g.seasonId||g.id||'',
+      seasonName:f.seasonName||g.seasonName||g.name||'',
+      phaseId:f.phaseId||'',
+      phaseName:f.phaseName||'',
+      phasePath:f.phasePath||'',
+      phaseKey:f.phaseKey||'',
+      source:'server'
+    };
+  };
+
+  const oldAddGame = addGame;
+  addGame = function(text, filename, meta){
+    const game = oldAddGame(text, filename, meta);
+    meta = meta || {};
+    game.seasonId = meta.seasonId || game.seasonId || game.groupId || '';
+    game.seasonName = meta.seasonName || game.seasonName || game.groupName || '';
+    game.phaseId = meta.phaseId || game.phaseId || '';
+    game.phaseName = meta.phaseName || game.phaseName || '';
+    game.phasePath = meta.phasePath || game.phasePath || '';
+    game.phaseKey = meta.phaseKey || game.phaseKey || '';
+    (game.pitches||[]).forEach(p=>{
+      p._seasonId = game.seasonId;
+      p._seasonName = game.seasonName;
+      p._phaseId = game.phaseId;
+      p._phaseName = game.phaseName;
+      p._phasePath = game.phasePath;
+      p._phaseKey = game.phaseKey;
+    });
+    return game;
+  };
+
+  function ensurePhaseFilter(){
+    const groupSel=document.getElementById('dash-group-filter');
+    if(!groupSel || document.getElementById('dash-phase-filter')) return;
+    const label=document.createElement('span');
+    label.className='filter-label';
+    label.textContent='세부';
+    const sel=document.createElement('select');
+    sel.id='dash-phase-filter';
+    sel.onchange=renderGameDashboard;
+    sel.innerHTML='<option value="">전체</option>';
+    groupSel.insertAdjacentElement('afterend', sel);
+    groupSel.insertAdjacentElement('afterend', label);
+    groupSel.onchange = onDashGroupFilterChange;
+  }
+
+  _populateDashMetaFilters = function(){
+    ensurePhaseFilter();
+    const catSel=document.getElementById('dash-category-filter');
+    const groupSel=document.getElementById('dash-group-filter');
+    const phaseSel=document.getElementById('dash-phase-filter');
+    const prevCat=catSel?catSel.value:'';
+    const prevGroup=groupSel?groupSel.value:'';
+    const prevPhase=phaseSel?phaseSel.value:'';
+    const cats=new Map(), groups=new Map(), phases=new Map();
+    GAMES.forEach(g=>{
+      const cat=g.category||'local';
+      const catName=g.categoryName||(cat==='local'?'직접 추가':cat);
+      cats.set(cat,catName);
+      if(!prevCat || cat===prevCat){
+        const gid=g.groupId||'local';
+        const gname=g.groupName||'직접 추가';
+        groups.set(gid,gname);
+        if((!prevGroup || gid===prevGroup) && g.phaseId){
+          phases.set(g.phaseId, g.phaseName || g.phaseId);
+        }
+      }
+    });
+    const catOrder=['league','scrim','independent','event','etc','local'];
+    if(catSel){
+      const entries=[...cats.entries()].sort((a,b)=>{
+        const ai=catOrder.indexOf(a[0]), bi=catOrder.indexOf(b[0]);
+        return (ai<0?99:ai)-(bi<0?99:bi)||String(a[1]).localeCompare(String(b[1]),'ko');
+      });
+      catSel.innerHTML='<option value="">전체</option>'+entries.map(([id,name])=>`<option value="${esc(id)}">${esc(name)}</option>`).join('');
+      if(prevCat && cats.has(prevCat)) catSel.value=prevCat;
+    }
+    if(groupSel){
+      const entries=[...groups.entries()].sort((a,b)=>String(a[1]).localeCompare(String(b[1]),'ko'));
+      groupSel.innerHTML='<option value="">전체</option>'+entries.map(([id,name])=>`<option value="${esc(id)}">${esc(name)}</option>`).join('');
+      if(prevGroup && groups.has(prevGroup)) groupSel.value=prevGroup;
+    }
+    if(phaseSel){
+      const entries=[...phases.entries()].sort((a,b)=>{
+        const ar=a[0].endsWith('/__regular__')?-1:0, br=b[0].endsWith('/__regular__')?-1:0;
+        return ar-br||String(a[1]).localeCompare(String(b[1]),'ko');
+      });
+      phaseSel.innerHTML='<option value="">전체</option>'+entries.map(([id,name])=>`<option value="${esc(id)}">${esc(name)}</option>`).join('');
+      if(prevPhase && phases.has(prevPhase)) phaseSel.value=prevPhase;
+    }
+  };
+  onDashCategoryFilterChange = function(){
+    const gs=document.getElementById('dash-group-filter');
+    const ps=document.getElementById('dash-phase-filter');
+    if(gs) gs.value='';
+    if(ps) ps.value='';
+    renderGameDashboard();
+  };
+  window.onDashGroupFilterChange = function(){
+    const ps=document.getElementById('dash-phase-filter');
+    if(ps) ps.value='';
+    renderGameDashboard();
+  };
+
+  function runAfter(){
+    rebuildG(); updateNavInfo(); renderGamesList(); populateSelects(); renderActiveContent();
+  }
+  activateMetaScope = function(category, groupId, phaseId, on){
+    if(typeof phaseId === 'boolean'){ on=phaseId; phaseId=''; }
+    GAMES.forEach(g=>{
+      let match=true;
+      if(category && (g.category||'local')!==category) match=false;
+      if(groupId && (g.groupId||'local')!==groupId) match=false;
+      if(phaseId && (g.phaseId||'')!==phaseId) match=false;
+      if(match){ if(on) activeGameIds.add(g.id); else activeGameIds.delete(g.id); }
+    });
+    runAfter();
+  };
+  activateOnlyMetaScope = function(category, groupId, phaseId){
+    activeGameIds.clear();
+    GAMES.forEach(g=>{
+      let match=true;
+      if(category && (g.category||'local')!==category) match=false;
+      if(groupId && (g.groupId||'local')!==groupId) match=false;
+      if(phaseId && (g.phaseId||'')!==phaseId) match=false;
+      if(match) activeGameIds.add(g.id);
+    });
+    runAfter();
+  };
+  setDashboardGroupFilter = function(gid){
+    ensurePhaseFilter();
+    const group=document.getElementById('dash-group-filter');
+    const phase=document.getElementById('dash-phase-filter');
+    if(group) group.value=gid||'';
+    if(phase) phase.value='';
+    renderGameDashboard();
+  };
+  window.setDashboardPhaseFilter = function(pid){
+    ensurePhaseFilter();
+    const phase=document.getElementById('dash-phase-filter');
+    if(phase) phase.value=pid||'';
+    renderGameDashboard();
+  };
+
+  renderGamesOverview = function(){
+    const el=document.getElementById('games-overview');
+    if(!el)return;
+    if(!GAMES.length){el.style.display='none';return;}
+    el.style.display='block';
+    const total=GAMES.length;
+    const active=GAMES.filter(g=>activeGameIds.has(g.id)).length;
+    const totalP=GAMES.reduce((s,g)=>s+(g.pitches?g.pitches.length:0),0);
+    const activeP=G.length;
+    const server=GAMES.filter(g=>g.source==='server').length;
+    const local=GAMES.filter(g=>g.source!=='server').length;
+    const cats=new Map(), groups=new Map(), phases=new Map();
+    GAMES.forEach(g=>{
+      const cat=g.category||'local';
+      const catName=g.categoryName||(cat==='local'?'직접 추가':cat);
+      if(!cats.has(cat)) cats.set(cat,{id:cat,name:catName,total:0,active:0,pitches:0});
+      const c=cats.get(cat); c.total++; c.pitches+=(g.pitches||[]).length; if(activeGameIds.has(g.id))c.active++;
+      const gid=g.groupId||'local';
+      const gname=g.groupName||(gid==='local'?'직접 추가':gid);
+      if(!groups.has(gid)) groups.set(gid,{id:gid,name:gname,category:cat,categoryName:catName,total:0,active:0,pitches:0,phases:new Map()});
+      const gr=groups.get(gid); gr.total++; gr.pitches+=(g.pitches||[]).length; if(activeGameIds.has(g.id))gr.active++;
+      if(g.phaseId){
+        if(!gr.phases.has(g.phaseId)) gr.phases.set(g.phaseId,{id:g.phaseId,name:g.phaseName||g.phaseId,total:0,active:0});
+        const p=gr.phases.get(g.phaseId); p.total++; if(activeGameIds.has(g.id))p.active++;
+      }
+    });
+    const catFilter=(document.getElementById('dash-category-filter')||{}).value||'';
+    const groupFilter=(document.getElementById('dash-group-filter')||{}).value||'';
+    const phaseFilter=(document.getElementById('dash-phase-filter')||{}).value||'';
+    const catOrder=['league','scrim','independent','event','etc','local'];
+    const catCards=[...cats.values()].sort((a,b)=>{
+      const ai=catOrder.indexOf(a.id), bi=catOrder.indexOf(b.id);
+      return (ai<0?99:ai)-(bi<0?99:bi)||a.name.localeCompare(b.name,'ko');
+    }).map(c=>{
+      const pct=c.total?Math.round(c.active/c.total*100):0;
+      return `<div class="dhf-cat ${catFilter===c.id?'active':''}" onclick="setDashboardCategoryFilter('${js(c.id)}')">
+        <div class="dhf-cat-title"><b>${esc(c.name)}</b><span>${c.active}/${c.total}</span></div>
+        <div class="dhf-cat-sub">${c.pitches.toLocaleString()}투구 · ${pct}% 활성</div>
+        <div class="dhf-progress"><span style="width:${pct}%"></span></div>
+        <div class="dhf-actions" onclick="event.stopPropagation()">
+          <button class="dhf-btn" onclick="activateMetaScope('${js(c.id)}','','',true)">켜기</button>
+          <button class="dhf-btn" onclick="activateMetaScope('${js(c.id)}','','',false)">끄기</button>
+          <button class="dhf-btn" onclick="activateOnlyMetaScope('${js(c.id)}','','')">이것만</button>
+        </div>
+      </div>`;
+    }).join('');
+    const groupCards=[...groups.values()].sort((a,b)=>String(a.name).localeCompare(String(b.name),'ko')).map(g=>{
+      const pct=g.total?Math.round(g.active/g.total*100):0;
+      const phaseRows=[...g.phases.values()].sort((a,b)=>{
+        const ar=a.id.endsWith('/__regular__')?-1:0, br=b.id.endsWith('/__regular__')?-1:0;
+        return ar-br||String(a.name).localeCompare(String(b.name),'ko');
+      }).map(p=>{
+        const checked=p.active===p.total && p.total>0;
+        const mixed=p.active>0 && p.active<p.total;
+        return `<label class="dhf-phase ${phaseFilter===p.id?'active':''}" title="${esc(p.name)}">
+          <input type="checkbox" ${checked?'checked':''} onchange="activateMetaScope('', '', '${js(p.id)}', this.checked)">
+          <span onclick="event.preventDefault();setDashboardPhaseFilter('${js(p.id)}')">${esc(p.name)}</span>
+          <em>${p.active}/${p.total}</em>
+          <button type="button" onclick="event.preventDefault();event.stopPropagation();activateOnlyMetaScope('', '', '${js(p.id)}')">이것만</button>
+        </label>`;
+      }).join('');
+      return `<div class="dhf-group ${groupFilter===g.id?'active':''}">
+        <div class="dhf-group-top" onclick="setDashboardGroupFilter('${js(g.id)}')">
+          <div><b>${esc(g.name)}</b><span>${esc(g.categoryName)}</span></div><strong>${g.active}/${g.total}</strong>
+        </div>
+        <div class="dhf-progress"><span style="width:${pct}%"></span></div>
+        <div class="dhf-actions">
+          <button class="dhf-btn" onclick="activateMetaScope('', '${js(g.id)}','', true)">켜기</button>
+          <button class="dhf-btn" onclick="activateMetaScope('', '${js(g.id)}','', false)">끄기</button>
+          <button class="dhf-btn" onclick="activateOnlyMetaScope('', '${js(g.id)}','')">이것만</button>
+          <button class="dhf-btn" onclick="setDashboardGroupFilter('${js(g.id)}')">보기</button>
+        </div>
+        ${phaseRows?`<div class="dhf-phase-wrap">${phaseRows}</div>`:''}
+      </div>`;
+    }).join('');
+    el.innerHTML=`<div class="dhf-hub">
+      <div class="dhf-head">
+        <div><div class="dhf-title">☁ 데이터 컨트롤 센터</div><div class="dhf-sub">모든 서버 DB를 로드한 뒤, 여기서 리그/시즌/정규·포스트시즌을 동시에 켜고 끕니다.</div></div>
+        <div class="dhf-actions"><button class="dhf-btn primary" onclick="dashActivateAll(true)">현재 보기 전체 활성</button><button class="dhf-btn" onclick="dashActivateAll(false)">현재 보기 비활성</button><button class="dhf-btn" onclick="activateRecentDays(30)">최근 30일</button><button class="dhf-btn" onclick="openServerLibraryModal()">서버 관리</button></div>
+      </div>
+      <div class="dhf-kpis"><div><span>로드 경기</span><b>${total}</b><em>서버 ${server} · 직접 ${local}</em></div><div><span>활성 경기</span><b>${active}</b><em>${total?Math.round(active/total*100):0}% 선택</em></div><div><span>전체 투구</span><b>${totalP.toLocaleString()}</b><em>DB 원본</em></div><div><span>활성 투구</span><b>${activeP.toLocaleString()}</b><em>분석 반영</em></div><div><span>그룹</span><b>${groups.size}</b><em>시즌/대회</em></div></div>
+      <div class="dhf-label">분류</div><div class="dhf-cat-grid">${catCards}</div>
+      <div class="dhf-label">시즌/대회 그룹 · 세부 구분</div><div class="dhf-group-grid">${groupCards}</div>
+    </div>`;
+  };
+
+  renderGameDashboard = function(){
+    _populateDashMetaFilters();
+    _populateDashTeamFilter();
+    const grid=document.getElementById('dashboard-grid'); if(!grid)return;
+    const catFilter=(document.getElementById('dash-category-filter')||{}).value||'';
+    const groupFilter=(document.getElementById('dash-group-filter')||{}).value||'';
+    const phaseFilter=(document.getElementById('dash-phase-filter')||{}).value||'';
+    const teamFilter=(document.getElementById('dash-team-filter')||{}).value||'';
+    const sortMode=(document.getElementById('dash-sort')||{}).value||'date-desc';
+    const search=((document.getElementById('dash-search')||{}).value||'').toLowerCase().trim();
+    let list=GAMES.slice().map(g=>({g,info:_gameDisplayInfo(g)}));
+    if(catFilter) list=list.filter(x=>(x.g.category||'local')===catFilter);
+    if(groupFilter) list=list.filter(x=>(x.g.groupId||'local')===groupFilter);
+    if(phaseFilter) list=list.filter(x=>(x.g.phaseId||'')===phaseFilter);
+    if(teamFilter) list=list.filter(x=>x.info.teamA===teamFilter||x.info.teamB===teamFilter);
+    if(search) list=list.filter(x=>(x.info.teamA+' '+x.info.teamB+' '+x.info.title+' '+x.g.name+' '+_gameCategoryLabel(x.g)+' '+_gameGroupLabel(x.g)+' '+phaseLabel(x.g)).toLowerCase().includes(search));
+    list.sort((a,b)=>{
+      const da=a.info.date||'', db=b.info.date||'';
+      return sortMode==='date-asc'?da.localeCompare(db):db.localeCompare(da);
+    });
+    grid.innerHTML=list.map(({g,info})=>{
+      const isActive=activeGameIds.has(g.id);
+      const {totalA,totalB,hA,hB}=_computeInningScores(g.pitches);
+      const winA=totalA>totalB, winB=totalB>totalA;
+      const aColor=winA?'#ff6b6b':winB?'#7b8796':'#cbd5e1';
+      const bColor=winB?'#6bb5ff':winA?'#7b8796':'#cbd5e1';
+      const activeStyle=isActive?'border-color:var(--amber);box-shadow:0 0 0 1px rgba(245,166,35,.32),0 7px 18px rgba(0,0,0,.18);opacity:1':'border-color:var(--border);opacity:.50';
+      const title=info.knownTeams?`${info.teamA} vs ${info.teamB}`:info.title;
+      const label=[_gameGroupLabel(g), phaseLabel(g)].filter(Boolean).join(' · ');
+      return `<div style="background:var(--card);border:1px solid var(--border);${activeStyle};border-radius:10px;padding:11px 12px;transition:all .15s;position:relative;min-height:132px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:6px">
+          <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:11px;color:${isActive?'var(--amber)':'var(--muted)'};font-family:var(--mono);min-width:92px"><input type="checkbox" ${isActive?'checked':''} onchange="toggleGame('${g.id}')" style="cursor:pointer;accent-color:var(--amber)">${info.date||'날짜 없음'}</label>
+          <span title="${esc(_gameCategoryLabel(g)+' / '+label)}" class="dhf-badge">${_gameSourceBadge(g)} ${esc(label)}</span>
+          <button onclick="openGameScoreboard('${g.id}')" title="스코어보드 보기" class="dhf-btn" style="padding:3px 8px;font-size:10px">상세</button>
+        </div>
+        <div title="${esc(title)}" style="font-size:10px;color:var(--muted);margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(_gameCategoryLabel(g))} · ${esc(label)} · ${esc(title)}</div>
+        ${info.knownTeams?`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><span class="game-team-name" style="font-size:13px;color:${aColor};font-weight:${winA?800:600};max-width:210px">${winA?'🏆 ':''}${esc(info.teamA)}</span><span style="font-size:22px;font-family:var(--mono);color:${aColor};font-weight:${winA?800:600}">${totalA}</span></div><div style="display:flex;justify-content:space-between;align-items:center"><span class="game-team-name" style="font-size:13px;color:${bColor};font-weight:${winB?800:600};max-width:210px">${winB?'🏆 ':''}${esc(info.teamB)}</span><span style="font-size:22px;font-family:var(--mono);color:${bColor};font-weight:${winB?800:600}">${totalB}</span></div>`:`<div style="font-size:13px;color:var(--text);font-weight:800;line-height:1.35;height:36px;overflow:hidden">${esc(info.title)}</div><div style="margin-top:4px;font-size:11px;color:var(--muted)">스코어 ${totalA} : ${totalB}</div>`}
+        <div style="margin-top:8px;padding-top:7px;border-top:1px solid var(--border);font-size:10px;color:var(--muted);font-family:var(--mono);display:flex;justify-content:space-between"><span>H ${hA}-${hB}</span><span>${g.pitches.length}투구</span></div>
+      </div>`;
+    }).join('');
+    if(list.length===0) grid.innerHTML='<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px;grid-column:1/-1">조건에 맞는 경기가 없어요</div>';
+    const activeCnt=list.filter(x=>activeGameIds.has(x.g.id)).length;
+    const el=document.getElementById('dashboard-summary');
+    if(el) el.textContent=`${activeCnt} / ${list.length} 경기 활성  ·  전체 ${GAMES.length}경기 · 활성 투구 ${G.length}개`;
+  };
+
+  dashActivateAll = function(on){
+    const catFilter=(document.getElementById('dash-category-filter')||{}).value||'';
+    const groupFilter=(document.getElementById('dash-group-filter')||{}).value||'';
+    const phaseFilter=(document.getElementById('dash-phase-filter')||{}).value||'';
+    const teamFilter=(document.getElementById('dash-team-filter')||{}).value||'';
+    const search=((document.getElementById('dash-search')||{}).value||'').toLowerCase().trim();
+    GAMES.forEach(g=>{
+      const info=_gameDisplayInfo(g);
+      let match=true;
+      if(catFilter&&(g.category||'local')!==catFilter)match=false;
+      if(groupFilter&&(g.groupId||'local')!==groupFilter)match=false;
+      if(phaseFilter&&(g.phaseId||'')!==phaseFilter)match=false;
+      if(teamFilter&&info.teamA!==teamFilter&&info.teamB!==teamFilter)match=false;
+      if(search&&!(info.teamA+' '+info.teamB+' '+info.title+' '+g.name+' '+_gameCategoryLabel(g)+' '+_gameGroupLabel(g)+' '+phaseLabel(g)).toLowerCase().includes(search))match=false;
+      if(match){ if(on)activeGameIds.add(g.id); else activeGameIds.delete(g.id); }
+    });
+    runAfter();
+  };
+
+  // CSS는 맨 아래에서 강제로 추가해서 이전 스타일과 충돌하지 않게 함
+  const css=document.createElement('style');
+  css.textContent=`
+    .dhf-hub{background:linear-gradient(135deg,rgba(9,23,42,.96),rgba(11,31,54,.88));border:1px solid var(--border);border-radius:12px;padding:18px;box-shadow:0 10px 30px rgba(0,0,0,.22)}
+    .dhf-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:14px}.dhf-title{font-size:18px;font-weight:900;color:var(--amber);letter-spacing:.8px}.dhf-sub{font-size:12px;color:var(--muted);margin-top:4px}.dhf-actions{display:flex;gap:7px;flex-wrap:wrap}.dhf-btn{background:rgba(255,255,255,.035);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:7px 11px;font-size:12px}.dhf-btn:hover{border-color:var(--amber);color:var(--amber)}.dhf-btn.primary{background:var(--amber);color:#111;border-color:var(--amber)}
+    .dhf-kpis{display:grid;grid-template-columns:repeat(5,minmax(120px,1fr));gap:10px;margin:12px 0 16px}.dhf-kpis>div{background:rgba(3,12,24,.55);border:1px solid var(--border);border-radius:9px;padding:12px;text-align:center}.dhf-kpis span{display:block;font-size:10px;color:var(--muted);letter-spacing:.8px}.dhf-kpis b{display:block;font-family:var(--mono);font-size:25px;color:var(--amber);margin-top:4px}.dhf-kpis em{display:block;font-style:normal;font-size:10px;color:var(--muted);margin-top:2px}.dhf-label{font-size:11px;color:#88ccff;font-weight:800;letter-spacing:1px;margin:14px 0 8px;text-transform:uppercase}
+    .dhf-cat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));gap:10px}.dhf-cat,.dhf-group{background:rgba(5,13,25,.72);border:1px solid var(--border);border-radius:10px;padding:12px;cursor:pointer;transition:.15s}.dhf-cat:hover,.dhf-group:hover{border-color:rgba(245,166,35,.6)}.dhf-cat.active,.dhf-group.active{border-color:var(--amber);box-shadow:0 0 0 1px rgba(245,166,35,.25)}.dhf-cat-title,.dhf-group-top{display:flex;justify-content:space-between;gap:10px;align-items:center}.dhf-cat-title b,.dhf-group-top b{color:var(--text);font-size:14px}.dhf-cat-title span,.dhf-group-top strong{font-family:var(--mono);color:var(--amber);font-size:13px}.dhf-cat-sub{font-size:11px;color:var(--muted);margin-top:5px}.dhf-progress{height:5px;background:rgba(255,255,255,.06);border-radius:999px;overflow:hidden;margin-top:9px}.dhf-progress span{display:block;height:100%;background:linear-gradient(90deg,var(--amber),#39ff8a);border-radius:999px}.dhf-group-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:10px}.dhf-group-top span{display:block;color:var(--muted);font-size:10px;margin-top:2px}.dhf-phase-wrap{display:flex;flex-direction:column;gap:6px;margin-top:10px}.dhf-phase{display:flex;align-items:center;gap:7px;background:rgba(255,255,255,.035);border:1px solid var(--border);border-radius:7px;padding:7px 8px;cursor:pointer}.dhf-phase.active{border-color:#88ccff;background:rgba(136,204,255,.08)}.dhf-phase span{flex:1;font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.dhf-phase em{font-style:normal;font-family:var(--mono);font-size:11px;color:var(--amber)}.dhf-phase button{background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:5px;padding:3px 7px;font-size:10px}.dhf-badge{font-size:9px;color:var(--muted);border:1px solid var(--border);border-radius:999px;padding:2px 7px;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    @media(max-width:900px){.dhf-kpis{grid-template-columns:repeat(2,1fr)}.dhf-group-grid{grid-template-columns:1fr}.dhf-cat-grid{grid-template-columns:1fr}}
+  `;
+  document.head.appendChild(css);
+})();
+
 </script>
 </body>
 </html>
