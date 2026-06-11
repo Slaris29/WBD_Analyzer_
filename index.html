@@ -27198,7 +27198,22 @@ function toggleGame(gid){
     </div>`;
   };
 
+
+  // V10.2: 카드 미니칩 — 로드된 그룹/페이즈가 다양할 때만 노출 (단일 그룹이면 숨김)
+  window._dashChipText = function(g){
+    let ph = g.phaseName||'';
+    if(ph && window._dashPhaseVariety>1){
+      // 축약: 정규시즌→정규, 포스트시즌/Postseason→포스트
+      ph = ph.replace(/정규\s*시즌/,'정규').replace(/포스트\s*시즌/,'포스트').replace(/Postseason/i,'포스트').replace(/Regular/i,'정규');
+      return ph;
+    }
+    return g.groupName||g.categoryName||'';
+  };
   renderGameDashboard = function(){
+    const _gset=new Set(GAMES.map(g=>g.groupId||'local'));
+    const _pset=new Set(GAMES.map(g=>g.phaseId||'').filter(Boolean));
+    window._dashPhaseVariety=_pset.size;
+    window._dashChip=(_gset.size>1)||(_pset.size>1);
     _populateDashMetaFilters();
     _populateDashTeamFilter();
     const grid=document.getElementById('dashboard-grid'); if(!grid)return;
@@ -27227,11 +27242,13 @@ function toggleGame(gid){
       const activeStyle=isActive?'border-color:var(--amber);box-shadow:0 0 0 1px rgba(245,166,35,.32),0 7px 18px rgba(0,0,0,.18);opacity:1':'border-color:var(--border);opacity:.50';
       const title=info.knownTeams?`${info.teamA} vs ${info.teamB}`:info.title;
       const label=[_gameGroupLabel(g), phaseLabel(g)].filter(Boolean).join(' · ');
-      return `<div style="background:var(--card);border:1px solid var(--border);${activeStyle};border-radius:10px;padding:11px 12px;transition:all .15s;position:relative;min-height:132px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:6px">
-          <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:11px;color:${isActive?'var(--amber)':'var(--muted)'};font-family:var(--mono);min-width:92px"><input type="checkbox" ${isActive?'checked':''} onchange="toggleGame('${g.id}')" style="cursor:pointer;accent-color:var(--amber)">${info.date||'날짜 없음'}</label>
-          <span title="${esc(_gameCategoryLabel(g)+' / '+label+' · '+title)}" style="font-size:9.5px;color:var(--muted);font-family:var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px;border:1px solid var(--border);border-radius:3px;padding:1px 6px">${esc(label)}</span>
-          <button onclick="openGameScoreboard('${g.id}')" title="스코어보드 보기" class="dhf-btn" style="padding:3px 8px;font-size:10px">상세</button>
+      return `<div title="${esc(_gameCategoryLabel(g)+' / '+label+' · '+title)}" style="background:var(--card);${activeStyle};border-radius:6px;padding:10px 12px;transition:all .15s;position:relative">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:6px">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:10px;color:${isActive?'var(--amber)':'var(--muted)'};font-family:var(--mono)"><input type="checkbox" ${isActive?'checked':''} onchange="toggleGame('${g.id}')" style="cursor:pointer;accent-color:var(--amber)"><span style="white-space:nowrap">${info.date||'—'}</span>${window._dashChip?`<span style="font-size:9px;color:var(--muted);border:1px solid var(--border);border-radius:3px;padding:0 5px;max-width:56px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(window._dashChipText(g))}</span>`:''}</label>
+          <div style="display:flex;gap:4px;flex-shrink:0">
+            <button onclick="openGameScoreboard('${g.id}')" title="스코어보드 보기" style="background:transparent;border:1px solid var(--border);color:var(--muted);font-size:10px;padding:3px 8px;border-radius:3px;cursor:pointer;font-family:var(--cond);white-space:nowrap">📊 상세</button>
+            <button onclick="removeGame('${g.id}')" title="목록에서 제거" style="background:transparent;border:1px solid var(--border);color:var(--muted);font-size:10px;padding:3px 6px;border-radius:3px;cursor:pointer">✕</button>
+          </div>
         </div>
         ${info.knownTeams?`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><span class="game-team-name" style="font-size:13px;color:${aColor};font-weight:${winA?800:600};max-width:210px">${winA?'🏆 ':''}${esc(info.teamA)}</span><span style="font-size:22px;font-family:var(--mono);color:${aColor};font-weight:${winA?800:600}">${totalA}</span></div><div style="display:flex;justify-content:space-between;align-items:center"><span class="game-team-name" style="font-size:13px;color:${bColor};font-weight:${winB?800:600};max-width:210px">${winB?'🏆 ':''}${esc(info.teamB)}</span><span style="font-size:22px;font-family:var(--mono);color:${bColor};font-weight:${winB?800:600}">${totalB}</span></div>`:`<div style="font-size:13px;color:var(--text);font-weight:800;line-height:1.35;height:36px;overflow:hidden">${esc(info.title)}</div><div style="margin-top:4px;font-size:11px;color:var(--muted)">스코어 ${totalA} : ${totalB}</div>`}
         <div style="margin-top:8px;padding-top:7px;border-top:1px solid var(--border);font-size:10px;color:var(--muted);font-family:var(--mono);display:flex;justify-content:space-between"><span>H ${hA}-${hB}</span><span>${g.pitches.length}투구</span></div>
