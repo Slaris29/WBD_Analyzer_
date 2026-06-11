@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <!-- V10.1: 외부 이미지(WBD 프로필) hotlinking 방지 우회 - Referer 헤더 차단 -->
 <meta name="referrer" content="no-referrer">
-<title>WBD Baseball Analyzer V10.1 Server UI</title>
+<title>WBD Baseball Analyzer V10.2</title>
 <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -456,16 +456,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
 <!-- ════ UPLOAD PAGE ════ -->
 <div id="upload-page">
   <div class="logo-big">WBD</div>
-  <div class="logo-sub">BASEBALL ANALYZER · V10.1-SERVER-UI-FINAL-FINAL</div>
-  <div id="drop-zone">
-    <svg width="48" height="48" viewBox="0 0 48 48" fill="none"><rect x="8" y="6" width="32" height="36" rx="3" stroke="#5a7a9a" stroke-width="2"/><path d="M16 18h16M16 24h16M16 30h10" stroke="#5a7a9a" stroke-width="1.5" stroke-linecap="round"/><path d="M30 34l4-4 4 4M34 30v10" stroke="#f5a623" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    <div class="drop-title">CSV / TXT 파일을 드롭하세요</div>
-    <div class="drop-sub">WBD 경기 로그 파일 (.csv, .txt) — 여러 파일 동시 선택 가능</div>
-    <div class="btn-row">
-      <button class="btn-primary" onclick="document.getElementById('file-input').click()">📁 파일 선택</button>
-    </div>
-  </div>
-  <div id="server-library-box" style="width:100%;max-width:560px;margin-top:16px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:16px;display:none">
+  <div class="logo-sub">BASEBALL ANALYZER · V10.2</div>
+  <div id="server-library-box" style="width:100%;max-width:600px;margin-bottom:18px;background:var(--card);border:1px solid rgba(245,166,35,0.4);border-radius:10px;padding:18px;display:none;box-shadow:0 0 24px rgba(245,166,35,0.06)">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;flex-wrap:wrap">
       <div>
         <div style="font-size:13px;font-weight:700;letter-spacing:1px;color:var(--amber);text-transform:uppercase">☁ 서버 경기 데이터</div>
@@ -481,6 +473,15 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
       <button class="btn-secondary" onclick="document.getElementById('file-input').click()" style="font-size:12px;padding:8px 14px">내 CSV 사용</button>
     </div>
   </div>
+  <div style="display:flex;align-items:center;gap:12px;width:100%;max-width:600px;margin:4px 0 14px"><div style="flex:1;height:1px;background:var(--border)"></div><span style="font-size:11px;color:var(--muted);letter-spacing:1px">또는 직접 업로드</span><div style="flex:1;height:1px;background:var(--border)"></div></div>
+  <div id="drop-zone">
+    <svg width="48" height="48" viewBox="0 0 48 48" fill="none"><rect x="8" y="6" width="32" height="36" rx="3" stroke="#5a7a9a" stroke-width="2"/><path d="M16 18h16M16 24h16M16 30h10" stroke="#5a7a9a" stroke-width="1.5" stroke-linecap="round"/><path d="M30 34l4-4 4 4M34 30v10" stroke="#f5a623" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <div class="drop-title">CSV / TXT 파일을 드롭하세요</div>
+    <div class="drop-sub">WBD 경기 로그 파일 (.csv, .txt) — 여러 파일 동시 선택 가능</div>
+    <div class="btn-row">
+      <button class="btn-primary" onclick="document.getElementById('file-input').click()">📁 파일 선택</button>
+    </div>
+  </div>
   <input type="file" id="file-input" accept=".csv,.txt" multiple>
   <div id="file-info"></div>
   <div id="upload-error"></div>
@@ -491,7 +492,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
   <!-- 모바일 전용 상단 바 (햄버거) -->
   <div id="mobile-topbar" style="display:none">
     <button id="hamburger-btn" onclick="toggleMobileMenu()" aria-label="메뉴">☰</button>
-    <div class="mobile-logo">WBD <span style="font-size:10px;color:var(--muted);margin-left:2px">V10.1-SERVER-UI-FINAL</span></div>
+    <div class="mobile-logo">WBD <span style="font-size:10px;color:var(--muted);margin-left:2px">V10.2</span></div>
     <button class="mobile-icon-btn" onclick="openGlobalSearch()" title="검색">🔍</button>
     <button class="mobile-icon-btn" onclick="document.getElementById('add-file-input').click()" title="경기 추가" style="color:var(--amber)">+</button>
   </div>
@@ -547,7 +548,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
         <button class="mobile-menu-btn" onclick="closeMobileMenu();openPresetModal()">💾 프리셋</button>
         <button class="mobile-menu-btn" onclick="closeMobileMenu();openThemeModal()">🎨 테마</button>
         <button class="mobile-menu-btn" onclick="closeMobileMenu();openShortcutsModal()">⌨️ 단축키</button>
-        <button class="mobile-menu-btn" onclick="closeMobileMenu();openChangelogModal()" style="background:linear-gradient(90deg,rgba(204,68,255,.15),transparent);color:#cc44ff;font-weight:700">📋 업데이트 내역 (V10.1 NEW!)</button>
+        <button class="mobile-menu-btn" onclick="closeMobileMenu();openChangelogModal()" style="background:linear-gradient(90deg,rgba(204,68,255,.15),transparent);color:#cc44ff;font-weight:700">📋 업데이트 내역 (V10.2 NEW!)</button>
         <button class="mobile-menu-btn" onclick="closeMobileMenu();document.getElementById('add-file-input').click()" style="color:var(--amber)">+ 경기 추가</button>
         <button class="mobile-menu-btn" onclick="closeMobileMenu();openServerLibraryModal()" style="color:#88ccff">☁ 서버 경기 추가</button>
         <button class="mobile-menu-btn" onclick="closeMobileMenu();clearAllGames()" style="color:#ff4560">🗑️ 모든 경기 제거</button>
@@ -556,7 +557,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
   </div>
 
   <div id="topnav">
-    <div class="nav-logo">WBD <span style="font-size:11px;color:var(--muted);letter-spacing:1px;margin-left:4px">V10.1-SERVER-UI-FINAL</span></div>
+    <div class="nav-logo">WBD <span style="font-size:11px;color:var(--muted);letter-spacing:1px;margin-left:4px">V10.2</span></div>
     <button class="nav-btn active" onclick="showPage('home')">🏠 홈</button>
     <button class="nav-btn" onclick="showPage('pitcher')">⚾ 투수</button>
     <button class="nav-btn" onclick="showPage('batter')">🏏 타자</button>
@@ -12244,6 +12245,18 @@ function openThemeModal(){
 //   - 버저닝: V9.x (소수점) → 누적되면 V10
 //   - title은 한 줄 핵심 요약, changes는 항목별 (icon + text)
 const CHANGELOG = [
+  {
+    version: 'V10.2',
+    date: '2026-06',
+    title: '☁️ GitHub 서버 데이터 자동 로드 + 📂 카테고리/시즌 스코프 시스템',
+    badge: '#88ccff',
+    changes: [
+      {icon:'☁️', text:'⭐⭐⭐ <b>(NEW) GitHub 서버 CSV 자동 로드</b> — GitHub 저장소 <code>data/league/시즌명/</code> 등 폴더에 CSV를 넣으면 GitHub Actions가 manifest를 자동 생성하고, 사이트 접속 시 <b>전체 경기를 자동으로 불러옵니다</b>. 더 이상 매번 파일 업로드 불필요. 병렬 다운로드(동시 8) + 번들 묶음 파일로 로딩 속도 최적화'},
+      {icon:'📂', text:'⭐⭐⭐ <b>(NEW) 카테고리/그룹 스코프 시스템</b> — 리그전/일반 스크림/독립팀/이벤트리그/기타 카테고리와 시즌 그룹별로 데이터를 관리. 대시보드에서 카테고리·그룹·기간(최근 N일) 필터로 원하는 범위만 활성화해서 분석 가능'},
+      {icon:'📊', text:'⭐⭐ <b>경기 목록 메타 표시</b> — 각 경기에 출처(서버/로컬)·카테고리·그룹 배지 표시. 서버 경기와 직접 올린 경기를 한눈에 구분'},
+      {icon:'🔧', text:'⭐ <b>인프라</b> — GitHub Actions 워크플로(data 폴더 변경 시 manifest 자동 갱신), 번들 생성 스크립트, GitHub Pages 배포 구조'},
+    ]
+  },
   {
     version: 'V10.1',
     date: '2026-05',
@@ -25170,7 +25183,7 @@ function exportAnalyticsBundle(opts){
   // 1) 메타 정보
   const meta={
     generatedAt:new Date().toISOString(),
-    appVersion:'V10.1',
+    appVersion:'V10.2',
     schemaVersion:8,
     schemaChanges:{
       v8_changes:[
@@ -25786,7 +25799,7 @@ function exportFullBackup(){
   // 풀 분석 데이터
   const data={
     generatedAt:new Date().toISOString(),
-    appVersion:'V10.1',
+    appVersion:'V10.2',
     schemaVersion:2,
     
     // 메타 정보
