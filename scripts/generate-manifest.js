@@ -54,8 +54,9 @@ function niceNameFromPathPart(part) {
 function fileToItem(full) {
   const rel = toPosix(path.relative(ROOT, full));
   const st = fs.statSync(full);
-  const base = path.basename(full).replace(/\.(csv|txt)$/i, '');
-  return { name: base, path: rel, size: st.size, updatedAt: st.mtime.toISOString() };
+  const fileName = path.basename(full);
+  const base = fileName.replace(/\.(csv|txt)$/i, '');
+  return { name: base, fileName, path: rel, size: st.size, updatedAt: st.mtime.toISOString() };
 }
 function groupKeyFromFile(full) {
   const relFromData = toPosix(path.relative(DATA_DIR, full));
