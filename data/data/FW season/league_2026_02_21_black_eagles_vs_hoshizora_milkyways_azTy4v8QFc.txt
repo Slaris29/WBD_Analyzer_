@@ -1,0 +1,2 @@
+pitchNo,pName,bName,inn,bZone,result,1BSafe,cx,cz,lx,lz,ev,ldeg,scoreA,scoreB,hSec
+1,Forfeit,Forfeit,1,R,0,0,0,0,0,0,0,0,0,0,0
