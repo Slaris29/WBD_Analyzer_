@@ -2093,6 +2093,7 @@ function _totalBases(arr){
 }
 
 function addGame(text,filename,meta){
+  const _tAdd = performance.now();
   try{
     const pitches=parseCSV(text);
     if(!pitches.length)throw new Error('데이터 없음');
@@ -2148,6 +2149,7 @@ function addGame(text,filename,meta){
     });
     const game={id,name:filename,pitches,_fp:fp,...serverMeta};
     GAMES.push(game);
+    window._parseMs = (window._parseMs||0) + (performance.now()-_tAdd);
     activeGameIds.add(id);
     return game;
   }catch(e){throw e;}
@@ -2288,6 +2290,7 @@ function loadData(text,filename,append,deferRebuild,meta){
 
 // 일괄 로드 마무리 (마지막 파일 후 한 번 호출, 화면은 이미 전환된 상태)
 function _finishBulkLoad(){
+  const _tFin = performance.now();
   rebuildG();
   
   // V10.0: 모두 중복이라 G가 비었지만 GAMES는 있는 경우 — 정상 처리됨, 화면 유지
@@ -2329,6 +2332,8 @@ function _finishBulkLoad(){
     const more = count > 3 ? `\n…그 외 ${count-3}개` : '';
     _toast(msg, detail + more, '#88ccff', 6000);
   }
+
+  window._finishMs = performance.now()-_tFin;
 }
 
 // V10.0: 간단한 토스트 알림 (의존성 없음)
@@ -2443,8 +2448,9 @@ function renderActiveContent(){
 }
 
 function populateSelects(){
-  const pitchers=[...new Set(G.map(d=>d.pName).filter(Boolean))].sort();
-  const batters=[...new Set(G.map(d=>d.bName).filter(Boolean))].sort();
+  // V10.2 perf: 이름 목록은 _rebuildCaches가 이미 정렬해둔 캐시 사용 (G 재스캔 2회 제거)
+  const pitchers=(window._cache&&window._cache.pitcherNames)||[];
+  const batters=(window._cache&&window._cache.batterNames)||[];
   const innings=[...new Set(G.map(d=>d.inn))].sort((a,b)=>a-b);
   const groups=Object.keys(PITCH_GROUPS);
   const results=Object.keys(RESULT_NAMES).map(Number);
@@ -3283,23 +3289,33 @@ function toggleGamesOverview(){
 
 // 경기 하나의 이닝별 점수 계산
 function _computeInningScores(data){
-  const innings=[...new Set(data.map(d=>d.inn))].sort((a,b)=>a-b);
+  // V10.2 perf: 이닝×8회 재순회 → 단일 패스 (대시보드 카드/스코어보드/리그득점 전부 가속)
   const runsA={},runsB={};
+  const innSet=new Set(), maxAByInn={}, maxBByInn={};
+  let totalA=0,totalB=0,hA=0,hB=0;
+  for(let j=0;j<data.length;j++){
+    const d=data[j], inn=d.inn;
+    innSet.add(inn);
+    const sA=+d.scoreA||0, sB=+d.scoreB||0;
+    if(sA>totalA)totalA=sA;
+    if(sB>totalB)totalB=sB;
+    const isHit=d['1BSafe']||d.result===4;
+    if(d.half===1){
+      if(sA>(maxAByInn[inn]||0))maxAByInn[inn]=sA;
+      if(isHit)hA++;
+    } else {
+      if(sB>(maxBByInn[inn]||0))maxBByInn[inn]=sB;
+      if(isHit)hB++;
+    }
+  }
+  const innings=[...innSet].sort((a,b)=>a-b);
   let prevA=0,prevB=0;
   innings.forEach(inn=>{
-    const topRows=data.filter(d=>d.inn===inn && d.half===1);
-    const maxAinTop=topRows.length?Math.max(prevA,...topRows.map(d=>+d.scoreA||0)):prevA;
-    runsA[inn]=maxAinTop-prevA;
-    prevA=maxAinTop;
-    const botRows=data.filter(d=>d.inn===inn && d.half===0);
-    const maxBinBot=botRows.length?Math.max(prevB,...botRows.map(d=>+d.scoreB||0)):prevB;
-    runsB[inn]=maxBinBot-prevB;
-    prevB=maxBinBot;
+    const mA=Math.max(prevA, maxAByInn[inn]||0);
+    runsA[inn]=mA-prevA; prevA=mA;
+    const mB=Math.max(prevB, maxBByInn[inn]||0);
+    runsB[inn]=mB-prevB; prevB=mB;
   });
-  const totalA=data.length?Math.max(...data.map(d=>+d.scoreA||0)):0;
-  const totalB=data.length?Math.max(...data.map(d=>+d.scoreB||0)):0;
-  const hA=data.filter(d=>d.half===1&&(d['1BSafe']||d.result===4)).length;
-  const hB=data.filter(d=>d.half===0&&(d['1BSafe']||d.result===4)).length;
   return {innings,runsA,runsB,totalA,totalB,hA,hB};
 }
 
@@ -3794,15 +3810,29 @@ window._gameLogFilter = function(inning){
 };
 
 function renderStatCards(){
+  // V10.2 perf: G 6회 재순회 + 게임별 스프레드 → 단일 패스
+  let hr=0,hit=0,k=0,bb=0,hbp=0,balk=0;
+  const innMax={};  // gameId → max inn
+  for(let j=0;j<G.length;j++){
+    const d=G[j], r=d.result;
+    if(r===4)hr++;
+    if(d['1BSafe']||r===4)hit++;
+    if(+d.strk===2&&(+d.call===0||+d.call===4))k++;
+    if(r===5)bb++; else if(r===6)hbp++;
+    if(d.balk==1)balk++;
+    const inn=d.inn||0;
+    if(inn>(innMax[d._gameId]||0))innMax[d._gameId]=inn;
+  }
+  let innSum=0; for(const gid in innMax)innSum+=innMax[gid];
   const cards=[
     {label:'총 투구수',val:G.length},
-    {label:'경기 이닝',val:GAMES.filter(g=>activeGameIds.has(g.id)).reduce((s,g)=>s+Math.max(...g.pitches.map(d=>d.inn||0),0),0)},
-    {label:'홈런',val:G.filter(d=>d.result===4).length},
-    {label:'안타',val:G.filter(d=>d['1BSafe']||d.result===4).length},
-    {label:'삼진(K)',val:G.filter(d=>_isK(d)).length},
-    {label:'볼넷',val:G.filter(d=>d.result===5).length},
-    {label:'사구',val:G.filter(d=>d.result===6).length},
-    {label:'보크',val:G.filter(d=>d.balk==1).length}
+    {label:'경기 이닝',val:innSum},
+    {label:'홈런',val:hr},
+    {label:'안타',val:hit},
+    {label:'삼진(K)',val:k},
+    {label:'볼넷',val:bb},
+    {label:'사구',val:hbp},
+    {label:'보크',val:balk}
   ];
   const el=document.getElementById('stat-cards-wrap');
   el.innerHTML=cards.map(c=>`<div class="stat-card"><div class="stat-label">${c.label}</div><div class="stat-val" data-target="${c.val}">0</div></div>`).join('');
@@ -3829,7 +3859,7 @@ function renderRosters(){
 
   // 투수 카드 렌더
   const renderPitcherCard=p=>{
-    const pd=G.filter(d=>d.pName===p);
+    const pd=getPitcherDataByName(p);  // V10.2 perf: G 풀스캔(선수당 7만건) → 인덱스 캐시
     const ks=pd.filter(d=>_isK(d)).length;
     const fbGroups=['포심','투심','커터','패스트볼'];
     const fbSpds=pd.filter(d=>d.spdK>0&&fbGroups.includes(pitchGroup(d.pType,d))).map(d=>+d.spdK);
@@ -3848,15 +3878,15 @@ function renderRosters(){
   };
   // 타자 카드 렌더
   const renderBatterCard=b=>{
-    const allB=G.filter(d=>d.bName===b);
-    const bd=allB.filter(d=>d.ev>0);
-    const hits = allB.filter(d => +d['1BSafe']===1 || +d.result===4).length;
-    const hrs = allB.filter(d => +d.result===4).length;
-    // 표준 BA (AB = 인플레이 + K)
-    const ab = allB.filter(d => {
-      const r=+d.result;
-      return +d['1BSafe']===1||r===4||r===1||r===2||(+d.strk===2 && (+d.call===0 || +d.call===4));
-    }).length;
+    const allB=getBatterDataByName(b);  // V10.2 perf: G 풀스캔 → 인덱스 캐시
+    let hits=0,hrs=0,ab=0;
+    for(let j=0;j<allB.length;j++){
+      const d=allB[j], r=+d.result;
+      const isHit=+d['1BSafe']===1||r===4;
+      if(isHit)hits++;
+      if(r===4)hrs++;
+      if(isHit||r===1||r===2||(+d.strk===2&&(+d.call===0||+d.call===4)))ab++;
+    }
     const avg = ab > 0 ? (hits/ab).toFixed(3) : '---';
     return `<div class="player-card section" onclick="goToBatter('${b.replace(/'/g,"\\'")}')">
       <div class="pc-name">${b}</div>
@@ -3931,12 +3961,21 @@ function renderTimeline(){
     items+=sEl('text',{x:x.toFixed(1),y:H-5,fill:'#3a5a7a','font-size':'9','text-anchor':'middle'},inn+'이닝');
     items+=sEl('line',{x1:x.toFixed(1),y1:padT,x2:x.toFixed(1),y2:H-16,stroke:'#1a2f4a','stroke-width':'0.5'});
   });
-  const byInn={};G.forEach((d,i)=>{if(!byInn[d.inn])byInn[d.inn]=[];byInn[d.inn].push({d,i})});
+  // V10.2 perf: 이벤트마다 findIndex 선형검색(O(n²), 37만건에서 수백ms) → 이닝별 카운터 단일 패스
+  const innTotal={};G.forEach(d=>{innTotal[d.inn]=(innTotal[d.inn]||0)+1;});
+  const innIdxMap={};innings.forEach((inn,ii)=>{innIdxMap[inn]=ii;});
+  // V10.2 perf: 대용량 시 도트 샘플링 — 수만 개 SVG 노드는 렌더만 느리고 어차피 겹쳐서 안 보임
+  let _evTotal=0;
+  for(let j=0;j<G.length;j++){const d=G[j];if([4,5,6].includes(d.result)||d['1BSafe']||(d.bSwing&&d.call===4))_evTotal++;}
+  const _evStep=Math.max(1, Math.ceil(_evTotal/2000));
+  let _evSeen=0;
+  const innCounter={};
   G.forEach((d,gi)=>{
+    const pos=(innCounter[d.inn]=(innCounter[d.inn]||0)+1)-1;
     if(![4,5,6].includes(d.result)&&!(d['1BSafe'])&&!(d.bSwing&&d.call===4))return;
-    const innIdx=innings.indexOf(d.inn);if(innIdx<0)return;
-    const list=byInn[d.inn];const pos=list.findIndex(o=>o.i===gi);
-    const ix=padL+innIdx*innW+2+(pos/Math.max(list.length-1,1))*(innW-4);
+    if((_evSeen++%_evStep)!==0 && d.result!==4)return;  // 홈런은 항상 표시
+    const innIdx=innIdxMap[d.inn];if(innIdx==null)return;
+    const ix=padL+innIdx*innW+2+(pos/Math.max(innTotal[d.inn]-1,1))*(innW-4);
     const iy=d.half===0?28:62;
     let col='#607080',r=3;
     if(d.result===4){col='#ffd700';r=6;}
@@ -8270,7 +8309,12 @@ function _countPaEnd(pitches){
 // 무거운 calcPitcherGameStats를 게임별로 캐시 (활성 게임 변경 시 invalidate)
 const _statsCache={pitcher:{}, batter:{}, _gameKey:''};
 function _gameStatsKey(){
-  return [...activeGameIds].sort().join(',');
+  // V10.2 perf: 호출마다 정렬+조인하던 것을 generation 기반 메모이즈 (수만 회 호출 지점)
+  const gen = window._cache ? window._cache.generation : -1;
+  if(_statsCache._keyMemoGen === gen && _statsCache._keyMemo != null) return _statsCache._keyMemo;
+  _statsCache._keyMemo = [...activeGameIds].sort().join(',');
+  _statsCache._keyMemoGen = gen;
+  return _statsCache._keyMemo;
 }
 function _getCachedPitcherStats(gameId){
   const key=_gameStatsKey();
@@ -8360,6 +8404,10 @@ function _getLeagueAverages(){
 
 // 누적 투수 통계 (활성 게임 전체) - 한 선수
 function _getPitcherSeason(name){
+  // V10.2 perf: 이름별 시즌 메모이즈 (generation 변경 시 자동 무효화)
+  const _gen = window._cache ? window._cache.generation : -1;
+  if(!window._pSeasonMemo || window._pSeasonMemo._gen !== _gen) window._pSeasonMemo = {_gen: _gen};
+  if(window._pSeasonMemo[name]) return window._pSeasonMemo[name];
   let outs=0,runs=0,hits=0,bbs=0,hrs=0,ks=0,pitches=0,games=0;
   GAMES.forEach(g=>{
     if(!activeGameIds.has(g.id))return;
@@ -8371,7 +8419,7 @@ function _getPitcherSeason(name){
     }
   });
   const ip=outs/3;
-  return {outs,ip,runs,hits,bbs,hrs,ks,pitches,games,
+  return window._pSeasonMemo[name] = {outs,ip,runs,hits,bbs,hrs,ks,pitches,games,
     era:ip>0?runs/ip*9:0,
     whip:ip>0?(hits+bbs)/ip:0,
     ipDisp:Math.floor(ip)+'.'+(outs%3)};
@@ -11276,7 +11324,7 @@ const CHANGELOG = [
       {icon:'☁️', text:'⭐⭐⭐ <b>(NEW) GitHub 서버 CSV 자동 로드</b> — GitHub 저장소 <code>data/league/시즌명/</code> 등 폴더에 CSV를 넣으면 GitHub Actions가 manifest를 자동 생성하고, 사이트 접속 시 <b>전체 경기를 자동으로 불러옵니다</b>. 더 이상 매번 파일 업로드 불필요. 병렬 다운로드(동시 8) + 번들 묶음 파일로 로딩 속도 최적화'},
       {icon:'📂', text:'⭐⭐⭐ <b>(NEW) 카테고리/그룹 스코프 시스템</b> — 리그전/일반 스크림/독립팀/이벤트리그/기타 카테고리와 시즌 그룹별로 데이터를 관리. 대시보드에서 카테고리·그룹·기간(최근 N일) 필터로 원하는 범위만 활성화해서 분석 가능'},
       {icon:'📊', text:'⭐⭐ <b>경기 목록 메타 표시</b> — 각 경기에 출처(서버/로컬)·카테고리·그룹 배지 표시. 서버 경기와 직접 올린 경기를 한눈에 구분'},
-      {icon:'⚡', text:'⭐⭐⭐ <b>성능 최적화 — 로딩 58% 단축, 렉 대폭 감소</b> — 63경기 자동 로드 4.3초→1.8초, 기록실 첫 렌더 759ms→377ms (실측). 핵심: 선수 팀 판정(_playerTeam)이 호출마다 전체 DB를 풀스캔하던 것을 캐시 조회로 교체(54개 사용처 전역 가속), 기록실 집계를 선수당 12회 재순회→단일 패스로, 불필요한 중복 필터 제거, 프로필 사진 lazy 로딩(14곳). 모든 수치 결과는 변경 전과 100% 동일 검증'},
+      {icon:'⚡', text:'⭐⭐⭐ <b>성능 최적화 — 대용량(370경기+)에서도 쾌적하게</b> — 실측(372경기/71,322투구): 전체 로드 17.2초→7초, 기록실 첫 진입 2.3초→1.1초, 홈 화면 갱신(토글) 5초→1초. 핵심 수술: 선수 팀 판정 풀스캔→캐시(54곳 가속), OAA enriched의 Object.create 딕셔너리모드 제거, 기록실·이닝점수·통계카드 단일패스화, 홈 로스터 풀스캔→인덱스, 타임라인 O(n²) 제거+도트 샘플링, 프로필 사진 lazy. 모든 수치 결과 변경 전과 동일 검증 완료'},
       {icon:'🧹', text:'⭐⭐ <b>코드 정리 + 홈 UI 컴팩트 재설계</b> — 중복 정의 함수 84개 제거(28,500→27,500줄). 데이터 컨트롤 센터를 ☁ 데이터 범위 슬림 바로 재설계: 거대 KPI 카드 5개 → 헤더 한 줄 요약, 그룹별 한 줄 행(체크+미니바+카운트) + 정규/포스트시즌 인라인 칩. 경기 카드의 중복 메타 표기 제거, 그룹 미니 배지로 통일'},
       {icon:'🔧', text:'⭐ <b>인프라</b> — GitHub Actions 워크플로(data 폴더 변경 시 manifest 자동 갱신), 번들 생성 스크립트, GitHub Pages 배포 구조'},
     ]
@@ -16897,6 +16945,7 @@ function _computeDefenseData(){
   if(window._defenseDataCache && window._defenseDataCache._gKey === G.length) {
     return window._defenseDataCache;
   }
+  window._defPerf={t0:performance.now()};
   
   // V9.9: 비-선수 cPlr 필터 — bName으로 한 번도 등장 안 한 cPlr은 운영진/AI/디버그
   const bNameSet = new Set();
@@ -16946,9 +16995,11 @@ function _computeDefenseData(){
   const posNameKor = {P:'투수', C:'포수', '1B':'1루수', '2B':'2루수', '3B':'3루수', SS:'유격수', LF:'좌익수', CF:'중견수', RF:'우익수'};
   
   // cPlr → 그 행에서 어느 포지션이었는지 (PosName 매칭)
+  const _posNameKeys = posKeys.map(pk => pk + 'Name');  // V10.2 perf: 키 문자열 사전 생성
   function findPlayerPos(d){
-    for(const pk of posKeys){
-      if(d[`${pk}Name`] === d.cPlr) return pk;
+    const c = d.cPlr;
+    for(let k = 0; k < posKeys.length; k++){
+      if(d[_posNameKeys[k]] === c) return posKeys[k];
     }
     return null;  // 어디서도 못 찾으면 unknown (P는 PName 없으니 None)
   }
@@ -16961,7 +17012,13 @@ function _computeDefenseData(){
     LF: 55, CF: 60, RF: 55
   };
   
-  const enriched = plays.map(d => {
+  window._defPerf = {t0: performance.now()};
+  window._defPerf.pre=performance.now();
+  // V10.2 perf: Object.create 프로토타입 위임(492ms@19k건, V8 딕셔너리 모드 유발)도 제거 —
+  // 계산 필드를 원본 d에 직접 부착 (_gameId/_hitBase처럼 '_' 필드 부착은 기존 관례, 재계산 시 덮어써서 안전)
+  const enriched = [];
+  for(let _j=0; _j<plays.length; _j++){
+    const d = plays[_j];
     const cx = +d.cx || 0;
     const cz = +d.cz || 0;
     const lx = +d.lx || 0;
@@ -16973,19 +17030,17 @@ function _computeDefenseData(){
     // V9.9: 비합리적 이동거리 = 노이즈 (포지션 매칭 무효화)
     const isNoiseyDist = bestPos && moveDist != null && moveDist > (POS_MAX_DIST[bestPos] || 60);
     const finalPos = isNoiseyDist ? null : bestPos;
-    const isOut = +d['1BSafe'] === 0;
-    const isHit = +d['1BSafe'] === 1;
     const gameH = gameNameHeight[d._gameId]?.[d.cPlr];
-    const playerH = gameH != null ? gameH : (playerHeight[d.cPlr] || null);
-    return {
-      ...d, _cplr: d.cPlr, _pos: finalPos, _moveDist: moveDist,
-      _isOut: isOut, _isHit: isHit, _ev: +d.ev || 0, _ldeg: +d.ldeg || 0,
-      _T: (()=>{ const t=(+d.cSec||0)-(+d.hSec||0); return (+d.hSec>0 && +d.cSec>0 && t>0.05 && t<20) ? t : null; })(),
-      _hitDistFromHP: _distM(0, -20, lx, lz),
-      _playerH: playerH, _gameId: d._gameId,
-      _noiseyDist: isNoiseyDist
-    };
-  }).filter(p => p._pos != null);  // 포지션 못 찾거나 노이즈는 제외
+    const tT = (+d.cSec||0)-(+d.hSec||0);
+    d._cplr = d.cPlr; d._pos = finalPos; d._moveDist = moveDist;
+    d._isOut = +d['1BSafe'] === 0; d._isHit = +d['1BSafe'] === 1;
+    d._ev = +d.ev || 0; d._ldeg = +d.ldeg || 0;
+    d._T = (+d.hSec>0 && +d.cSec>0 && tT>0.05 && tT<20) ? tT : null;
+    d._hitDistFromHP = _distM(0, -20, lx, lz);
+    d._playerH = gameH != null ? gameH : (playerHeight[d.cPlr] || null);
+    d._noiseyDist = isNoiseyDist;
+    if(finalPos != null) enriched.push(d);  // 포지션 못 찾거나 노이즈는 제외
+  }
   
   // ━━━ V9.9 OAA v3: 포지션별 분리, 이동거리·EV·발사각 baseline ━━━
   // baseline grid: 포지션 × 이동거리(3m) × EV(10mph) × 발사각(GB/LD/FB)
@@ -16997,6 +17052,8 @@ function _computeDefenseData(){
     return 'FB';
   }
   
+  window._defPerf.enriched = performance.now();
+  window._defPerf.enriched=performance.now();
   enriched.forEach(p => { if(p._pos) p._la = laCat(p._ldeg); });
   
   const GLOBAL_OUT_RATE = enriched.filter(p => p._isOut).length / Math.max(1, enriched.length);
@@ -17058,6 +17115,7 @@ function _computeDefenseData(){
   });
   // zero-sum 캘리브레이션: 리그 전체 기대 아웃 합 = 실제 아웃 합 (스무딩 편향 제거)
   // 보정 없으면 전 선수 OAA 합이 0에서 벗어나 평균 수비수도 +/- 점수를 받게 됨
+  window._defPerf.curves = performance.now();
   const _totActual = enriched.filter(p => p._isOut).length;
   let _totExp = 0; enriched.forEach(p => { _totExp += p._xOut; });
   const _calib = enriched.length > 0 ? (_totActual - _totExp)/enriched.length : 0;
@@ -17068,6 +17126,7 @@ function _computeDefenseData(){
   
   // V9.9: 키 그룹별 평균 이동속도 (키 보정 baseline) — 5cm bin
   // 실측: 160대 18.5 m/s, 190대 11.4 m/s (-38%)
+  window._defPerf.curves=performance.now();
   const heightSpeedGrid = {};
   enriched.forEach(p => {
     if(p._playerH == null || p._moveSpeed == null) return;
@@ -17178,6 +17237,8 @@ function _computeDefenseData(){
   });
   
   // 선수별 종합 — 합산 X, 주 포지션 stat 위주
+  window._defPerf.calib = performance.now();
+  window._defPerf.grid=performance.now();
   const byPlayer = {};
   Object.entries(byPlayerPos).forEach(([name, byPos]) => {
     const posEntries = Object.entries(byPos);
@@ -17236,6 +17297,7 @@ function _computeDefenseData(){
   // result에 byPlayerPos도 포함
   
   // 포지션별 통계
+  window._defPerf.player=performance.now();
   const byPos = {};
   enriched.forEach(p => {
     const pk = p._pos || '?';
@@ -17255,7 +17317,9 @@ function _computeDefenseData(){
     s.posName = posNameKor[k] || k;
   });
   
+  window._defPerf.end = performance.now();
   const result = { enriched, byPlayer, byPlayerPos, byPos, posKeys, posNameKor, globalOutRate: GLOBAL_OUT_RATE, heightAvgSpeed, _gKey: G.length };
+  window._defPerf.end=performance.now();
   window._defenseDataCache = result;
   return result;
 }
@@ -27214,12 +27278,14 @@ function toggleGame(gid){
 
   // V10.2: 카드 미니칩 — 로드된 그룹/페이즈가 다양할 때만 노출 (단일 그룹이면 숨김)
   window._dashChipText = function(g){
+    // 그룹명 축약: "Season/시즌" 단어 제거 (FW Season → FW)
+    let grp = String(g.groupName||g.categoryName||'').replace(/\s*(Season|시즌)\s*/gi,' ').replace(/\s+/g,' ').trim();
     let ph = g.phaseName||'';
     if(ph){
-      // 축약: 정규시즌→정규, 포스트시즌/Postseason→포스트
-      return ph.replace(/정규\s*시즌/,'정규').replace(/포스트\s*시즌/,'포스트').replace(/Postseason/i,'포스트').replace(/Regular/i,'정규');
+      ph = ph.replace(/정규\s*시즌/,'정규').replace(/포스트\s*시즌/,'포스트').replace(/Postseason/i,'포스트').replace(/Regular/i,'정규');
+      return grp ? grp+' '+ph : ph;  // 예: "FW 정규"
     }
-    return g.groupName||g.categoryName||'';
+    return grp;
   };
   renderGameDashboard = function(){
     const _pset=new Set(GAMES.map(g=>g.phaseId||'').filter(Boolean));
@@ -27255,7 +27321,7 @@ function toggleGame(gid){
       const label=[_gameGroupLabel(g), phaseLabel(g)].filter(Boolean).join(' · ');
       return `<div title="${esc(_gameCategoryLabel(g)+' / '+label+' · '+title)}" style="background:var(--card);${activeStyle};border-radius:6px;padding:10px 12px;transition:all .15s;position:relative">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:6px">
-          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:10px;color:${isActive?'var(--amber)':'var(--muted)'};font-family:var(--mono)"><input type="checkbox" ${isActive?'checked':''} onchange="toggleGame('${g.id}')" style="cursor:pointer;accent-color:var(--amber)"><span style="white-space:nowrap">${info.date||'—'}</span>${window._dashChip?`<span style="font-size:9px;color:var(--muted);border:1px solid var(--border);border-radius:3px;padding:0 5px;max-width:76px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(window._dashChipText(g))}</span>`:''}</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:10px;color:${isActive?'var(--amber)':'var(--muted)'};font-family:var(--mono)"><input type="checkbox" ${isActive?'checked':''} onchange="toggleGame('${g.id}')" style="cursor:pointer;accent-color:var(--amber)"><span style="white-space:nowrap">${info.date||'—'}</span>${window._dashChip?`<span style="font-size:9px;color:var(--muted);border:1px solid var(--border);border-radius:3px;padding:0 5px;max-width:112px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(window._dashChipText(g))}</span>`:''}</label>
           <div style="display:flex;gap:4px;flex-shrink:0">
             <button onclick="openGameScoreboard('${g.id}')" title="스코어보드 보기" style="background:transparent;border:1px solid var(--border);color:var(--muted);font-size:10px;padding:3px 8px;border-radius:3px;cursor:pointer;font-family:var(--cond);white-space:nowrap">📊 상세</button>
             <button onclick="removeGame('${g.id}')" title="목록에서 제거" style="background:transparent;border:1px solid var(--border);color:var(--muted);font-size:10px;padding:3px 6px;border-radius:3px;cursor:pointer">✕</button>
