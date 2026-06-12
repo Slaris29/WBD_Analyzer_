@@ -9268,6 +9268,7 @@ window.teamAliases=(()=>{
   }catch(e){return {};}
 })();
 function _saveTeamAliases(){
+  window._teamAliasLC=null;  // V10.2: 대소문자 무시 매핑 캐시 무효화
   try{localStorage.setItem('wbd_team_aliases',JSON.stringify(window.teamAliases||{}));}
   catch(e){console.warn('팀 별명 저장 실패',e);}
 }
@@ -9277,11 +9278,49 @@ function _isScrimTeam(name){
   if(!name)return true;
   return SCRIM_TEAM_NAMES.has(String(name).trim());
 }
+// V10.2: 대소문자만 다른 표기(Pna/PNA/pna)를 최다 등장 표기로 자동 통일하는 맵 (별칭 등록 불필요)
+function _autoCanonTeamMap(){
+  if(window._autoCanonMap && window._autoCanonMap._key===GAMES.length) return window._autoCanonMap;
+  const cnt={};
+  GAMES.forEach(g=>{
+    const info=_parseGameName(g.name);
+    [info.teamA, info.teamB].forEach(t=>{
+      if(!t||_isScrimTeam(t))return;
+      const lc=String(t).trim().toLowerCase();
+      if(!cnt[lc])cnt[lc]={};
+      cnt[lc][t]=(cnt[lc][t]||0)+1;
+    });
+  });
+  const map={_key:GAMES.length};
+  for(const lc in cnt){
+    map[lc]=Object.entries(cnt[lc]).sort((a,b)=>b[1]-a[1])[0][0];
+  }
+  window._autoCanonMap=map;
+  return map;
+}
 function _normalizeTeam(name){
   if(!name)return name;
   // 스크림 팀명은 null 반환 → 팀 분류에서 제외됨
   if(_isScrimTeam(name))return null;
-  return window.teamAliases[name]||name;
+  // V10.2: 파일명에서 섞여 들어온 경기 차수 접미사 제거 — "TWP Final #1" → "TWP", "GE Match2" → "GE"
+  name = String(name).replace(/\s+(?:final|match|game|set)\s*#?\s*\d+\s*$/i, '').trim() || name;
+  // V10.2: 별칭 매칭을 대소문자/공백 무시로 — "PNA" 별칭 하나로 "Pna"/"pna "까지 병합
+  let resolved = window.teamAliases[name];
+  if(!resolved){
+    if(!window._teamAliasLC){
+      const m={};
+      for(const k in (window.teamAliases||{})) m[String(k).trim().toLowerCase()]=window.teamAliases[k];
+      window._teamAliasLC=m;
+    }
+    resolved = window._teamAliasLC[String(name).trim().toLowerCase()];
+  }
+  let out = resolved || name;
+  // 대소문자만 다른 변형은 최다 표기로 자동 통일 (별칭 결과에도 적용해 일관성 보장)
+  try{
+    const canon=_autoCanonTeamMap()[String(out).trim().toLowerCase()];
+    if(canon) out=canon;
+  }catch(e){}
+  return out;
 }
 function _getAllRawTeams(){
   const teams=new Set();
@@ -11377,6 +11416,7 @@ const CHANGELOG = [
       {icon:'☁️', text:'⭐⭐⭐ <b>(NEW) GitHub 서버 CSV 자동 로드</b> — GitHub 저장소 <code>data/league/시즌명/</code> 등 폴더에 CSV를 넣으면 GitHub Actions가 manifest를 자동 생성하고, 사이트 접속 시 <b>전체 경기를 자동으로 불러옵니다</b>. 더 이상 매번 파일 업로드 불필요. 병렬 다운로드(동시 8) + 번들 묶음 파일로 로딩 속도 최적화'},
       {icon:'📂', text:'⭐⭐⭐ <b>(NEW) 카테고리/그룹 스코프 시스템</b> — 리그전/일반 스크림/독립팀/이벤트리그/기타 카테고리와 시즌 그룹별로 데이터를 관리. 대시보드에서 카테고리·그룹·기간(최근 N일) 필터로 원하는 범위만 활성화해서 분석 가능'},
       {icon:'📊', text:'⭐⭐ <b>경기 목록 메타 표시</b> — 각 경기에 출처(서버/로컬)·카테고리·그룹 배지 표시. 서버 경기와 직접 올린 경기를 한눈에 구분'},
+      {icon:'🔗', text:'⭐⭐ <b>팀명 자동 병합 강화 + wOBA왕 기준 통일</b> — ① 별칭 매칭이 대소문자/공백 무시로: "PNA → Purple Neon Apex" 한 번 등록이면 Pna/pna까지 전부 병합 ② 별칭 등록 없이도 대소문자만 다른 표기(Pna/PNA 공존)는 최다 등장 표기로 자동 통일 ③ 파일명에서 섞여 들어온 경기 차수 접미사 자동 제거 ("TWP Final #1"→"TWP", "GE Match2"→"GE") — 팀 기록·teamReports·팀 WAR 합산 갈라짐 방지 ④ 내보내기 wOBA왕을 기록실(advanced) wOBA 기준으로 통일'},
       {icon:'🏆', text:'⭐⭐ <b>내보내기 어워드 WAR 기반 교정 + 문구 갱신</b> — 내보내기(awards)의 MVP/사이영/종합MVP가 OVR 정렬 1위를 그대로 쓰고 자격 요건도 무시하던 문제 수정 (3이닝 투수가 사이영으로 잡히던 사례). 이제 앱 내 어워드 페이지와 동일: MVP=oWAR 1위(AB≥20), CyYoung=pWAR(실점 기반) 1위(투구≥50), 종합MVP=투타 합산 WAR 1위. OVR top10은 참고 필드로 유지. schemaChanges의 "pWAR(FIP 기반)" 잔존 문구도 RA9 기반으로 갱신'},
       {icon:'🎯', text:'⭐⭐ <b>호투/망경기 판정 교체: 피안타율 → 게임별 실점 효율(RA9)</b> — 기존 게임 BA 기준(.280/.420)은 안타를 산발로 막은 0실점 경기를 망경기로, 적게 맞고 몰아서 실점한 경기를 호투로 오판. 이제 게임별 정밀 실점/이닝으로 판정: 리그 RA9의 절반 이하=호투, 1.8배 이상=망경기 (최소 2이닝 등판만). pWAR 실점 기반 전환과 철학 일관. 기복(σ) 지표는 등판 간 일관성 측정용으로 유지'},
       {icon:'⚖️', text:'⭐⭐⭐ <b>투수 pWAR 산식 교체: FIP 기반 → 실점(RA9) 기반 (bWAR 방식)</b> — way 13경기 + 리그전 63경기 실데이터 검증 결과: WBD는 BB%≈1.5%(MLB의 1/6)로 FIP의 볼넷 항이 사실상 무력하고 K 분포도 좁아, FIP가 홈런 1~2개 노이즈로 결정되는 구조였음 (ERA 9점대 투수가 2점대 투수보다 fWAR이 높은 역전 발생, ERA↔WAR 상관 -0.63). 컨택 위주 리그 특성상 인플레이 억제가 핵심 스킬이므로 실점 기반 채택 (상관 -0.91로 개선). 리더보드·헤더·카드 WAR 자동 동기. FIP/FIP- 컬럼은 참고 지표로 유지'},
@@ -24816,7 +24856,10 @@ function exportAnalyticsBundle(opts){
       OBPKing: (() => { const t=sortBy(qualifyB,'OBP'); return t[0] ? {name:t[0].name, obp:t[0].season.OBP} : null; })(),
       SLGKing: (() => { const t=sortBy(qualifyB,'SLG'); return t[0] ? {name:t[0].name, slg:t[0].season.SLG} : null; })(),
       OPSKing: (() => { const t=sortBy(qualifyB,'OPS'); return t[0] ? {name:t[0].name, ops:t[0].season.OPS} : null; })(),
-      wOBAKing: (() => { const t=sortBy(qualifyB,'wOBA'); return t[0] ? {name:t[0].name, woba:t[0].season.wOBA} : null; })(),
+      wOBAKing: (() => { // V10.2: advanced(기록실) wOBA 기준으로 통일 — season.wOBA(구버전 계산)와 정렬 불일치 해소
+        if(_rec){ const t=_rec.batters.filter(b=>b.AB>=20).sort((a,b)=>(b.woba||0)-(a.woba||0))[0];
+          if(t) return {name:t.name, team:t.team, woba:+t.woba.toFixed(3)}; }
+        const t=sortBy(qualifyB,'wOBA'); return t[0] ? {name:t[0].name, woba:t[0].season.wOBA} : null; })(),
       HitsKing: (() => { const t=sortBy(qualifyB,'H'); return t[0] ? {name:t[0].name, hits:t[0].season.H} : null; })(),
     };
     
