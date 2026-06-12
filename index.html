@@ -11377,6 +11377,7 @@ const CHANGELOG = [
       {icon:'☁️', text:'⭐⭐⭐ <b>(NEW) GitHub 서버 CSV 자동 로드</b> — GitHub 저장소 <code>data/league/시즌명/</code> 등 폴더에 CSV를 넣으면 GitHub Actions가 manifest를 자동 생성하고, 사이트 접속 시 <b>전체 경기를 자동으로 불러옵니다</b>. 더 이상 매번 파일 업로드 불필요. 병렬 다운로드(동시 8) + 번들 묶음 파일로 로딩 속도 최적화'},
       {icon:'📂', text:'⭐⭐⭐ <b>(NEW) 카테고리/그룹 스코프 시스템</b> — 리그전/일반 스크림/독립팀/이벤트리그/기타 카테고리와 시즌 그룹별로 데이터를 관리. 대시보드에서 카테고리·그룹·기간(최근 N일) 필터로 원하는 범위만 활성화해서 분석 가능'},
       {icon:'📊', text:'⭐⭐ <b>경기 목록 메타 표시</b> — 각 경기에 출처(서버/로컬)·카테고리·그룹 배지 표시. 서버 경기와 직접 올린 경기를 한눈에 구분'},
+      {icon:'🎯', text:'⭐⭐ <b>호투/망경기 판정 교체: 피안타율 → 게임별 실점 효율(RA9)</b> — 기존 게임 BA 기준(.280/.420)은 안타를 산발로 막은 0실점 경기를 망경기로, 적게 맞고 몰아서 실점한 경기를 호투로 오판. 이제 게임별 정밀 실점/이닝으로 판정: 리그 RA9의 절반 이하=호투, 1.8배 이상=망경기 (최소 2이닝 등판만). pWAR 실점 기반 전환과 철학 일관. 기복(σ) 지표는 등판 간 일관성 측정용으로 유지'},
       {icon:'⚖️', text:'⭐⭐⭐ <b>투수 pWAR 산식 교체: FIP 기반 → 실점(RA9) 기반 (bWAR 방식)</b> — way 13경기 + 리그전 63경기 실데이터 검증 결과: WBD는 BB%≈1.5%(MLB의 1/6)로 FIP의 볼넷 항이 사실상 무력하고 K 분포도 좁아, FIP가 홈런 1~2개 노이즈로 결정되는 구조였음 (ERA 9점대 투수가 2점대 투수보다 fWAR이 높은 역전 발생, ERA↔WAR 상관 -0.63). 컨택 위주 리그 특성상 인플레이 억제가 핵심 스킬이므로 실점 기반 채택 (상관 -0.91로 개선). 리더보드·헤더·카드 WAR 자동 동기. FIP/FIP- 컬럼은 참고 지표로 유지'},
       {icon:'🔍', text:'⭐⭐⭐ <b>데이터 일관성 전수 점검 — 기록실 ↔ 투수/타자분석 완전 일치</b> — 타자 94명×5지표, 투수 57명×6지표 자동 대조로 3가지 불일치 원인을 찾아 수정: ① 기록실 이닝이 타석결과 추정(병살 등 누락, 16.0)이었던 것을 투수분석과 같은 정밀 아웃카운트 추적(20.1)으로 통일 — ERA·FIP·K/9·pWAR 분모도 함께 정확해짐 ② 낫아웃 출루(삼진+1루 세이프)를 안타로 잘못 카운트하던 5곳 수정 ③ 타석 종료 판정에 게임 경계와 확정 이벤트(HR/BB/HBP) 보강. 이제 어느 화면에서 봐도 같은 선수는 같은 기록'},
       {icon:'📅', text:'⭐⭐ <b>날짜 구간 필터</b> — 데이터 범위 바에서 원하는 기간을 직접 지정해 분석: 시작일~종료일 달력 입력 + 기간 프리셋(최근 1/2/3/6개월·전체). 서버 자동 전체 로드 시에는 최근 3개월 경기만 초기 활성화되어 대용량에서도 첫 화면이 가볍습니다 (전체 보기는 📅 기간 ▾ → 전체 기간)'},
@@ -13453,7 +13454,7 @@ window._scoutSwitchSplit = function(split){
 
 // ─── 데이터 수집 헬퍼들 ───
 function _scoutCollectPitcher(name){
-  const all = G.filter(d => d.pName === name);
+  const all = getPitcherDataByName(name);  // V10.2 perf: 잔존 풀스캔 교체
   if(!all.length) return null;
   
   const card = calcPitcherCard(name);
@@ -13581,12 +13582,25 @@ function _scoutCollectPitcher(name){
     const bas = gameStats.map(g => g.ba).filter(v => v!=null);
     const mean = bas.reduce((s,v)=>s+v,0)/bas.length;
     const variance = bas.reduce((s,v)=>s+Math.pow(v-mean,2),0)/bas.length;
-    gameVariability = Math.sqrt(variance);
-    // V9.7 WBD 환경 조정: 평균 BA가 .377이라 기준 상향 필요
-    //   망경기: BA > .420 (평균 +.043 이상)
-    //   호투: BA < .280 (평균 -.097 이하)
-    badGames = gameStats.filter(g => g.ba > 0.420).length;  // 망한 경기
-    goodGames = gameStats.filter(g => g.ba < 0.280).length; // 좋은 경기 (호투)
+    gameVariability = Math.sqrt(variance);  // 기복 지표는 BA σ 유지 (등판 간 일관성)
+    // V10.2: 호투/망경기를 피안타율 → 게임별 실점 효율(RA9) 기반으로 교체.
+    // 안타를 산발로 막으면 호투, 적게 맞아도 몰아서 실점하면 망경기 — pWAR(실점 기반)과 철학 일관.
+    // 기준: 리그 RA9의 절반 이하 = 호투, 1.8배 이상 = 망경기. 최소 2이닝(6아웃) 등판만 판정.
+    let lgRA9Ref = 5.6;
+    try {
+      const _lg = (window._recordsCache && window._recordsCache.lg) || _computeRecordsData().lg;
+      if(_lg && _lg.lgRA9 > 0) lgRA9Ref = _lg.lgRA9;
+    } catch(e){}
+    gameStats.forEach(g => {
+      g.ra9 = null;
+      try {
+        const gs = _getCachedPitcherStats(g.gid);
+        const s = gs && gs[name];
+        if(s && s.outs >= 6) g.ra9 = s.runs/(s.outs/3)*9;
+      } catch(e){}
+    });
+    badGames = gameStats.filter(g => g.ra9!=null && g.ra9 >= lgRA9Ref*1.8).length;  // 망한 경기 (대량 실점)
+    goodGames = gameStats.filter(g => g.ra9!=null && g.ra9 <= lgRA9Ref*0.5).length; // 호투 (실점 억제)
   }
   
   // ─── 헬퍼: subStat 계산 ───
