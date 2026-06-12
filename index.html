@@ -11377,6 +11377,7 @@ const CHANGELOG = [
       {icon:'☁️', text:'⭐⭐⭐ <b>(NEW) GitHub 서버 CSV 자동 로드</b> — GitHub 저장소 <code>data/league/시즌명/</code> 등 폴더에 CSV를 넣으면 GitHub Actions가 manifest를 자동 생성하고, 사이트 접속 시 <b>전체 경기를 자동으로 불러옵니다</b>. 더 이상 매번 파일 업로드 불필요. 병렬 다운로드(동시 8) + 번들 묶음 파일로 로딩 속도 최적화'},
       {icon:'📂', text:'⭐⭐⭐ <b>(NEW) 카테고리/그룹 스코프 시스템</b> — 리그전/일반 스크림/독립팀/이벤트리그/기타 카테고리와 시즌 그룹별로 데이터를 관리. 대시보드에서 카테고리·그룹·기간(최근 N일) 필터로 원하는 범위만 활성화해서 분석 가능'},
       {icon:'📊', text:'⭐⭐ <b>경기 목록 메타 표시</b> — 각 경기에 출처(서버/로컬)·카테고리·그룹 배지 표시. 서버 경기와 직접 올린 경기를 한눈에 구분'},
+      {icon:'🏆', text:'⭐⭐ <b>내보내기 어워드 WAR 기반 교정 + 문구 갱신</b> — 내보내기(awards)의 MVP/사이영/종합MVP가 OVR 정렬 1위를 그대로 쓰고 자격 요건도 무시하던 문제 수정 (3이닝 투수가 사이영으로 잡히던 사례). 이제 앱 내 어워드 페이지와 동일: MVP=oWAR 1위(AB≥20), CyYoung=pWAR(실점 기반) 1위(투구≥50), 종합MVP=투타 합산 WAR 1위. OVR top10은 참고 필드로 유지. schemaChanges의 "pWAR(FIP 기반)" 잔존 문구도 RA9 기반으로 갱신'},
       {icon:'🎯', text:'⭐⭐ <b>호투/망경기 판정 교체: 피안타율 → 게임별 실점 효율(RA9)</b> — 기존 게임 BA 기준(.280/.420)은 안타를 산발로 막은 0실점 경기를 망경기로, 적게 맞고 몰아서 실점한 경기를 호투로 오판. 이제 게임별 정밀 실점/이닝으로 판정: 리그 RA9의 절반 이하=호투, 1.8배 이상=망경기 (최소 2이닝 등판만). pWAR 실점 기반 전환과 철학 일관. 기복(σ) 지표는 등판 간 일관성 측정용으로 유지'},
       {icon:'⚖️', text:'⭐⭐⭐ <b>투수 pWAR 산식 교체: FIP 기반 → 실점(RA9) 기반 (bWAR 방식)</b> — way 13경기 + 리그전 63경기 실데이터 검증 결과: WBD는 BB%≈1.5%(MLB의 1/6)로 FIP의 볼넷 항이 사실상 무력하고 K 분포도 좁아, FIP가 홈런 1~2개 노이즈로 결정되는 구조였음 (ERA 9점대 투수가 2점대 투수보다 fWAR이 높은 역전 발생, ERA↔WAR 상관 -0.63). 컨택 위주 리그 특성상 인플레이 억제가 핵심 스킬이므로 실점 기반 채택 (상관 -0.91로 개선). 리더보드·헤더·카드 WAR 자동 동기. FIP/FIP- 컬럼은 참고 지표로 유지'},
       {icon:'🔍', text:'⭐⭐⭐ <b>데이터 일관성 전수 점검 — 기록실 ↔ 투수/타자분석 완전 일치</b> — 타자 94명×5지표, 투수 57명×6지표 자동 대조로 3가지 불일치 원인을 찾아 수정: ① 기록실 이닝이 타석결과 추정(병살 등 누락, 16.0)이었던 것을 투수분석과 같은 정밀 아웃카운트 추적(20.1)으로 통일 — ERA·FIP·K/9·pWAR 분모도 함께 정확해짐 ② 낫아웃 출루(삼진+1루 세이프)를 안타로 잘못 카운트하던 5곳 수정 ③ 타석 종료 판정에 게임 경계와 확정 이벤트(HR/BB/HBP) 보강. 이제 어느 화면에서 봐도 같은 선수는 같은 기록'},
@@ -24417,7 +24418,7 @@ function exportAnalyticsBundle(opts){
         '📊 (NEW) pitchers[i].season.advanced: {FIP, FIPminus, WHIP, KBB, pWAR, estIP, HRpct} — WBD 리그 RA9 보정',
         '📊 wOBA/wRC+/FIP 모두 WBD 리그 자체 환경 상수 사용 (리그 평균 = 100 기준)',
         '⚠️ 기존 season.wOBA(v7)는 안타 분류 이전 근사치 — advanced.wOBA가 정확한 값',
-        '📊 타자 oWAR(타격만, 수비는 OAA 신뢰도 검증 후 합류 예정) / 투수 pWAR(FIP 기반) / WAR144(KBO 144경기 환산) / 투수 ERA(실점=자책). dOAA_ref는 참고용',
+        '📊 타자 oWAR(타격만, 수비는 OAA 신뢰도 검증 후 합류 예정) / 투수 pWAR(RA9/실점 기반, bWAR식 — V10.2에서 FIP 기반에서 교체) / WAR144(KBO 144경기 환산) / 투수 ERA(실점=자책). dOAA_ref는 참고용',
         '⚙️ calcBatterWAR/calcPitcherWAR 전면 통합 — 리더보드·헤더·카드의 WAR이 모두 새 식 사용'
       ],
       v7_changes:[
@@ -24440,7 +24441,7 @@ function exportAnalyticsBundle(opts){
         '🧹 Forfeit 더미 투구 분석 집계에서 자동 제외'
       ],
       v5_changes:[
-        '🏆 awards: MVP/사이영/홈런왕/타격왕/OPS왕/wOBA왕/K왕/ERA1위/WHIP1위/PV왕/xPV왕 등 시즌 수상자',
+        '🏆 awards: MVP/사이영/홈런왕/타격왕/OPS왕/wOBA왕/K왕/ERA1위/WHIP1위/PV왕/xPV왕 등 시즌 수상자. (V10.2) MVP=oWAR 1위, CyYoung=pWAR(실점 기반) 1위, overall.MVP=투타 합산 WAR 1위 — 자격: AB≥20/투구≥50',
         '🏆 teamReports: 팀별 핵심 투수(로테이션)/핵심 타자(중심타선) 분류 + 강점/약점 + 라인업',
         '🏆 scoutReports: OVR 상위 30 투수/타자의 강점/약점/FV 등급/스카우트 노트',
         '⚖️ PV 가중치 1.7배 강화: 40이닝(~600투구) 기준 분포감 확대',
@@ -24803,8 +24804,13 @@ function exportAnalyticsBundle(opts){
     
     // 타자 어워드
     const qualifyB=batters.filter(b=>(b.season?.AB||0)>=20);
+    // V10.2: MVP/사이영을 OVR 1위 → WAR 기반으로 교체 (앱 내 어워드 페이지와 동일 기준, 자격 요건 동일)
+    const _rec = (()=>{ try{ return _computeRecordsData(); }catch(e){ return null; } })();
+    const _warB = (()=>{ if(!_rec) return null;
+      const q=_rec.batters.filter(b=>b.AB>=20).sort((a,b)=>(b.owar||0)-(a.owar||0))[0];
+      return q?{name:q.name, team:q.team, oWAR:+(q.owar||0).toFixed(2)}:null; })();
     awards.batting = {
-      MVP: batters[0] ? {name:batters[0].name, team:batters[0].team, OVR:batters[0].OVR} : null,
+      MVP: _warB || (batters[0] ? {name:batters[0].name, team:batters[0].team, OVR:batters[0].OVR} : null),
       HRKing: (() => { const t=sortBy(qualifyB,'HR'); return t[0] ? {name:t[0].name, hr:t[0].season.HR} : null; })(),
       AVGKing: (() => { const t=sortBy(qualifyB,'BA'); return t[0] ? {name:t[0].name, ba:t[0].season.BA} : null; })(),
       OBPKing: (() => { const t=sortBy(qualifyB,'OBP'); return t[0] ? {name:t[0].name, obp:t[0].season.OBP} : null; })(),
@@ -24817,7 +24823,9 @@ function exportAnalyticsBundle(opts){
     // 투수 어워드
     const qualifyP=pitchers.filter(p=>(p.season?.pitches||0)>=50);
     awards.pitching = {
-      CyYoung: pitchers[0] ? {name:pitchers[0].name, team:pitchers[0].team, OVR:pitchers[0].OVR} : null,
+      CyYoung: (()=>{ if(!_rec) return pitchers[0]?{name:pitchers[0].name, team:pitchers[0].team, OVR:pitchers[0].OVR}:null;
+        const q=_rec.pitchers.filter(p=>p.n>=50).sort((a,b)=>(b.pwar||-99)-(a.pwar||-99))[0];
+        return q?{name:q.name, team:q.team, pWAR:+(q.pwar||0).toFixed(2), ERA:q.era!=null?+q.era.toFixed(2):null}:null; })(),
       KKing: (() => { const t=sortBy(qualifyP,'K'); return t[0] ? {name:t[0].name, k:t[0].season.K} : null; })(),
       ERA_Best: (() => { const t=sortBy(qualifyP,'ERA',false); return t[0] ? {name:t[0].name, era:t[0].season.ERA} : null; })(),
       WHIP_Best: (() => { const t=sortBy(qualifyP,'WHIP',false); return t[0] ? {name:t[0].name, whip:t[0].season.WHIP} : null; })(),
@@ -24825,14 +24833,20 @@ function exportAnalyticsBundle(opts){
       xPVKing: (() => { const t=sortBy(qualifyP,'seasonXPV'); return t[0] ? {name:t[0].name, xpv:t[0].season.seasonXPV} : null; })(),
     };
     
-    // 종합 MVP (투타 통합 OVR 1위)
+    // V10.2: 종합 MVP = 투타 합산 WAR 1위 (앱 내 통합 MVP와 동일 철학). OVR top10은 참고로 유지
     const allPlayers = [
       ...pitchers.map(p => ({name:p.name, team:p.team, OVR:p.OVR, type:'pitcher'})),
       ...batters.map(b => ({name:b.name, team:b.team, OVR:b.OVR, type:'batter'}))
     ].sort((a,b)=>b.OVR-a.OVR);
+    const _warMvp = (()=>{ if(!_rec) return null;
+      const wm={};
+      _rec.batters.forEach(b=>{ if(b.AB>=20) wm[b.name]={name:b.name, team:b.team, WAR:+(b.owar||0)}; });
+      _rec.pitchers.forEach(p=>{ if(p.n>=50){ if(!wm[p.name]) wm[p.name]={name:p.name, team:p.team, WAR:0}; wm[p.name].WAR=+(wm[p.name].WAR+(p.pwar||0)); } });
+      const top=Object.values(wm).sort((a,b)=>b.WAR-a.WAR)[0];
+      return top?{...top, WAR:+top.WAR.toFixed(2)}:null; })();
     awards.overall = {
-      MVP: allPlayers[0] || null,
-      top10: allPlayers.slice(0, 10)
+      MVP: _warMvp || allPlayers[0] || null,
+      top10_OVR: allPlayers.slice(0, 10)
     };
   }catch(e){console.warn('awards aggregation failed',e);}
   
