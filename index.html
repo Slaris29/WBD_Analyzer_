@@ -7589,6 +7589,11 @@ function buildCardBack(name,type,card){
   }else{
     // 타자 뒷면: 시즌 누적 + 상대 좌/우 투수 + 카운트별 BA
     const _bs=_getBatterSeason(name);
+    // V10.2: 1·2·3루타는 기록실 advanced(베이스 추적)에서 정밀값 보강
+    try{
+      const _rb=_computeRecordsData().batters.find(b=>b.name===name);
+      if(_rb){ _bs.h1B=_rb.h1B; _bs.h2B=_rb.h2B; _bs.h3B=_rb.h3B; }
+    }catch(e){}
     const totalAB=_bs.ab, totalH=_bs.hits, totalHr=_bs.hrs;
     const totalBB=_bs.bbs, totalK=_bs.ks, totalPit=_bs.pitches, games=_bs.games;
     const ba=totalAB>0?_bs.ba.toFixed(3).replace(/^0/,''):'-';
@@ -8487,10 +8492,13 @@ function _getBatterSeason(name){
       ab+=s.ab;hits+=s.hits;hrs+=s.hrs;bbs+=s.bbs;ks+=s.ks;pitches+=s.pitches;games++;
     }
   });
+  const _ba=ab>0?hits/ab:0;
+  const _slg=ab>0?(hits+hrs*3)/ab:0;  // 주: 단타 가중(2/3루타 미분류) — 카드용 근사
+  const _obp=(ab+bbs)>0?(hits+bbs)/(ab+bbs):0;
   return {ab,hits,hrs,bbs,ks,pitches,games,
-    ba:ab>0?hits/ab:0,
-    slg:ab>0?(hits+hrs*3)/ab:0,
-    obp:(ab+bbs)>0?(hits+bbs)/(ab+bbs):0};
+    ba:_ba, slg:_slg, obp:_obp,
+    ops:_obp+_slg,            // V10.2 fix: 카드 뒷면이 _bs.ops 참조 — 누락 시 toFixed 크래시
+    h1B:Math.max(0,hits-hrs), h2B:0, h3B:0};  // 카드 표시용 폴백(베이스 분류는 기록실 advanced 참조)
 }
 
 // ───── 투수 게임 실점/이닝 계산 (승계주자 룰 적용) ─────
@@ -11416,6 +11424,7 @@ const CHANGELOG = [
       {icon:'☁️', text:'⭐⭐⭐ <b>(NEW) GitHub 서버 CSV 자동 로드</b> — GitHub 저장소 <code>data/league/시즌명/</code> 등 폴더에 CSV를 넣으면 GitHub Actions가 manifest를 자동 생성하고, 사이트 접속 시 <b>전체 경기를 자동으로 불러옵니다</b>. 더 이상 매번 파일 업로드 불필요. 병렬 다운로드(동시 8) + 번들 묶음 파일로 로딩 속도 최적화'},
       {icon:'📂', text:'⭐⭐⭐ <b>(NEW) 카테고리/그룹 스코프 시스템</b> — 리그전/일반 스크림/독립팀/이벤트리그/기타 카테고리와 시즌 그룹별로 데이터를 관리. 대시보드에서 카테고리·그룹·기간(최근 N일) 필터로 원하는 범위만 활성화해서 분석 가능'},
       {icon:'📊', text:'⭐⭐ <b>경기 목록 메타 표시</b> — 각 경기에 출처(서버/로컬)·카테고리·그룹 배지 표시. 서버 경기와 직접 올린 경기를 한눈에 구분'},
+      {icon:'🐛', text:'⭐⭐⭐ <b>타자 카드 클릭 크래시 수정</b> — 카드 뒷면 렌더(buildCardBack)가 _getBatterSeason에 없는 필드(ops, 1·2·3루타)를 참조해 toFixed undefined 에러로 카드가 안 열리던 문제 해결. 누락 필드(ops·h1B/h2B/h3B)를 보강하고, 1·2·3루타는 기록실 베이스 추적 정밀값과 연동'},
       {icon:'🔗', text:'⭐⭐ <b>팀명 자동 병합 강화 + wOBA왕 기준 통일</b> — ① 별칭 매칭이 대소문자/공백 무시로: "PNA → Purple Neon Apex" 한 번 등록이면 Pna/pna까지 전부 병합 ② 별칭 등록 없이도 대소문자만 다른 표기(Pna/PNA 공존)는 최다 등장 표기로 자동 통일 ③ 파일명에서 섞여 들어온 경기 차수 접미사 자동 제거 ("TWP Final #1"→"TWP", "GE Match2"→"GE") — 팀 기록·teamReports·팀 WAR 합산 갈라짐 방지 ④ 내보내기 wOBA왕을 기록실(advanced) wOBA 기준으로 통일'},
       {icon:'🏆', text:'⭐⭐ <b>내보내기 어워드 WAR 기반 교정 + 문구 갱신</b> — 내보내기(awards)의 MVP/사이영/종합MVP가 OVR 정렬 1위를 그대로 쓰고 자격 요건도 무시하던 문제 수정 (3이닝 투수가 사이영으로 잡히던 사례). 이제 앱 내 어워드 페이지와 동일: MVP=oWAR 1위(AB≥20), CyYoung=pWAR(실점 기반) 1위(투구≥50), 종합MVP=투타 합산 WAR 1위. OVR top10은 참고 필드로 유지. schemaChanges의 "pWAR(FIP 기반)" 잔존 문구도 RA9 기반으로 갱신'},
       {icon:'🎯', text:'⭐⭐ <b>호투/망경기 판정 교체: 피안타율 → 게임별 실점 효율(RA9)</b> — 기존 게임 BA 기준(.280/.420)은 안타를 산발로 막은 0실점 경기를 망경기로, 적게 맞고 몰아서 실점한 경기를 호투로 오판. 이제 게임별 정밀 실점/이닝으로 판정: 리그 RA9의 절반 이하=호투, 1.8배 이상=망경기 (최소 2이닝 등판만). pWAR 실점 기반 전환과 철학 일관. 기복(σ) 지표는 등판 간 일관성 측정용으로 유지'},
