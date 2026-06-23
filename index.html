@@ -11421,7 +11421,6 @@ const CHANGELOG = [
     title: '☁️ GitHub 서버 데이터 자동 로드 + 📂 카테고리/시즌 스코프 시스템',
     badge: '#88ccff',
     changes: [
-      {icon:'🎯', text:'⭐⭐ <b>무브먼트 평가 재설계 — 주력+결정구 균형</b> — 각 구종을 그 구종 분포 안에서 별개 평가(포심끼리/커브끼리), 백분위→grade S곡선(상위10%→76·평균→50). 합산 = 위력 가중평균 70% + 주력 구종 grade 30%, 주력 부진 시 감점·엘리트 구종 보너스. 주력이 나빠도 위력적 결정구(상위15%↑)면 소폭 보너스(+2~3)로 바닥 방어. 검증(28명): 주력+서브 골고루 우수→70~75, 전반양호→65, 평범+일부우수→60, 평범→50, 전반 평범이하→25~40. (무브를 |sH|+|sV| 절대이동량으로 — 음수좌표 백분위 버그 수정)'},
       {icon:'☁️', text:'⭐⭐⭐ <b>(NEW) GitHub 서버 CSV 자동 로드</b> — GitHub 저장소 <code>data/league/시즌명/</code> 등 폴더에 CSV를 넣으면 GitHub Actions가 manifest를 자동 생성하고, 사이트 접속 시 <b>전체 경기를 자동으로 불러옵니다</b>. 더 이상 매번 파일 업로드 불필요. 병렬 다운로드(동시 8) + 번들 묶음 파일로 로딩 속도 최적화'},
       {icon:'📂', text:'⭐⭐⭐ <b>(NEW) 카테고리/그룹 스코프 시스템</b> — 리그전/일반 스크림/독립팀/이벤트리그/기타 카테고리와 시즌 그룹별로 데이터를 관리. 대시보드에서 카테고리·그룹·기간(최근 N일) 필터로 원하는 범위만 활성화해서 분석 가능'},
       {icon:'📊', text:'⭐⭐ <b>경기 목록 메타 표시</b> — 각 경기에 출처(서버/로컬)·카테고리·그룹 배지 표시. 서버 경기와 직접 올린 경기를 한눈에 구분'},
@@ -14211,6 +14210,19 @@ function _scoutLeagueAvgs(){
   });
   // 구종별 리그 평균 (구속, 무브먼트)
   const groupStats = {};
+  // V10.2: 투수별 구종 평균무브 수집 (선수평가 백분위가 랭킹과 같은 모수를 쓰도록)
+  const _movByPitcher = {};  // {group: {pName: {sum, n}}}
+  G.forEach(d => {
+    if(d.pName!=null && d.pType!=null && d.sH!=null && d.sV!=null){
+      const _g=pitchGroup(d.pType,d);
+      if(_g && _g!=='기타'){
+        if(!_movByPitcher[_g]) _movByPitcher[_g]={};
+        if(!_movByPitcher[_g][d.pName]) _movByPitcher[_g][d.pName]={sum:0,n:0};
+        _movByPitcher[_g][d.pName].sum += Math.abs(+d.sH)+Math.abs(+d.sV);
+        _movByPitcher[_g][d.pName].n++;
+      }
+    }
+  });
   G.forEach(d => {
     const g = pitchGroup(d.pType, d);
     if(!g || g === '기타') return;
@@ -14241,7 +14253,10 @@ function _scoutLeagueAvgs(){
       movP25: sortNum(s.movs, 0.25),
       movP75: sortNum(s.movs, 0.75),
       movP50: sortNum(s.movs, 0.50),
-      movSorted: s.movs.slice().sort((a,b)=>a-b)  // V10.2: 정직한 백분위 계산용 원시 분포
+      movSorted: s.movs.slice().sort((a,b)=>a-b),  // 투구단위 분포 (참고용)
+      // V10.2: 투수별 평균무브 분포 — 선수평가 백분위가 랭킹("선수 평균끼리 순위")과 일치하도록.
+      //   최소 5구 이상 던진 투수만 (랭킹 자격과 동일선상)
+      movByPitcherSorted: Object.values(_movByPitcher[g]||{}).filter(o=>o.n>=5).map(o=>o.sum/o.n).sort((a,b)=>a-b)
     };
   });
   
@@ -18274,12 +18289,28 @@ function _generateScoutReportPitcher(data){
     const myMov = Math.abs(d.avgSH) + Math.abs(d.avgSV);  // V10.2: 무브는 방향 무관 절대 이동량 — 음수 좌표로 백분위가 깨지던 버그 수정
     // V10.2: 보간 추정 → 실제 리그 분포 대비 정직한 백분위 (0~1, 절대 음수 안 나옴)
     let pctile;
-    if(lgG.movSorted && lgG.movSorted.length >= 5){
-      const arr = lgG.movSorted;
-      // 내 무브보다 작거나 같은 리그 표본 비율 = 백분위
+    // V10.2: 랭킹과 같은 모수 — '투수별 평균무브' 분포 대비 내 순위 (투구단위 분포는 폴백)
+    const distArr = (lgG.movByPitcherSorted && lgG.movByPitcherSorted.length >= 4) ? lgG.movByPitcherSorted : lgG.movSorted;
+    if(distArr && distArr.length >= 4){
+      const arr = distArr;
       let cnt = 0;
-      for(let k=0;k<arr.length;k++){ if(arr[k] <= myMov) cnt++; else break; }
-      pctile = cnt / arr.length;  // 0~1 보장
+      for(let k=0;k<arr.length;k++){ if(arr[k] <= myMov){ cnt++; } }
+      pctile = arr.length>1 ? (cnt-0.5)/arr.length : 0.5;  // 순위 백분위(중앙보정), 0~1
+      pctile = Math.max(0, Math.min(1, pctile));
+      // V10.2: 포화 구종 보정 — 커브/스크류처럼 리그 분포가 한 값(상한)에 몰린 구종은
+      //   1~2cm 차이로 백분위가 출렁여 부당. 분포 폭(IQR)이 평균 대비 좁으면(포화) 백분위
+      //   신뢰도가 낮으므로, '내가 그 구종 상한에 얼마나 근접했나(절대 수준)'를 섞어 보정.
+      const mean = arr.reduce((s,v)=>s+v,0)/arr.length;
+      const p25 = arr[Math.floor(arr.length*0.25)], p75 = arr[Math.floor(arr.length*0.75)];
+      const iqrRatio = mean>0 ? (p75-p25)/mean : 1;   // 작을수록 포화
+      if(false && iqrRatio < 0.12){  // V10.2: 투수평균 모수로 바꾼 뒤 불필요 — 비활성화
+        // 절대 근접도: 내 무브 / 그 구종 최대치 (상한 근처면 1)
+        const maxV = arr[arr.length-1] || 1;
+        const absLevel = Math.max(0, Math.min(1, myMov / maxV));
+        // 포화일수록 절대근접도 비중↑ (백분위는 못 믿으니)
+        const blend = Math.min(0.7, (0.12 - iqrRatio) / 0.12 * 0.7);
+        pctile = pctile*(1-blend) + absLevel*blend;
+      }
     } else {
       // 폴백: P25/P50/P75 구간 선형보간 (모두 양수 분모, clamp)
       const p25=lgG.movP25, p50=lgG.movP50||lgG.movMean, p75=lgG.movP75;
