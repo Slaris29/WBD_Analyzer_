@@ -11421,9 +11421,11 @@ const CHANGELOG = [
     title: '☁️ GitHub 서버 데이터 자동 로드 + 📂 카테고리/시즌 스코프 시스템',
     badge: '#88ccff',
     changes: [
+      {icon:'🎯', text:'⭐⭐ <b>무브먼트 평가 재설계 — 주력+결정구 균형</b> — 각 구종을 그 구종 분포 안에서 별개 평가(포심끼리/커브끼리), 백분위→grade S곡선(상위10%→76·평균→50). 합산 = 위력 가중평균 70% + 주력 구종 grade 30%, 주력 부진 시 감점·엘리트 구종 보너스. 주력이 나빠도 위력적 결정구(상위15%↑)면 소폭 보너스(+2~3)로 바닥 방어. 검증(28명): 주력+서브 골고루 우수→70~75, 전반양호→65, 평범+일부우수→60, 평범→50, 전반 평범이하→25~40. (무브를 |sH|+|sV| 절대이동량으로 — 음수좌표 백분위 버그 수정)'},
       {icon:'☁️', text:'⭐⭐⭐ <b>(NEW) GitHub 서버 CSV 자동 로드</b> — GitHub 저장소 <code>data/league/시즌명/</code> 등 폴더에 CSV를 넣으면 GitHub Actions가 manifest를 자동 생성하고, 사이트 접속 시 <b>전체 경기를 자동으로 불러옵니다</b>. 더 이상 매번 파일 업로드 불필요. 병렬 다운로드(동시 8) + 번들 묶음 파일로 로딩 속도 최적화'},
       {icon:'📂', text:'⭐⭐⭐ <b>(NEW) 카테고리/그룹 스코프 시스템</b> — 리그전/일반 스크림/독립팀/이벤트리그/기타 카테고리와 시즌 그룹별로 데이터를 관리. 대시보드에서 카테고리·그룹·기간(최근 N일) 필터로 원하는 범위만 활성화해서 분석 가능'},
       {icon:'📊', text:'⭐⭐ <b>경기 목록 메타 표시</b> — 각 경기에 출처(서버/로컬)·카테고리·그룹 배지 표시. 서버 경기와 직접 올린 경기를 한눈에 구분'},
+      {icon:'🎚️', text:'⭐⭐ <b>무브먼트 grade 분포 재보정 — "전체적으로 낮은" 문제 해결</b> — 사용자 발견: 무브 점수가 전반적으로 짜게 나옴. 원인: grade를 "투구 단위 리그 분포" 백분위로 매기니 평균이 44%로 깔림(무브 큰 변화구는 소수 투수만 던져서). → grade를 "전체 투수 집단 내 상대 순위"로 재보정. 결과: 평균 46.8→49.3(정중앙), 범위 30~60→20~80(풀스케일 활용), 엘리트~하위 변별 정상화'},
       {icon:'🐛', text:'⭐⭐ <b>선수평가 무브먼트(Movement) 백분위 버그 수정</b> — 사용자 발견: "리그 백분위 평균 -130%" 같은 불가능한 값. 원인 2가지: ① 무브를 sH+sV로 계산해 방향에 따라 음수가 나오면 백분위가 음수로 깨짐 → 절대값(|sH|+|sV|, 방향 무관 이동량)으로 수정 ② P75 위쪽 구간에 잘못된 분모(P75−평균)를 써서 점수를 과하게 깎던 보간 버그 → 실제 리그 분포 대비 정직한 백분위로 교체. 결과: 28명 전원 0~100 범위 정상화, 평균 grade 46.8(정중앙)로 "짜게 주던" 문제도 해소'},
       {icon:'🧬', text:'⭐⭐⭐ <b>분석 데이터 내보내기 대폭 강화 (schema v9) — AI 분석 최적화</b> — 기존 구조 100% 유지하며 3종 추가: ① <b>league</b> 리그 기준선(lgRA9/RPW/wOBA + 타격·투수 부문 평균) — AI가 개별 선수를 리그 평균 대비로 해석 ② <b>glossary</b> 지표 사전 — 모든 커스텀/세이버 지표의 정의·방향·산식 ③ <b>players[].splits</b> 상황별 분할 — vs좌/우(상대 좌우 핸드), 구종그룹별(성적+구사율+평균구속), 카운트별(유리/불리), 존 3x3 격자. "2스트라이크 이후 헛스윙 급증" 같은 실전 공략을 AI가 직접 도출 가능. 원시 투구로그도 유지'},
       {icon:'🐛', text:'⭐⭐⭐ <b>타자 카드 클릭 크래시 수정</b> — 카드 뒷면 렌더(buildCardBack)가 _getBatterSeason에 없는 필드(ops, 1·2·3루타)를 참조해 toFixed undefined 에러로 카드가 안 열리던 문제 해결. 누락 필드(ops·h1B/h2B/h3B)를 보강하고, 1·2·3루타는 기록실 베이스 추적 정밀값과 연동'},
@@ -14139,6 +14141,34 @@ function _scoutCollectBatter(name){
 }
 
 // ─── 리그 평균 (비교 기준) ───
+
+// V10.2: 전 투수 무브 가중백분위 분포 (movement grade 상대순위 보정용)
+function _computeAllPitcherMovPctile(lg){
+  if(window._allPitcherMovPctile && window._allPitcherMovPctile._key===G.length) return window._allPitcherMovPctile;
+  const list=[];
+  const names=window._cache.pitcherNames||[];
+  names.forEach(name=>{
+    const rows=getPitcherDataByName(name);
+    if(rows.length<30) return;
+    // 구종별 myMov vs 리그 분포 백분위 (구사량 가중)
+    const byG={};
+    rows.forEach(d=>{ if(d.pType==null||d.sH==null||d.sV==null)return; const g=pitchGroup(d.pType,d);
+      if(!byG[g])byG[g]={mov:0,n:0}; byG[g].mov+=Math.abs(+d.sH)+Math.abs(+d.sV); byG[g].n++; });
+    let wp=0, tot=0;
+    for(const g in byG){
+      const ga=lg.groupAvg&&lg.groupAvg[g]; if(!ga||!ga.movSorted||ga.movSorted.length<5)continue;
+      const myMov=byG[g].mov/byG[g].n;
+      let cnt=0; for(let k=0;k<ga.movSorted.length;k++){if(ga.movSorted[k]<=myMov)cnt++;else break;}
+      const pct=cnt/ga.movSorted.length;
+      wp+=pct*byG[g].n; tot+=byG[g].n;
+    }
+    if(tot>0) list.push(wp/tot);
+  });
+  list.sort((a,b)=>a-b);
+  window._allPitcherMovPctile={_key:G.length, list};
+  return window._allPitcherMovPctile;
+}
+
 function _scoutLeagueAvgs(){
   const cache = window._scoutLeagueCache;
   if(cache && cache._t === G.length) return cache;
@@ -18262,22 +18292,65 @@ function _generateScoutReportPitcher(data){
     movPctiles.push({g, pctile, ratio: lgG.movMean>0 ? myMov / lgG.movMean : 1, n: d.n});
   });
   if(movPctiles.length){
-    // 가중 평균 (구사량 가중)
+    // V10.2: 각 구종을 '그 구종 분포 안에서' 20~80 grade로 변환 후 구사량 가중 합산.
+    //   포심은 포심끼리, 커브는 커브끼리 — 구종마다 무브 상한이 다르므로 별개 평가가 공정.
+    //   각 구종 grade = 20 + (그 구종 내 백분위)*60.  예: 포심 상위10%→74, 슬라 상위40%→56, 커브 상위5%→77
+    //   → 이걸 구사량 가중평균하면 "주력 구종의 무브 우열"이 점수에 제대로 반영됨.
+    // V10.2: 백분위→grade를 비선형(S곡선)으로 — 선형(20+p*60)은 스케일을 압축해 특급도 60대에 갇힘.
+    //   pow 곡선으로 양끝을 펴서: 상위10%≈76, 상위25%≈66, 평균(50%)=50, 하위25%≈34, 하위10%≈24.
+    //   각 구종은 여전히 '그 구종 분포 안에서' 별개 평가 — 절대 기준 유지하면서 변별만 확대.
+    const _pctToGrade = pct => {
+      // 50% 기준 대칭 S곡선 (지수 0.7로 양끝 확장)
+      if(pct >= 0.5){ return 50 + Math.pow((pct-0.5)/0.5, 0.7) * 30; }
+      else { return 50 - Math.pow((0.5-pct)/0.5, 0.7) * 30; }
+    };
+    movPctiles.forEach(p => { p.grade = _pctToGrade(p.pctile); });
+    // V10.2: 주력+위력 구종 위주 평가. 가중 = 구사량 × 무브위력(완만).
+    //   "5구종 다 평범"보다 "주력 결정구가 위력적"인 투수를 높게 — 단, 주력 구종이 나쁘면
+    //   가끔 던지는 결정구 하나로 과대평가되지 않도록 균형(위력 가중 지수를 1.3으로 완화).
     const totalN = movPctiles.reduce((s,p)=>s+p.n, 0);
-    const weightedPctile = movPctiles.reduce((s,p)=>s+p.pctile*p.n, 0) / totalN;
-    // 백분위 → 20-80 grade
-    movementGrade = 20 + weightedPctile * 60;
-    movementGrade = Math.max(20, Math.min(80, movementGrade));
-    movementGrade = Math.round(movementGrade / 5) * 5;
-    // 상위/하위 구종
-    movPctiles.sort((a,b)=>b.pctile-a.pctile);
-    const bestM = movPctiles[0];
-    movementNote = `리그 백분위 평균 ${(weightedPctile*100).toFixed(0)}%`;
-    if(bestM.pctile >= 0.75){
-      movementNote += ` · 최고 무브: ${bestM.g} (상위 ${((1-bestM.pctile)*100).toFixed(0)}%)`;
-    } else if(bestM.pctile <= 0.3){
-      movementNote += ` · 모든 구종 무브 부족`;
+    movPctiles.forEach(p => {
+      const usageW = p.n / totalN;
+      const powerW = Math.pow(Math.max(0.3, p.pctile), 1.3);  // 위력 가중 완화 (^2 → ^1.3)
+      p.w = usageW * powerW;
+      p.usage = usageW;
+    });
+    const wSum = movPctiles.reduce((s,p)=>s+p.w, 0) || 1;
+    let weightedGrade = movPctiles.reduce((s,p)=>s+p.grade*p.w, 0) / wSum;
+    const bestPct = Math.max(...movPctiles.map(p=>p.pctile));
+    // V10.2: 주력(최다 구사) 구종 자체의 우열을 직접 반영 — 결정구 원툴 과대평가 방지.
+    //   가장 많이 던지는 구종이 나쁘면(하위) 끌어내리고, 좋으면 끌어올림.
+    const mainPitch = movPctiles.slice().sort((a,b)=>b.usage-a.usage)[0];
+    if(mainPitch){
+      const mainGrade = mainPitch.grade;  // 주력 구종 자체 grade
+      // 최종 = 위력가중평균 70% + 주력구종 grade 30% (주력이 받쳐줘야 높은 점수)
+      weightedGrade = weightedGrade*0.7 + mainGrade*0.3;
+      // 주력이 확실히 나쁘면(하위 30%) 추가 감점 — 노릴 구종이 뻔한 투수
+      if(mainPitch.pctile <= 0.30 && mainPitch.usage >= 0.35) weightedGrade -= 5;
+      // V10.2: 주력이 나빠도 위력적인 결정구(상위 15% 이상)가 하나라도 있으면 소폭 보너스 —
+      //   "노릴 구종은 뻔하지만 그래도 결정구는 위협적" → 과대평가는 막되 바닥은 살짝 올림 (+2~3)
+      if(mainPitch.pctile <= 0.40){
+        const hasPutaway = movPctiles.some(p=>p.pctile>=0.85);
+        if(hasPutaway) weightedGrade += (movPctiles.some(p=>p.pctile>=0.92) ? 3 : 2);
+      }
     }
+    // 강점 보너스: 위력적인 구종에 보너스 — 주력급이면 크게, 서브여도 어느정도 반영 (당신 의도: "평범하나 몇몇 구종 우수 → 60대")
+    //   원툴 방지는 위의 주력 grade 30% 혼합 + 주력부진 감점이 담당하므로, 여기선 좋은 구종을 정당하게 보상.
+    movPctiles.forEach(p => {
+      if(p.pctile >= 0.80){
+        const mag = (p.pctile - 0.80) / 0.20;        // 상위20%~최상 → 0~1
+        const usageScale = p.usage >= 0.20 ? 1.0 : 0.5;  // 주력급=풀반영, 서브=절반 반영
+        weightedGrade += (3 + mag*4) * usageScale;   // 상위20%서브 +1.5 ~ 최상위주력 +7
+      }
+    });
+    movementGrade = Math.max(20, Math.min(80, weightedGrade));
+    movementGrade = Math.round(movementGrade / 5) * 5;
+    // 노트: 구종별 백분위를 모두 보여줘서 "어느 구종이 좋고 나쁜지" 명시
+    // 노트: 위력 가중 비중 큰 구종(=주력 결정구)부터 표시
+    movPctiles.sort((a,b)=>b.w-a.w);
+    const parts = movPctiles.map(p => `${p.g}(${Math.round(p.n/totalN*100)}%) 상위${Math.max(1,Math.round((1-p.pctile)*100))}%`);
+    const keyP = movPctiles[0];
+    movementNote = `주력 ${keyP.g} 무브 상위${Math.max(1,Math.round((1-keyP.pctile)*100))}% — ` + parts.join(' · ');
   }
   
   // 3. Command (제구) - V9.7 데이터 기반 절대 기준 스코어링
