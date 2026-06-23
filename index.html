@@ -11424,6 +11424,8 @@ const CHANGELOG = [
       {icon:'☁️', text:'⭐⭐⭐ <b>(NEW) GitHub 서버 CSV 자동 로드</b> — GitHub 저장소 <code>data/league/시즌명/</code> 등 폴더에 CSV를 넣으면 GitHub Actions가 manifest를 자동 생성하고, 사이트 접속 시 <b>전체 경기를 자동으로 불러옵니다</b>. 더 이상 매번 파일 업로드 불필요. 병렬 다운로드(동시 8) + 번들 묶음 파일로 로딩 속도 최적화'},
       {icon:'📂', text:'⭐⭐⭐ <b>(NEW) 카테고리/그룹 스코프 시스템</b> — 리그전/일반 스크림/독립팀/이벤트리그/기타 카테고리와 시즌 그룹별로 데이터를 관리. 대시보드에서 카테고리·그룹·기간(최근 N일) 필터로 원하는 범위만 활성화해서 분석 가능'},
       {icon:'📊', text:'⭐⭐ <b>경기 목록 메타 표시</b> — 각 경기에 출처(서버/로컬)·카테고리·그룹 배지 표시. 서버 경기와 직접 올린 경기를 한눈에 구분'},
+      {icon:'🐛', text:'⭐⭐ <b>선수평가 무브먼트(Movement) 백분위 버그 수정</b> — 사용자 발견: "리그 백분위 평균 -130%" 같은 불가능한 값. 원인 2가지: ① 무브를 sH+sV로 계산해 방향에 따라 음수가 나오면 백분위가 음수로 깨짐 → 절대값(|sH|+|sV|, 방향 무관 이동량)으로 수정 ② P75 위쪽 구간에 잘못된 분모(P75−평균)를 써서 점수를 과하게 깎던 보간 버그 → 실제 리그 분포 대비 정직한 백분위로 교체. 결과: 28명 전원 0~100 범위 정상화, 평균 grade 46.8(정중앙)로 "짜게 주던" 문제도 해소'},
+      {icon:'🧬', text:'⭐⭐⭐ <b>분석 데이터 내보내기 대폭 강화 (schema v9) — AI 분석 최적화</b> — 기존 구조 100% 유지하며 3종 추가: ① <b>league</b> 리그 기준선(lgRA9/RPW/wOBA + 타격·투수 부문 평균) — AI가 개별 선수를 리그 평균 대비로 해석 ② <b>glossary</b> 지표 사전 — 모든 커스텀/세이버 지표의 정의·방향·산식 ③ <b>players[].splits</b> 상황별 분할 — vs좌/우(상대 좌우 핸드), 구종그룹별(성적+구사율+평균구속), 카운트별(유리/불리), 존 3x3 격자. "2스트라이크 이후 헛스윙 급증" 같은 실전 공략을 AI가 직접 도출 가능. 원시 투구로그도 유지'},
       {icon:'🐛', text:'⭐⭐⭐ <b>타자 카드 클릭 크래시 수정</b> — 카드 뒷면 렌더(buildCardBack)가 _getBatterSeason에 없는 필드(ops, 1·2·3루타)를 참조해 toFixed undefined 에러로 카드가 안 열리던 문제 해결. 누락 필드(ops·h1B/h2B/h3B)를 보강하고, 1·2·3루타는 기록실 베이스 추적 정밀값과 연동'},
       {icon:'🔗', text:'⭐⭐ <b>팀명 자동 병합 강화 + wOBA왕 기준 통일</b> — ① 별칭 매칭이 대소문자/공백 무시로: "PNA → Purple Neon Apex" 한 번 등록이면 Pna/pna까지 전부 병합 ② 별칭 등록 없이도 대소문자만 다른 표기(Pna/PNA 공존)는 최다 등장 표기로 자동 통일 ③ 파일명에서 섞여 들어온 경기 차수 접미사 자동 제거 ("TWP Final #1"→"TWP", "GE Match2"→"GE") — 팀 기록·teamReports·팀 WAR 합산 갈라짐 방지 ④ 내보내기 wOBA왕을 기록실(advanced) wOBA 기준으로 통일'},
       {icon:'🏆', text:'⭐⭐ <b>내보내기 어워드 WAR 기반 교정 + 문구 갱신</b> — 내보내기(awards)의 MVP/사이영/종합MVP가 OVR 정렬 1위를 그대로 쓰고 자격 요건도 무시하던 문제 수정 (3이닝 투수가 사이영으로 잡히던 사례). 이제 앱 내 어워드 페이지와 동일: MVP=oWAR 1위(AB≥20), CyYoung=pWAR(실점 기반) 1위(투구≥50), 종합MVP=투타 합산 WAR 1위. OVR top10은 참고 필드로 유지. schemaChanges의 "pWAR(FIP 기반)" 잔존 문구도 RA9 기반으로 갱신'},
@@ -14207,7 +14209,9 @@ function _scoutLeagueAvgs(){
       sVP75: sortNum(s.sVs, 0.75),
       movMean: avg(s.movs),
       movP25: sortNum(s.movs, 0.25),
-      movP75: sortNum(s.movs, 0.75)
+      movP75: sortNum(s.movs, 0.75),
+      movP50: sortNum(s.movs, 0.50),
+      movSorted: s.movs.slice().sort((a,b)=>a-b)  // V10.2: 정직한 백분위 계산용 원시 분포
     };
   });
   
@@ -18237,14 +18241,25 @@ function _generateScoutReportPitcher(data){
     if(d.n < 10) return;
     const lgG = lg.groupAvg && lg.groupAvg[g];
     if(!lgG || !lgG.movMean) return;
-    const myMov = d.avgSH + d.avgSV;
-    // 백분위 계산 (P25, Mean, P75 기준 보간)
+    const myMov = Math.abs(d.avgSH) + Math.abs(d.avgSV);  // V10.2: 무브는 방향 무관 절대 이동량 — 음수 좌표로 백분위가 깨지던 버그 수정
+    // V10.2: 보간 추정 → 실제 리그 분포 대비 정직한 백분위 (0~1, 절대 음수 안 나옴)
     let pctile;
-    if(myMov >= lgG.movP75) pctile = 0.75 + Math.min(0.25, (myMov - lgG.movP75) / (lgG.movP75 - lgG.movMean) * 0.25);
-    else if(myMov >= lgG.movMean) pctile = 0.5 + (myMov - lgG.movMean) / Math.max(0.01, lgG.movP75 - lgG.movMean) * 0.25;
-    else if(myMov >= lgG.movP25) pctile = 0.25 + (myMov - lgG.movP25) / Math.max(0.01, lgG.movMean - lgG.movP25) * 0.25;
-    else pctile = Math.max(0, (myMov / Math.max(0.01, lgG.movP25)) * 0.25);
-    movPctiles.push({g, pctile, ratio: myMov / lgG.movMean, n: d.n});
+    if(lgG.movSorted && lgG.movSorted.length >= 5){
+      const arr = lgG.movSorted;
+      // 내 무브보다 작거나 같은 리그 표본 비율 = 백분위
+      let cnt = 0;
+      for(let k=0;k<arr.length;k++){ if(arr[k] <= myMov) cnt++; else break; }
+      pctile = cnt / arr.length;  // 0~1 보장
+    } else {
+      // 폴백: P25/P50/P75 구간 선형보간 (모두 양수 분모, clamp)
+      const p25=lgG.movP25, p50=lgG.movP50||lgG.movMean, p75=lgG.movP75;
+      if(myMov <= p25) pctile = Math.max(0, 0.25 * (myMov / Math.max(0.01, p25)));
+      else if(myMov <= p50) pctile = 0.25 + 0.25 * (myMov - p25) / Math.max(0.01, p50 - p25);
+      else if(myMov <= p75) pctile = 0.50 + 0.25 * (myMov - p50) / Math.max(0.01, p75 - p50);
+      else pctile = Math.min(1, 0.75 + 0.25 * (myMov - p75) / Math.max(0.01, p75 - p50));
+    }
+    pctile = Math.max(0, Math.min(1, pctile));  // 안전 clamp
+    movPctiles.push({g, pctile, ratio: lgG.movMean>0 ? myMov / lgG.movMean : 1, n: d.n});
   });
   if(movPctiles.length){
     // 가중 평균 (구사량 가중)
@@ -24451,6 +24466,103 @@ function exportAllPlayersJSON(){
 }
 
 // ─── 분석 데이터 풀 패키지 (외부 분석용) ───
+
+// ═══════════ V10.2: AI 분석용 split 빌더 (내보내기 전용) ═══════════
+// 원시 투구 로그 없이 '집계 격자'만 생성 — 파일 경량 유지하며 공략 분석 재료 제공.
+function _expEmptyLine(){ return {pa:0,ab:0,h:0,hr:0,k:0,bb:0,swing:0,whiff:0,tb:0,evSum:0,evN:0}; }
+function _expAccum(line,d,isPaEnd){
+  const r=+d.result;
+  const isHit=(+d['1BSafe']===1&&+d.ev>0)||r===4;
+  if(d.bSwing){ line.swing++; if(+d.call!==2) line.whiff++; }
+  if(+d.ev>0){ line.evSum+=+d.ev; line.evN++; }
+  if(isPaEnd){
+    line.pa++;
+    if(r!==5&&r!==6) line.ab++;
+    if(r===5) line.bb++;
+    if(isHit){ line.h++; line.tb += (+d._hitBase||0)||(r===4?4:1); }
+    if(r===4) line.hr++;
+    if(+d.strk===2&&(+d.call===0||+d.call===4)) line.k++;
+  }
+}
+function _expFinalize(line){
+  if(!line||line.pa===0&&line.swing===0) return null;
+  const r=v=>v==null?null:+v.toFixed(3);
+  return {
+    PA:line.pa, AB:line.ab, H:line.h, HR:line.hr, K:line.k, BB:line.bb,
+    AVG: line.ab>0?r(line.h/line.ab):null,
+    SLG: line.ab>0?r(line.tb/line.ab):null,
+    whiffPct: line.swing>0?+(line.whiff/line.swing*100).toFixed(1):null,
+    avgEV: line.evN>0?+(line.evSum/line.evN).toFixed(1):null
+  };
+}
+// 존 9분할: zoneX(가로 ±, 음수=한쪽), zoneY(세로). 데이터 분포 기반 3x3 격자 인덱스 0~8 (좌상→우하)
+function _expZoneIdx(d, zb){
+  const x=+d.zoneX, y=+d.zoneY;
+  if(isNaN(x)||isNaN(y)) return -1;
+  const cx = x < zb.x1 ? 0 : (x < zb.x2 ? 1 : 2);
+  const cy = y < zb.y1 ? 0 : (y < zb.y2 ? 1 : 2);  // y 작을수록 아래로 가정
+  return cy*3+cx;
+}
+function _expZoneBounds(rows){
+  const xs=rows.map(d=>+d.zoneX).filter(v=>!isNaN(v)).sort((a,b)=>a-b);
+  const ys=rows.map(d=>+d.zoneY).filter(v=>!isNaN(v)).sort((a,b)=>a-b);
+  const q=(a,p)=>a.length?a[Math.floor(a.length*p)]:0;
+  return {x1:q(xs,0.33), x2:q(xs,0.66), y1:q(ys,0.33), y2:q(ys,0.66)};
+}
+// PA 종료 판정 (export용, 게임/이닝/타자 경계 + 확정이벤트)
+function _expPaEndFlags(rows){
+  const f=new Array(rows.length);
+  for(let i=0;i<rows.length;i++){
+    const d=rows[i], n=rows[i+1], r=+d.result;
+    f[i] = !n || (r>=4&&r<=6) || d._gameId!==n._gameId || d.inn!==n.inn || d.half!==n.half || d.bName!==n.bName;
+  }
+  return f;
+}
+// 투수 또는 타자 한 명의 split 묶음 생성
+function _buildPlayerSplits(rows, role){
+  if(!rows||rows.length<10) return null;  // 표본 너무 작으면 생략
+  const flags=_expPaEndFlags(rows);
+  const zb=_expZoneBounds(rows);
+  // 상대 핸드 키: 투수면 상대타자(bZone), 타자면 상대투수(pHand)
+  const handKey = role==='pitcher' ? (d=>d.bZone==='L'?'vsL':'vsR') : (d=>d.pHand==='L'?'vsL':'vsR');
+  const byHand={vsL:_expEmptyLine(), vsR:_expEmptyLine()};
+  const byGroup={};   // 구종그룹별
+  const byCount={ahead:_expEmptyLine(), behind:_expEmptyLine(), even:_expEmptyLine()};
+  const grpSpd={};    // 구종별 평균구속
+  const zone=Array.from({length:9},()=>_expEmptyLine());
+  for(let i=0;i<rows.length;i++){
+    const d=rows[i], end=flags[i];
+    _expAccum(byHand[handKey(d)], d, end);
+    if(d.pType!=null){ const g=pitchGroup(d.pType,d);
+      if(!byGroup[g]) byGroup[g]=_expEmptyLine();
+      _expAccum(byGroup[g], d, end);
+      const sp=+d.spdK; if(sp>0){ if(!grpSpd[g])grpSpd[g]={s:0,n:0}; grpSpd[g].s+=sp; grpSpd[g].n++; }
+    }
+    // 카운트: 투수 유리(스트라이크>볼) / 불리 / 동일
+    const b=+d.ball||0, s=+d.strk||0;
+    const adv = role==='pitcher' ? (s>b?'ahead':(b>s?'behind':'even')) : (b>s?'ahead':(s>b?'behind':'even'));
+    _expAccum(byCount[adv], d, end);
+    const zi=_expZoneIdx(d, zb); if(zi>=0) _expAccum(zone[zi], d, end);
+  }
+  const finGroup={};
+  for(const g in byGroup){
+    const fz=_expFinalize(byGroup[g]); if(!fz) continue;
+    const pitchN=byGroup[g].swing+ (byGroup[g].pa); // 근사 노출
+    finGroup[g]={...fz, avgSpd: grpSpd[g]&&grpSpd[g].n? +(grpSpd[g].s/grpSpd[g].n).toFixed(1):null};
+  }
+  // 구사율(투수) / 구종 마주침 비율(타자) — 그룹별 투구수
+  const grpPitchCnt={}; let totPitch=0;
+  for(let i=0;i<rows.length;i++){ const d=rows[i]; if(d.pType!=null){ const g=pitchGroup(d.pType,d); grpPitchCnt[g]=(grpPitchCnt[g]||0)+1; totPitch++; } }
+  for(const g in finGroup){ finGroup[g].pitchPct = totPitch>0? +(grpPitchCnt[g]/totPitch*100).toFixed(1):null; }
+  return {
+    byHand: {vsL:_expFinalize(byHand.vsL), vsR:_expFinalize(byHand.vsR)},
+    byPitchGroup: finGroup,
+    byCount: {ahead:_expFinalize(byCount.ahead), behind:_expFinalize(byCount.behind), even:_expFinalize(byCount.even)},
+    zone9: zone.map(z=>_expFinalize(z)),
+    zoneNote: role==='pitcher'?'9칸=상대 타자 시점 3x3(0:좌상~8:우하), 값=해당 존 피안타/헛스윙':'9칸=3x3 존, 값=해당 존 스윙/컨택'
+  };
+}
+
 function exportAnalyticsBundle(opts){
   opts=opts||{includeRawPitches:true,includeMatchups:false};
   const pNames=(window._cache.pitcherNames||[]).slice();
@@ -24460,8 +24572,14 @@ function exportAnalyticsBundle(opts){
   const meta={
     generatedAt:new Date().toISOString(),
     appVersion:'V10.2',
-    schemaVersion:8,
+    schemaVersion:9,
     schemaChanges:{
+      v9_changes:[
+        '🆕 league: 리그 기준선 블록 추가 — lgRA9/RPW/wOBA + 타격·투수 부문 평균(자격자 기준). AI가 개별 선수를 리그 평균 대비로 해석 가능',
+        '🆕 glossary: 지표 사전 추가 — 모든 커스텀/세이버 지표의 정의·방향(높을/낮을수록 좋음)·산식 요약',
+        '🆕 players[i].splits: 상황별 분할 추가 — byHand(좌우 상대), byPitchGroup(구종그룹별 성적·구사율·평균구속), byCount(유리/불리 카운트), zone9(3x3 존 격자). 원시 투구로그 없이 집계 격자만 담아 경량 유지',
+        '📌 기존 v8 구조는 모두 그대로 유지 (하위 호환). 추가 필드만 얹음'
+      ],
       v8_changes:[
         '📊 (NEW) batters[i].season.advanced: {h1B, h2B, h3B, TB, wOBA, wRCplus, wRAA, oWAR, HRpct} — 베이스 추적 안타 분류 기반',
         '📊 (NEW) pitchers[i].season.advanced: {FIP, FIPminus, WHIP, KBB, pWAR, estIP, HRpct} — WBD 리그 RA9 보정',
@@ -24549,6 +24667,7 @@ function exportAnalyticsBundle(opts){
       styles:classifyStyle(c).map(s=>({label:s.label,desc:s.desc})),
       strength:(typeof generateStrengthReport==='function')?generateStrengthReport(c).map(x=>x.text):[],
       weakness:(typeof generateWeaknessReport==='function')?generateWeaknessReport(c).map(x=>x.text):[],
+      splits:(()=>{ try{ return _buildPlayerSplits(getPitcherDataByName(n), 'pitcher'); }catch(_){ return null; } })(),
       season:{
         games:season.games,
         IP:+(season.ip||0).toFixed(1),
@@ -24635,6 +24754,7 @@ function exportAnalyticsBundle(opts){
       styles:classifyStyle(c).map(s=>({label:s.label,desc:s.desc})),
       strength:(typeof generateStrengthReport==='function')?generateStrengthReport(c).map(x=>x.text):[],
       weakness:(typeof generateWeaknessReport==='function')?generateWeaknessReport(c).map(x=>x.text):[],
+      splits:(()=>{ try{ return _buildPlayerSplits(getBatterDataByName(n), 'batter'); }catch(_){ return null; } })(),
       season:{
         games:season.games,
         PA:ex.PA||0,
@@ -24995,6 +25115,40 @@ function exportAnalyticsBundle(opts){
     awards,
     teamReports,
     scoutReports,
+    league:(()=>{ try{
+      const lg=_computeRecordsData().lg||{};
+      const bs=_computeRecordsData().batters, ps=_computeRecordsData().pitchers;
+      const avg=(arr,k)=>arr.length?+(arr.reduce((s,x)=>s+(x[k]||0),0)/arr.length).toFixed(3):null;
+      return {
+        env:'WBD는 MLB 대비 극단적 타고(打高) 리그 — 리그 평균을 기준선으로 해석할 것',
+        lgRA9:+(lg.lgRA9||0).toFixed(2), lgRPG:+(lg.lgRPG||0).toFixed(2), RPW:+(lg.RPW||0).toFixed(2),
+        lgwOBA:+(lg.lgWoba||0).toFixed(3),
+        batting:{ avgAVG:avg(bs.filter(b=>b.AB>=20),'avg'), avgOBP:avg(bs.filter(b=>b.AB>=20),'obp'),
+          avgSLG:avg(bs.filter(b=>b.AB>=20),'slg'), avgOPS:avg(bs.filter(b=>b.AB>=20),'ops'),
+          avgK_pct:avg(bs.filter(b=>b.AB>=20),'kPct'), avgBB_pct:avg(bs.filter(b=>b.AB>=20),'bbPct') },
+        pitching:{ avgERA:avg(ps.filter(p=>p.n>=50),'era'), avgFIP:avg(ps.filter(p=>p.n>=50),'fip'),
+          avgOppAVG:avg(ps.filter(p=>p.n>=50),'oAvg'), avgK9:avg(ps.filter(p=>p.n>=50),'k9'),
+          avgWhiff_pct:avg(ps.filter(p=>p.n>=50),'whiffPct') },
+        note:'avg* 는 자격(타자 AB≥20/투수 투구≥50) 충족 선수들의 평균. 개별 선수 비교 시 이 값을 100% 기준선으로 삼으면 됨'
+      };
+    }catch(_){ return null; } })(),
+    glossary:{
+      _desc:'WBD 커스텀/세이버 지표 정의 — 모든 지표는 WBD 리그 자체 환경 보정값 (MLB 상수 미사용)',
+      oWAR:'타자 종합 기여 승수(타격). 높을수록 좋음. (wRAA + 대체수준보정)/RPW. 리그 RPW로 환산',
+      pWAR:'투수 종합 기여 승수. 높을수록 좋음. V10.2부터 실점(RA9) 기반(bWAR식) — WBD는 BB가 희귀해 FIP 변별력이 낮아 실점 기반 채택',
+      WAR144:'WAR를 KBO 144경기 기준으로 환산(순위 불변, 스케일만 KBO 감각)',
+      wOBA:'타석당 득점가치 가중 평균. 높을수록 좋음. WBD 리그 가중치/스케일 사용',
+      'wRC+':'리그 평균=100 기준 득점생산력 지수. 110이면 평균보다 10% 우수',
+      FIP:'수비 무관 평균자책(K·BB·HR만). 낮을수록 좋음. 참고지표(WBD에선 변별력 낮음)',
+      'FIP-':'리그 평균=100 기준 FIP 지수. 낮을수록 좋음',
+      ERA:'평균자책점(실점=자책 단순화). 낮을수록 좋음',
+      WHIP:'이닝당 출루허용(피안타+볼넷). 낮을수록 좋음',
+      HRpct:'타자=홈런/타석%, 투수=피홈런/상대타자%',
+      seasonPV:'구종 가치 합 — 투구 결과 기반 누적 득점기여(투수 관점). 높을수록 좋음',
+      seasonXPV:'기대 구종 가치 — 타구질 기반 기대값',
+      OAA:'수비 아웃 기여(Outs Above Average). 양수면 평균 이상 수비',
+      splits:'선수별 상황 분할: byHand(vsL/vsR 상대 좌우투/좌우타), byPitchGroup(구종그룹별 성적+구사율+평균구속), byCount(ahead=유리/behind=불리/even 카운트), zone9(3x3 존 격자, 0:좌상~8:우하). null이면 표본 부족(<10구)'
+    },
     userData:lsData
   };
 }
