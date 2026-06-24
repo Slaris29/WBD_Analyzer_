@@ -5873,18 +5873,31 @@ function renderHeightStats(){
   const all=getBatterDataFiltered();
   if(!all.length){el.innerHTML='<span style="color:var(--muted)">데이터 없음</span>';return;}
   // 키별 집계
+  // V10.3 fix: 타수(AB)를 'ev>0이면 무조건'에서 '타석 종료 투구 중 볼넷·사구 제외'로 수정.
+  //   파울(ev>0이지만 타석 진행중)이 타수로 잘못 잡히던 버그. 안타도 낫아웃 출루 제외 통일.
   const byH={};
-  all.forEach(d=>{
+  // 타석 종료 판정 위해 타자별 정렬 필요 — all은 시간순 가정, 인덱스로 다음 투구 확인
+  all.forEach((d,i)=>{
     if(!d.bHCm)return;
     const h=Math.round(+d.bHCm);
     if(!byH[h])byH[h]={total:0,hits:0,hrs:0,ab:0,evSum:0,evCnt:0,laSum:0,laCnt:0};
     byH[h].total++;
-    if(d.ev>0){
-      byH[h].ab++;
+    // 타구질(EV/LA)은 인플레이 타구 전부에서 집계 (파울 포함해도 타구질 정보로 유효)
+    if(+d.ev>0){
       byH[h].evSum+=+d.ev;byH[h].evCnt++;
       if(d.ldeg!=null){byH[h].laSum+=+d.ldeg;byH[h].laCnt++;}
-      if(d['1BSafe']||d.result===4)byH[h].hits++;
-      if(d.result===4)byH[h].hrs++;
+    }
+    // 타석 종료 판정: 다음 투구가 다른 타자/이닝/게임이거나, 확정 종료 이벤트(HR/BB/HBP)
+    const nx=all[i+1];
+    const res=+d.result;
+    const isPaEnd = !nx || (res>=4&&res<=6) || d._gameId!==nx._gameId || d.inn!==nx.inn || d.half!==nx.half || d.bName!==nx.bName;
+    if(isPaEnd){
+      // 안타: 낫아웃 출루 제외 (1BSafe=1 & ev>0) 또는 홈런
+      const isHit=(+d['1BSafe']===1&&+d.ev>0)||res===4;
+      // 타수: 타석 종료 - 볼넷(5)/사구(6) 제외
+      if(res!==5&&res!==6) byH[h].ab++;
+      if(isHit) byH[h].hits++;
+      if(res===4) byH[h].hrs++;
     }
   });
   const heights=Object.keys(byH).map(Number).sort((a,b)=>b-a);
@@ -11420,6 +11433,7 @@ const CHANGELOG = [
     title: '🎯 평가 모델 고도화 — xPV 실측 재산출 · 수비 방향 · 무브먼트 재설계',
     badge: '#ffd700',
     changes: [
+      {icon:'🐛', text:'⭐ <b>(FIX) 키별 타격 성적 타수 오집계</b> — 사용자 발견: 4타수 3안타인데 5타수로 표시. 원인: 타수를 "인플레이 타구(ev>0)면 무조건"으로 세서 파울(ev>0이지만 타석 진행중)까지 타수로 잡힘. 타석 종료 판정 + 볼넷·사구 제외로 수정. 안타도 낫아웃 출루 제외 통일 (검증: 한 타자 59→54타수, 파울 15개 정확히 제외)'},
       {icon:'🎯', text:'⭐⭐⭐ <b>xPV 전면 재산출 (WBD 266경기 실측)</b> — 기대 구종가치를 MLB 격자+임의보정에서 WBD 실데이터로 교체. 인플레이 격자(EV×발사각) 재산출 + 카운트/삼진/볼넷 가치(COUNT_RE) 실측 통일 + 임의값(1.7배·zero-center·MLB결합) 전부 제거. 이제 "WBD 환경 투구당 실제 득점가치"로 일관'},
       {icon:'🛡️', text:'⭐⭐ <b>수비 OAA v5 — 포구 방향(전진/후퇴/측면)</b> — 외야 플라이 난이도가 방향에 크게 좌우(전진 아웃률 59% vs 후퇴 23%). 시작점→포구점 벡터로 방향 판정 후 요구속도 커브를 방향별 분리 학습. 예측-실제 1%p 이내, zero-sum 유지'},
       {icon:'🎯', text:'⭐⭐ <b>무브먼트 평가 재설계</b> — 구종별 절대평가(같은 구종끼리 백분위) → 주력+위력 가중 합산 + 결정구 보너스 + 원툴 방지. 구종분석 랭킹과 모수 통일(투수 평균무브 기준). 음수좌표 백분위 버그 수정'},
