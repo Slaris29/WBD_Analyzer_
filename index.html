@@ -601,6 +601,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
         <button class="mobile-menu-btn" onclick="navMobile('leaderboard')">🏅 리더보드</button>
         <button class="mobile-menu-btn" onclick="navMobile('team')">🏆 팀 분석</button>
         <button class="mobile-menu-btn" onclick="navMobile('awards')">🏆 어워드</button>
+        <button class="mobile-menu-btn" onclick="navMobile('league')">🏆 리그전</button>
         <button class="mobile-menu-btn" onclick="navMobile('insights')">📈 시즌 인사이트</button>
         <button class="mobile-menu-btn" onclick="navMobile('myteam')">⚔️ 내 팀</button>
         <button class="mobile-menu-btn" onclick="navMobile('pitchtype')">🎯 구종 분석</button>
@@ -647,6 +648,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
         <button onclick="showPage('leaderboard')">🏅 리더보드</button>
         <button onclick="showPage('records')" style="background:linear-gradient(90deg,rgba(255,200,68,.1),transparent);color:#ffc844">📚 기록실</button>
         <button onclick="showPage('awards')">🏆 어워드</button>
+        <button onclick="showPage('league')">🏆 리그전</button>
         <button onclick="showPage('insights')">📈 시즌 인사이트</button>
       </div>
     </div>
@@ -1339,6 +1341,15 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
 </div>
 
 <!-- ══ SEASON INSIGHTS PAGE ══ -->
+<div class="page" id="page-league">
+  <div class="filter-row" style="margin-bottom:14px;flex-wrap:wrap;align-items:center;gap:10px">
+    <span style="font-size:18px;font-weight:700;color:var(--amber)">🏆 리그전</span>
+    <span style="font-size:11px;color:var(--muted)">정규시즌 공식 기록</span>
+    <select id="league-season-sel" onchange="renderLeaguePage()" style="margin-left:auto;font-size:12px;padding:5px 10px;background:var(--bg2);color:var(--text);border:1px solid var(--border);border-radius:6px"></select>
+    <select id="league-phase-sel" onchange="renderLeaguePage()" style="font-size:12px;padding:5px 10px;background:var(--bg2);color:var(--text);border:1px solid var(--border);border-radius:6px"></select>
+  </div>
+  <div id="league-content"></div>
+</div>
 <div class="page" id="page-insights">
   <div class="filter-row" style="margin-bottom:16px;flex-wrap:wrap">
     <span class="filter-label">섹션</span>
@@ -3195,6 +3206,7 @@ function showPage(name,_internal){
     else if(name==='gamereport') renderGameReportPage();
     else if(name==='pfpmanager') renderPfpManagerPage();
     else if(name==='records') renderRecordsPage();
+    else if(name==='league') renderLeaguePage();
   };
   if(window._pageGateTimer) clearTimeout(window._pageGateTimer);
   _pageLoadingBadge(true);
@@ -22102,6 +22114,108 @@ function _recSort(key){
   if(st.sortKey === key) st.sortDir = st.sortDir==='desc' ? 'asc' : 'desc';
   else { st.sortKey = key; st.sortDir = 'desc'; }
   renderRecordsPage();
+}
+
+// ═══════════ V10.3: 리그전 전용 허브 (정규시즌 공식 기록) ═══════════
+function _leagueSeasons(){
+  // category='league' 게임들을 시즌(seasonName)별로 묶고, 각 시즌의 페이즈 목록도
+  const seasons = {};
+  GAMES.forEach(g => {
+    if((g.category||'') !== 'league') return;
+    const sn = g.seasonName || g.groupName || g.name || '?';
+    if(!seasons[sn]) seasons[sn] = { name: sn, phases: {}, count: 0 };
+    seasons[sn].count++;
+    const ph = g.phaseName || '정규시즌';
+    seasons[sn].phases[ph] = (seasons[sn].phases[ph]||0) + 1;
+  });
+  return seasons;
+}
+// 기본 시즌: localStorage에 저장된 값 우선, 없으면 가장 최근(게임 많은) 시즌
+function _leagueDefaultSeason(seasons){
+  try { const saved = localStorage.getItem('wbd_default_league_season');
+    if(saved && seasons[saved]) return saved; } catch(e){}
+  const names = Object.keys(seasons);
+  if(!names.length) return null;
+  return names.sort((a,b)=>seasons[b].count-seasons[a].count)[0];
+}
+function setDefaultLeagueSeason(){
+  const sel = document.getElementById('league-season-sel');
+  if(!sel || !sel.value) return;
+  try { localStorage.setItem('wbd_default_league_season', sel.value);
+    _toast && _toast('기본 시즌 설정', sel.value + ' 시즌이 리그전 기본값으로 저장됐습니다', 'success'); } catch(e){}
+}
+function renderLeaguePage(){
+  const el = document.getElementById('league-content');
+  if(!el) return;
+  const seasons = _leagueSeasons();
+  const seasonNames = Object.keys(seasons);
+  if(!seasonNames.length){
+    el.innerHTML = '<div class="card section" style="padding:30px;text-align:center;color:var(--muted)">리그전(league) 카테고리 데이터가 없습니다. 카테고리가 \'리그전\'인 경기를 불러오면 여기에 정규시즌 순위·기록이 표시됩니다.</div>';
+    return;
+  }
+  // 시즌 셀렉트 채우기
+  const ssel = document.getElementById('league-season-sel');
+  const defSeason = _leagueDefaultSeason(seasons);
+  const curSeason = (ssel.value && seasons[ssel.value]) ? ssel.value : defSeason;
+  ssel.innerHTML = seasonNames.sort().map(s=>`<option value="${s}"${s===curSeason?' selected':''}>${s} 시즌 (${seasons[s].count}경기)</option>`).join('');
+  // 페이즈 셀렉트 (정규시즌 기본)
+  const psel = document.getElementById('league-phase-sel');
+  const phases = Object.keys(seasons[curSeason].phases);
+  const hasReg = phases.includes('정규시즌');
+  const curPhase = (psel.value && seasons[curSeason].phases[psel.value]) ? psel.value : (hasReg ? '정규시즌' : phases[0]);
+  psel.innerHTML = phases.map(p=>`<option value="${p}"${p===curPhase?' selected':''}>${p} (${seasons[curSeason].phases[p]})</option>`).join('');
+
+  // 해당 시즌·페이즈 게임만
+  const games = GAMES.filter(g => (g.category||'')==='league' && (g.seasonName||g.groupName||g.name)===curSeason && (g.phaseName||'정규시즌')===curPhase);
+
+  // ── 팀 순위표 ──
+  const teams = {};
+  games.forEach(g => {
+    const info = _parseGameName(g.name);
+    const {totalA, totalB} = _computeInningScores(g.pitches);
+    const tA = _normalizeTeam(info.teamA), tB = _normalizeTeam(info.teamB);
+    if(!tA || !tB) return;
+    [[tA,totalA,totalB],[tB,totalB,totalA]].forEach(([t,rf,ra])=>{
+      if(!teams[t]) teams[t] = {team:t, w:0,l:0,t:0, rf:0,ra:0, g:0};
+      teams[t].g++; teams[t].rf+=rf; teams[t].ra+=ra;
+      if(rf>ra) teams[t].w++; else if(rf<ra) teams[t].l++; else teams[t].t++;
+    });
+  });
+  const standings = Object.values(teams).map(t=>({
+    ...t, pct: (t.w+t.l)>0 ? t.w/(t.w+t.l) : 0, diff: t.rf-t.ra
+  })).sort((a,b)=> b.pct-a.pct || b.diff-a.diff);
+  // 게임차(GB) 계산
+  const leader = standings[0];
+  standings.forEach(s=>{ s.gb = leader ? ((leader.w - s.w) + (s.l - leader.l))/2 : 0; });
+
+  let html = `<div class="card section" style="margin-bottom:16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div class="card-title" style="margin:0">📋 ${curSeason} ${curPhase} 순위표</div>
+      <button onclick="setDefaultLeagueSeason()" style="font-size:11px;padding:4px 10px;background:var(--bg2);color:var(--muted);border:1px solid var(--border);border-radius:6px;cursor:pointer" title="이 시즌을 리그전 기본값으로 저장">⭐ 기본 시즌으로</button>
+    </div>
+    <div class="tbl-wrap"><table class="data-table">
+    <thead><tr><th>순위</th><th>팀</th><th>경기</th><th>승</th><th>패</th><th>무</th><th>승률</th><th>게임차</th><th>득점</th><th>실점</th><th>득실차</th></tr></thead><tbody>`;
+  standings.forEach((s,i)=>{
+    const dc = s.diff>0?'#4ade80':s.diff<0?'#f87171':'var(--muted)';
+    html += `<tr>
+      <td style="font-family:var(--mono);font-weight:700;color:${i===0?'var(--amber)':'var(--text)'}">${i+1}</td>
+      <td style="font-weight:600">${s.team}</td>
+      <td style="font-family:var(--mono)">${s.g}</td>
+      <td style="font-family:var(--mono)">${s.w}</td>
+      <td style="font-family:var(--mono)">${s.l}</td>
+      <td style="font-family:var(--mono);color:var(--muted)">${s.t||0}</td>
+      <td style="font-family:var(--mono);font-weight:600">${s.pct.toFixed(3).replace(/^0/,'')}</td>
+      <td style="font-family:var(--mono);color:var(--muted)">${s.gb===0?'-':s.gb.toFixed(1)}</td>
+      <td style="font-family:var(--mono)">${s.rf}</td>
+      <td style="font-family:var(--mono)">${s.ra}</td>
+      <td style="font-family:var(--mono);color:${dc}">${s.diff>0?'+':''}${s.diff}</td>
+    </tr>`;
+  });
+  html += `</tbody></table></div>
+    <div style="font-size:10.5px;color:var(--muted);margin-top:6px">${games.length}경기 집계 · 승률 동률 시 득실차순 · 게임차(GB)는 1위 기준</div>
+  </div>`;
+
+  el.innerHTML = html;
 }
 
 function renderRecordsPage(){
