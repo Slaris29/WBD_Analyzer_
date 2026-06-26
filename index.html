@@ -598,6 +598,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
       </div>
       <div class="mobile-menu-section">
         <div class="mobile-menu-label">순위·어워드</div>
+        <button class="mobile-menu-btn" onclick="navMobile('league')" style="color:#ffd700;font-weight:700">🏆 리그전</button>
         <button class="mobile-menu-btn" onclick="navMobile('leaderboard')">🏅 리더보드</button>
         <button class="mobile-menu-btn" onclick="navMobile('team')">🏆 팀 분석</button>
         <button class="mobile-menu-btn" onclick="navMobile('awards')">🏆 어워드</button>
@@ -639,6 +640,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
     <button class="nav-btn" onclick="showPage('batter')">🏏 타자</button>
     <button class="nav-btn" onclick="showPage('cards')">🃏 카드</button>
     <button class="nav-btn" onclick="showPage('team')">🏆 팀</button>
+    <button class="nav-btn" onclick="showPage('league')" style="color:#ffd700;font-weight:700">🏆 리그전</button>
     
     <!-- 랭킹 드롭다운 -->
     <div class="nav-dropdown">
@@ -1339,6 +1341,15 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
 </div>
 
 <!-- ══ SEASON INSIGHTS PAGE ══ -->
+<div class="page" id="page-league">
+  <div class="filter-row" style="margin-bottom:14px;flex-wrap:wrap;align-items:center;gap:10px">
+    <span style="font-size:18px;font-weight:700;color:var(--amber)">🏆 리그전</span>
+    <span style="font-size:11px;color:var(--muted)">정규시즌 공식 기록</span>
+    <select id="league-season-sel" onchange="renderLeaguePage()" style="margin-left:auto;font-size:12px;padding:5px 10px;background:var(--bg2);color:var(--text);border:1px solid var(--border);border-radius:6px"></select>
+    <select id="league-phase-sel" onchange="renderLeaguePage()" style="font-size:12px;padding:5px 10px;background:var(--bg2);color:var(--text);border:1px solid var(--border);border-radius:6px"></select>
+  </div>
+  <div id="league-content"></div>
+</div>
 <div class="page" id="page-insights">
   <div class="filter-row" style="margin-bottom:16px;flex-wrap:wrap">
     <span class="filter-label">섹션</span>
@@ -3195,6 +3206,7 @@ function showPage(name,_internal){
     else if(name==='gamereport') renderGameReportPage();
     else if(name==='pfpmanager') renderPfpManagerPage();
     else if(name==='records') renderRecordsPage();
+    else if(name==='league') renderLeaguePage();
   };
   if(window._pageGateTimer) clearTimeout(window._pageGateTimer);
   _pageLoadingBadge(true);
@@ -9315,6 +9327,35 @@ function _autoCanonTeamMap(){
   for(const lc in cnt){
     map[lc]=Object.entries(cnt[lc]).sort((a,b)=>b[1]-a[1])[0][0];
   }
+  // V10.3: 오타 병합 — 편집거리 1(한 글자 차이)인 희귀 표기를 자주 쓰는 표기로 흡수.
+  //   예: "Purple Neosn Apex"(드묾) → "Purple Neon Apex"(자주). 길이 6자↑ + 빈도 3배↑일 때만(오병합 방지).
+  const _ed1 = (a,b) => {  // 편집거리 1 이하인지 (삽입/삭제/치환 1회)
+    if(Math.abs(a.length-b.length)>1) return false;
+    if(a===b) return true;
+    let i=0,j=0,diff=0;
+    while(i<a.length && j<b.length){
+      if(a[i]===b[j]){ i++; j++; }
+      else { if(++diff>1) return false;
+        if(a.length>b.length) i++; else if(a.length<b.length) j++; else { i++; j++; } }
+    }
+    return true;
+  };
+  const lcs = Object.keys(cnt);
+  const freq = lc => Object.values(cnt[lc]).reduce((s,v)=>s+v,0);
+  // 편집거리 1이고 길이 8자↑이면 더 많이 등장한 표기로 병합 (긴 이름의 오타는 우연일 확률 낮음).
+  //   짧은 이름(<8)은 진짜 다른 팀일 수 있어 제외해 오병합 방지.
+  lcs.forEach(rare => {
+    if(rare.length < 8) return;
+    const rf = freq(rare);
+    lcs.forEach(common => {
+      if(common===rare || common.length<8) return;
+      const cf = freq(common);
+      // 더 많은 쪽이 기준. 동률이면 사전순 먼저를 기준(결정적).
+      if(_ed1(rare, common) && (cf > rf || (cf===rf && common < rare))){
+        map[rare] = map[common];
+      }
+    });
+  });
   window._autoCanonMap=map;
   return map;
 }
@@ -22102,6 +22143,255 @@ function _recSort(key){
   if(st.sortKey === key) st.sortDir = st.sortDir==='desc' ? 'asc' : 'desc';
   else { st.sortKey = key; st.sortDir = 'desc'; }
   renderRecordsPage();
+}
+
+// ═══════════ V10.3: 팀 로고 시스템 (기반) ═══════════
+// 팀 로고 = GitHub 저장소 data/logos/ 폴더에서 자동 로드 (CSV 데이터와 같은 GitHub Pages 경로).
+//   운영자가 data/logos/<팀명>.png 를 push하면 자동 표시. localStorage는 보조(로컬 커스텀)용.
+//   파일명 규칙: 팀명 그대로(공백 포함) 또는 별칭. 확장자 png 우선 시도.
+const TEAM_LOGO_BASE = 'data/logos/';
+function _getTeamLogos(){  // 로컬 커스텀(보조)
+  try { return JSON.parse(localStorage.getItem('wbd_team_logos')||'{}'); } catch(e){ return {}; }
+}
+function _setTeamLogo(team, dataUrl){
+  const logos = _getTeamLogos();
+  if(dataUrl) logos[team] = dataUrl; else delete logos[team];
+  try { localStorage.setItem('wbd_team_logos', JSON.stringify(logos)); } catch(e){ console.warn('로고 저장 실패', e); }
+}
+// GitHub 로고 URL 후보 (팀명.png). 파일명 안전 처리.
+function _teamLogoUrl(team){
+  const safe = encodeURIComponent(String(team||'').trim());
+  return TEAM_LOGO_BASE + safe + '.png';
+}
+// 팀 로고 HTML — 로컬 커스텀 > GitHub 폴더 > 첫글자 폴백.
+//   GitHub 이미지는 onerror로 로드 실패 시 첫글자 뱃지로 자동 대체(폴더에 없는 팀도 깨지지 않음).
+function _teamLogoHTML(team, size){
+  size = size || 22;
+  const ch = (team||'?').trim().charAt(0).toUpperCase();
+  const hue = Math.abs([...(team||'')].reduce((a,c)=>a+c.charCodeAt(0),0)) % 360;
+  const fallback = `<span style=\"display:inline-flex;align-items:center;justify-content:center;width:${size}px;height:${size}px;border-radius:4px;background:hsl(${hue},45%,30%);color:#fff;font-size:${size*0.5}px;font-weight:700;vertical-align:middle;margin-right:6px\">${ch}</span>`;
+  const local = _getTeamLogos()[team];
+  const url = local || _teamLogoUrl(team);
+  // onerror: 이미지 없으면 폴백 뱃지로 교체
+  return `<img src="${url}" alt="${team}" loading="lazy" onerror="this.outerHTML=this.getAttribute('data-fb')" data-fb="${fallback.replace(/"/g,'&quot;')}" style="width:${size}px;height:${size}px;border-radius:4px;object-fit:cover;vertical-align:middle;margin-right:6px">`;
+}
+
+// ── 팀 로고 관리 모달 (브라우저 직접 업로드) ──
+function openLeagueLogoManager(){
+  const teams=new Set();
+  GAMES.filter(g=>(g.category||'')==='league').forEach(g=>{
+    const i=_parseGameName(g.name); [i.teamA,i.teamB].forEach(t=>{const n=_normalizeTeam(t);if(n)teams.add(n);});
+  });
+  const teamList=[...teams].sort();
+  let modal=document.getElementById('_logo_modal'); if(modal) modal.remove();
+  modal=document.createElement('div'); modal.id='_logo_modal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  modal.onclick=e=>{ if(e.target===modal) modal.remove(); };
+  modal.innerHTML=`<div style="background:var(--bg);border:1px solid var(--border);border-radius:12px;max-width:520px;width:100%;max-height:85vh;overflow:auto;padding:20px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <div style="font-size:16px;font-weight:700">🎨 팀 로고 관리</div>
+      <button onclick="document.getElementById('_logo_modal').remove()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer">✕</button>
+    </div>
+    <div style="font-size:10.5px;color:var(--muted);margin-bottom:14px">GitHub <code>${TEAM_LOGO_BASE}팀명.png</code>에 올리면 자동 로드됩니다. 또는 아래에서 직접 업로드(이 브라우저에만 저장).</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      ${teamList.map(t=>`<div style="display:flex;align-items:center;gap:10px;padding:6px;background:var(--bg2);border-radius:6px">
+        <span>${_teamLogoHTML(t,32)}</span>
+        <span style="flex:1;font-size:12px;font-weight:600">${t}</span>
+        <label style="font-size:10.5px;padding:4px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;cursor:pointer">업로드
+          <input type="file" accept="image/*" style="display:none" onchange="_handleLogoUpload('${t.replace(/'/g,"\\'")}',this)">
+        </label>
+        <button onclick="_setTeamLogo('${t.replace(/'/g,"\\'")}',null);document.getElementById('_logo_modal').remove();openLeagueLogoManager();renderLeaguePage()" style="font-size:10.5px;padding:4px 8px;background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);cursor:pointer" title="직접 업로드한 로고 삭제">🗑</button>
+      </div>`).join('')}
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+}
+function _handleLogoUpload(team, input){
+  const file=input.files&&input.files[0]; if(!file) return;
+  if(file.size>500000) _toast('파일이 큼','500KB 이하 권장 (브라우저 저장 용량 제한)','#f87171');
+  const reader=new FileReader();
+  reader.onload=e=>{ _setTeamLogo(team,e.target.result); renderLeaguePage();
+    document.getElementById('_logo_modal').remove(); openLeagueLogoManager(); _toast('로고 저장',team); };
+  reader.readAsDataURL(file);
+}
+
+// ═══════════ V10.3: 리그전 전용 허브 (정규시즌 공식 기록) ═══════════
+function _leagueSeasons(){
+  // category='league' 게임들을 시즌(seasonName)별로 묶고, 각 시즌의 페이즈 목록도
+  const seasons = {};
+  GAMES.forEach(g => {
+    if((g.category||'') !== 'league') return;
+    const sn = g.seasonName || g.groupName || g.name || '?';
+    if(!seasons[sn]) seasons[sn] = { name: sn, phases: {}, count: 0 };
+    seasons[sn].count++;
+    const ph = g.phaseName || '정규시즌';
+    seasons[sn].phases[ph] = (seasons[sn].phases[ph]||0) + 1;
+  });
+  return seasons;
+}
+// 기본 시즌: localStorage에 저장된 값 우선, 없으면 가장 최근(게임 많은) 시즌
+// ★ 운영자 설정: 현재 시즌 — 새 시즌 시작 시 이 값만 바꿔서 배포하면 리그전 기본값이 바뀜.
+//   해당 시즌(seasonName)이 로드된 데이터에 없으면 가장 최근(경기 많은) 시즌으로 자동 폴백.
+const WBD_CURRENT_SEASON = '26_Summer';
+function _leagueDefaultSeason(seasons){
+  if(seasons[WBD_CURRENT_SEASON]) return WBD_CURRENT_SEASON;
+  const names = Object.keys(seasons);
+  if(!names.length) return null;
+  return names.sort((a,b)=>seasons[b].count-seasons[a].count)[0];  // 폴백: 최다 경기 시즌
+}
+function renderLeaguePage(){
+  const el = document.getElementById('league-content');
+  if(!el) return;
+  const seasons = _leagueSeasons();
+  const seasonNames = Object.keys(seasons);
+  if(!seasonNames.length){
+    el.innerHTML = '<div class="card section" style="padding:30px;text-align:center;color:var(--muted)">리그전(league) 카테고리 데이터가 없습니다. 카테고리가 \'리그전\'인 경기를 불러오면 여기에 정규시즌 순위·기록이 표시됩니다.</div>';
+    return;
+  }
+  // 시즌 셀렉트 채우기
+  const ssel = document.getElementById('league-season-sel');
+  const defSeason = _leagueDefaultSeason(seasons);
+  const curSeason = (ssel.value && seasons[ssel.value]) ? ssel.value : defSeason;
+  ssel.innerHTML = seasonNames.sort().map(s=>`<option value="${s}"${s===curSeason?' selected':''}>${s} 시즌 (${seasons[s].count}경기)</option>`).join('');
+  // 페이즈 셀렉트 (정규시즌 기본)
+  const psel = document.getElementById('league-phase-sel');
+  const phases = Object.keys(seasons[curSeason].phases);
+  const hasReg = phases.includes('정규시즌');
+  const curPhase = (psel.value && seasons[curSeason].phases[psel.value]) ? psel.value : (hasReg ? '정규시즌' : phases[0]);
+  psel.innerHTML = phases.map(p=>`<option value="${p}"${p===curPhase?' selected':''}>${p} (${seasons[curSeason].phases[p]})</option>`).join('');
+
+  // 해당 시즌·페이즈 게임만
+  const games = GAMES.filter(g => (g.category||'')==='league' && (g.seasonName||g.groupName||g.name)===curSeason && (g.phaseName||'정규시즌')===curPhase);
+
+  // ── 팀 순위표 ──
+  const teams = {};
+  games.forEach(g => {
+    const info = _parseGameName(g.name);
+    const {totalA, totalB} = _computeInningScores(g.pitches);
+    const tA = _normalizeTeam(info.teamA), tB = _normalizeTeam(info.teamB);
+    if(!tA || !tB) return;
+    [[tA,totalA,totalB],[tB,totalB,totalA]].forEach(([t,rf,ra])=>{
+      if(!teams[t]) teams[t] = {team:t, w:0,l:0,t:0, rf:0,ra:0, g:0};
+      teams[t].g++; teams[t].rf+=rf; teams[t].ra+=ra;
+      if(rf>ra) teams[t].w++; else if(rf<ra) teams[t].l++; else teams[t].t++;
+    });
+  });
+  const standings = Object.values(teams).map(t=>({
+    ...t, pct: (t.w+t.l)>0 ? t.w/(t.w+t.l) : 0, diff: t.rf-t.ra
+  })).sort((a,b)=> b.pct-a.pct || b.diff-a.diff);
+  // 게임차(GB) 계산
+  const leader = standings[0];
+  standings.forEach(s=>{ s.gb = leader ? ((leader.w - s.w) + (s.l - leader.l))/2 : 0; });
+
+  let html = `<div class="card section" style="margin-bottom:16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div class="card-title" style="margin:0">📋 ${curSeason} ${curPhase} 순위표</div>
+      <span style="font-size:10px;color:var(--muted)">기본 시즌: <b style="color:var(--amber)">${WBD_CURRENT_SEASON}</b></span>
+    </div>
+    <div class="tbl-wrap"><table class="data-table">
+    <thead><tr><th>순위</th><th>팀</th><th>경기</th><th>승</th><th>패</th><th>무</th><th>승률</th><th>게임차</th><th>득점</th><th>실점</th><th>득실차</th></tr></thead><tbody>`;
+  standings.forEach((s,i)=>{
+    const dc = s.diff>0?'#4ade80':s.diff<0?'#f87171':'var(--muted)';
+    html += `<tr>
+      <td style="font-family:var(--mono);font-weight:700;color:${i===0?'var(--amber)':'var(--text)'}">${i+1}</td>
+      <td style="font-weight:600;cursor:pointer" onclick="toggleLeagueTeam('${s.team.replace(/'/g,"\\'")}')"  title="로스터 보기">${_teamLogoHTML(s.team)}${s.team} <span style="font-size:9px;color:var(--muted)">▾</span></td>
+      <td style="font-family:var(--mono)">${s.g}</td>
+      <td style="font-family:var(--mono)">${s.w}</td>
+      <td style="font-family:var(--mono)">${s.l}</td>
+      <td style="font-family:var(--mono);color:var(--muted)">${s.t||0}</td>
+      <td style="font-family:var(--mono);font-weight:600">${s.pct.toFixed(3).replace(/^0/,'')}</td>
+      <td style="font-family:var(--mono);color:var(--muted)">${s.gb===0?'-':s.gb.toFixed(1)}</td>
+      <td style="font-family:var(--mono)">${s.rf}</td>
+      <td style="font-family:var(--mono)">${s.ra}</td>
+      <td style="font-family:var(--mono);color:${dc}">${s.diff>0?'+':''}${s.diff}</td>
+    </tr>`;
+    // 펼친 팀이면 로스터 행 삽입 (해당 시즌 게임 활성화는 아래 리더보드 블록에서 처리되므로 여기선 표시만 마킹)
+  });
+  // 로스터는 리더보드용으로 게임 활성화된 뒤 렌더 (아래에서 처리)
+  html += `</tbody></table></div>
+    <div style="font-size:10.5px;color:var(--muted);margin-top:6px">${games.length}경기 집계 · 승률 동률 시 득실차순 · 게임차(GB)는 1위 기준</div>
+  </div>`;
+
+  // ── 리더보드 TOP5 (해당 시즌 게임만 임시 활성화 후 기록실 집계) ──
+  const gameIds = new Set(games.map(g=>g.id));
+  const savedActive = new Set(activeGameIds);
+  activeGameIds.clear(); gameIds.forEach(id=>activeGameIds.add(id));
+  rebuildG();
+  const savedCache = window._recordsCache;
+  window._recordsCache = {key:null, batters:null, pitchers:null};
+  let rec;
+  try { rec = _computeRecordsData(); } catch(e){ rec = {batters:[], pitchers:[]}; }
+  // 펼친 팀 로스터 HTML (게임 활성화된 지금 시점에 생성)
+  let rosterHTML = '';
+  if(window._leagueOpenTeam){
+    rosterHTML = _renderLeagueTeamRoster(window._leagueOpenTeam, games);
+  }
+  // 복원
+  activeGameIds.clear(); savedActive.forEach(id=>activeGameIds.add(id));
+  rebuildG();
+  window._recordsCache = savedCache;
+
+  const _lbCard = (title, rows, cols) => {
+    let h2 = `<div class="card section" style="flex:1;min-width:280px"><div class="card-title">${title}</div>
+      <div class="tbl-wrap"><table class="data-table"><thead><tr><th>#</th><th>선수</th>${cols.map(c=>`<th>${c.label}</th>`).join('')}</tr></thead><tbody>`;
+    rows.forEach((r,i)=>{
+      h2 += `<tr><td style="font-family:var(--mono);color:${i===0?'var(--amber)':'var(--muted)'}">${i+1}</td>
+        <td style="font-weight:600">${r.name}</td>${cols.map(c=>`<td style="font-family:var(--mono)${c.hl?';color:var(--amber);font-weight:600':''}">${c.fmt(r)}</td>`).join('')}</tr>`;
+    });
+    return h2 + '</tbody></table></div></div>';
+  };
+
+  const bQ = rec.batters.filter(b=>b.AB>=10);
+  const pQ = rec.pitchers.filter(p=>p.n>=30);
+  const top = (arr,key,n=5,desc=true) => arr.slice().sort((a,b)=>desc?(b[key]||0)-(a[key]||0):(a[key]||0)-(b[key]||0)).slice(0,n);
+
+  // 펼친 팀 로스터 (순위표 바로 아래)
+  if(rosterHTML) html += `<div class="card section" style="margin-bottom:16px">${rosterHTML}</div>`;
+
+  html += `<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px">`;
+  // 타격: 타율 / 홈런 / OPS / oWAR
+  html += _lbCard('🏏 타격 — 타율 TOP5', top(bQ,'avg'), [{label:'타율',fmt:r=>r.avg.toFixed(3).replace(/^0/,''),hl:1},{label:'안타',fmt:r=>r.H},{label:'타수',fmt:r=>r.AB}]);
+  html += _lbCard('💥 홈런 TOP5', top(bQ,'HR'), [{label:'홈런',fmt:r=>r.HR,hl:1},{label:'타율',fmt:r=>r.avg.toFixed(3).replace(/^0/,'')},{label:'OPS',fmt:r=>r.ops.toFixed(3).replace(/^0/,'')}]);
+  html += `</div><div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px">`;
+  html += _lbCard('🔥 OPS TOP5', top(bQ,'ops'), [{label:'OPS',fmt:r=>r.ops.toFixed(3).replace(/^0/,''),hl:1},{label:'타율',fmt:r=>r.avg.toFixed(3).replace(/^0/,'')},{label:'홈런',fmt:r=>r.HR}]);
+  html += _lbCard('⭐ oWAR TOP5', top(bQ,'owar'), [{label:'oWAR',fmt:r=>(r.owar||0).toFixed(2),hl:1},{label:'wOBA',fmt:r=>(r.woba||0).toFixed(3).replace(/^0/,'')},{label:'타석',fmt:r=>r.PA}]);
+  html += `</div><div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px">`;
+  // 투수: ERA(낮은순) / pWAR / 탈삼진
+  html += _lbCard('🎯 ERA TOP5', top(pQ,'era',5,false), [{label:'ERA',fmt:r=>r.era!=null?r.era.toFixed(2):'-',hl:1},{label:'이닝',fmt:r=>r.IP.toFixed(1)},{label:'탈삼진',fmt:r=>r.K}]);
+  html += _lbCard('⭐ pWAR TOP5', top(pQ,'pwar'), [{label:'pWAR',fmt:r=>(r.pwar!=null?r.pwar.toFixed(2):'-'),hl:1},{label:'ERA',fmt:r=>r.era!=null?r.era.toFixed(2):'-'},{label:'이닝',fmt:r=>r.IP.toFixed(1)}]);
+  html += `</div>`;
+
+  el.innerHTML = html;
+}
+
+// 리그전 팀 로스터 토글
+window._leagueOpenTeam = null;
+function toggleLeagueTeam(team){
+  window._leagueOpenTeam = (window._leagueOpenTeam===team) ? null : team;
+  renderLeaguePage();
+}
+function _renderLeagueTeamRoster(team, games){
+  // 해당 팀 소속 선수들의 정규시즌 기록 (해당 시즌 게임만 활성화된 상태에서 호출됨)
+  let rec;
+  try { rec = _computeRecordsData(); } catch(e){ return ''; }
+  const bat = rec.batters.filter(b=>_normalizeTeam(_playerTeam(b.name,'batter'))===team);
+  const pit = rec.pitchers.filter(p=>_normalizeTeam(_playerTeam(p.name,'pitcher'))===team);
+  if(!bat.length && !pit.length) return `<div style="padding:14px;color:var(--muted);font-size:12px">${team} 소속 선수 기록을 찾을 수 없습니다.</div>`;
+  bat.sort((a,b)=>(b.PA||0)-(a.PA||0));
+  pit.sort((a,b)=>(b.IP||0)-(a.IP||0));
+  let h2 = `<div style="padding:12px 14px;background:var(--bg2);border-radius:8px;margin:4px 0 12px">
+    <div style="font-size:13px;font-weight:700;margin-bottom:8px">${_teamLogoHTML(team,28)} ${team} 로스터</div>`;
+  if(bat.length){
+    h2 += `<div style="font-size:11px;color:var(--muted);margin:6px 0 3px">타자 (${bat.length})</div><div class="tbl-wrap"><table class="data-table"><thead><tr><th>선수</th><th>타석</th><th>타율</th><th>홈런</th><th>OPS</th><th>oWAR</th></tr></thead><tbody>`;
+    bat.forEach(b=>{ h2 += `<tr><td style="font-weight:600">${b.name}</td><td style="font-family:var(--mono)">${b.PA||0}</td><td style="font-family:var(--mono)">${(b.avg||0).toFixed(3).replace(/^0/,'')}</td><td style="font-family:var(--mono)">${b.HR||0}</td><td style="font-family:var(--mono)">${(b.ops||0).toFixed(3).replace(/^0/,'')}</td><td style="font-family:var(--mono)">${(b.owar||0).toFixed(2)}</td></tr>`; });
+    h2 += '</tbody></table></div>';
+  }
+  if(pit.length){
+    h2 += `<div style="font-size:11px;color:var(--muted);margin:10px 0 3px">투수 (${pit.length})</div><div class="tbl-wrap"><table class="data-table"><thead><tr><th>선수</th><th>이닝</th><th>ERA</th><th>탈삼진</th><th>pWAR</th></tr></thead><tbody>`;
+    pit.forEach(p=>{ h2 += `<tr><td style="font-weight:600">${p.name}</td><td style="font-family:var(--mono)">${(p.IP||0).toFixed(1)}</td><td style="font-family:var(--mono)">${p.era!=null?p.era.toFixed(2):'-'}</td><td style="font-family:var(--mono)">${p.K||0}</td><td style="font-family:var(--mono)">${p.pwar!=null?p.pwar.toFixed(2):'-'}</td></tr>`; });
+    h2 += '</tbody></table></div>';
+  }
+  return h2 + '</div>';
 }
 
 function renderRecordsPage(){
