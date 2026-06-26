@@ -22259,7 +22259,7 @@ function _leagueSeasons(){
 // 기본 시즌: localStorage에 저장된 값 우선, 없으면 가장 최근(게임 많은) 시즌
 // ★ 운영자 설정: 현재 시즌 — 새 시즌 시작 시 이 값만 바꿔서 배포하면 리그전 기본값이 바뀜.
 //   해당 시즌(seasonName)이 로드된 데이터에 없으면 가장 최근(경기 많은) 시즌으로 자동 폴백.
-const WBD_CURRENT_SEASON = '26_Summer';
+const WBD_CURRENT_SEASON = '26 Summer';
 function _leagueDefaultSeason(seasons){
   if(seasons[WBD_CURRENT_SEASON]) return WBD_CURRENT_SEASON;
   const names = Object.keys(seasons);
