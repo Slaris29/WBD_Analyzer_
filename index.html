@@ -22260,6 +22260,8 @@ function _leagueSeasons(){
 // ★ 운영자 설정: 현재 시즌 — 새 시즌 시작 시 이 값만 바꿔서 배포하면 리그전 기본값이 바뀜.
 //   해당 시즌(seasonName)이 로드된 데이터에 없으면 가장 최근(경기 많은) 시즌으로 자동 폴백.
 const WBD_CURRENT_SEASON = '26 Summer';
+// 시즌 폴더명(26_Summer) → 화면 표시용(26 Summer). 데이터 매칭은 폴더명 그대로 사용.
+function _seasonDisplay(s){ return String(s||'').replace(/_/g,' '); }
 function _leagueDefaultSeason(seasons){
   if(seasons[WBD_CURRENT_SEASON]) return WBD_CURRENT_SEASON;
   const names = Object.keys(seasons);
@@ -22506,29 +22508,80 @@ function _renderLeagueRecords(season, games){
       <button onclick="window._leagueRecTab='pitcher';renderLeaguePage()" style="font-size:12px;padding:6px 14px;border-radius:6px;border:1px solid var(--border);background:${!isB?'var(--amber)':'var(--bg2)'};color:${!isB?'#000':'var(--muted)'};font-weight:600;cursor:pointer">⚾ 투수</button>
       <button onclick="window._leagueHideUnqual=!window._leagueHideUnqual;renderLeaguePage()" style="font-size:11px;padding:6px 12px;border-radius:6px;border:1px solid var(--border);background:${hideUnq?'var(--amber)':'var(--bg2)'};color:${hideUnq?'#000':'var(--muted)'};cursor:pointer" title="규정 미달 선수 숨기기">${hideUnq?'☑':'☐'} 규정미달 제외</button>
       <span style="margin-left:auto;font-size:10.5px;color:var(--muted);align-self:center">${season} 정규시즌 · ${isB?`규정타석 ${Q.qPA.toFixed(0)}`:`규정이닝 ${_fmtIP(Q.qIP)}`} (${Q.games}경기 기준) · <span style="color:var(--muted);opacity:.6">흐린 행=규정미달</span></span>
-    </div><div class="tbl-wrap"><table class="data-table">`;
-  if(isB){
-    let bs = rec.batters.slice();
-    if(hideUnq) bs = bs.filter(b=>(b.PA||0)>=Q.qPA);
-    // 규정충족 먼저(OPS순), 그 다음 미달(OPS순)
-    bs.sort((a,b)=>{ const qa=(a.PA||0)>=Q.qPA, qb=(b.PA||0)>=Q.qPA; if(qa!==qb) return qa?-1:1; return (b.ops||0)-(a.ops||0); });
-    html += `<thead><tr><th>선수</th><th>팀</th><th>타석</th><th>타수</th><th>안타</th><th>2B</th><th>3B</th><th>홈런</th><th>총루타</th><th>볼넷</th><th>삼진</th><th>타율</th><th>출루</th><th>장타</th><th>OPS</th><th>ISO</th><th>BABIP</th><th>wOBA</th><th>wRC+</th><th>oWAR</th></tr></thead><tbody>`;
-    bs.forEach(b=>{ const unq=(b.PA||0)<Q.qPA;
-      html += `<tr style="${unq?'opacity:.45':''}" title="${unq?'규정타석 미달':''}"><td style="font-weight:600">${b.name}${unq?' <span style=\'font-size:9px;color:var(--muted)\'>°</span>':''}</td><td style="color:var(--muted);font-size:11px">${_normalizeTeam(_playerTeam(b.name,'batter'))||'-'}</td>
-      <td style="font-family:var(--mono)">${b.PA||0}</td><td style="font-family:var(--mono)">${b.AB||0}</td><td style="font-family:var(--mono)">${b.H||0}</td><td style="font-family:var(--mono)">${b.h2B||0}</td><td style="font-family:var(--mono)">${b.h3B||0}</td><td style="font-family:var(--mono)">${b.HR||0}</td><td style="font-family:var(--mono)">${b.TB||0}</td><td style="font-family:var(--mono)">${b.BB||0}</td><td style="font-family:var(--mono)">${b.K||0}</td>
-      <td style="font-family:var(--mono);font-weight:600">${(b.avg||0).toFixed(3).replace(/^0/,'')}</td><td style="font-family:var(--mono)">${(b.obp||0).toFixed(3).replace(/^0/,'')}</td><td style="font-family:var(--mono)">${(b.slg||0).toFixed(3).replace(/^0/,'')}</td>
-      <td style="font-family:var(--mono);font-weight:600">${(b.ops||0).toFixed(3).replace(/^0/,'')}</td><td style="font-family:var(--mono)">${(b.iso||0).toFixed(3).replace(/^0/,'')}</td><td style="font-family:var(--mono)">${(b.babip||0).toFixed(3).replace(/^0/,'')}</td><td style="font-family:var(--mono)">${(b.woba||0).toFixed(3).replace(/^0/,'')}</td><td style="font-family:var(--mono)">${(b.wrcPlus||0).toFixed(0)}</td><td style="font-family:var(--mono);color:var(--amber)">${(b.owar||0).toFixed(2)}</td></tr>`; });
-  } else {
-    let ps = rec.pitchers.slice();
-    if(hideUnq) ps = ps.filter(p=>(p.IP||0)>=Q.qIP);
-    ps.sort((a,b)=>{ const qa=(a.IP||0)>=Q.qIP, qb=(b.IP||0)>=Q.qIP; if(qa!==qb) return qa?-1:1; return (b.pwar||0)-(a.pwar||0); });
-    html += `<thead><tr><th>선수</th><th>팀</th><th>경기</th><th>이닝</th><th>투구</th><th>탈삼진</th><th>볼넷</th><th>피안타</th><th>피홈런</th><th>ERA</th><th>FIP</th><th>WHIP</th><th>K/9</th><th>K%</th><th>BB%</th><th>K/BB</th><th>pWAR</th></tr></thead><tbody>`;
-    ps.forEach(p=>{ const whip=(p.IP>0)?((p.H+p.BB)/p.IP):0; const unq=(p.IP||0)<Q.qIP;
-      html += `<tr style="${unq?'opacity:.45':''}" title="${unq?'규정이닝 미달':''}"><td style="font-weight:600">${p.name}${unq?' <span style=\'font-size:9px;color:var(--muted)\'>°</span>':''}</td><td style="color:var(--muted);font-size:11px">${_normalizeTeam(_playerTeam(p.name,'pitcher'))||'-'}</td>
-      <td style="font-family:var(--mono)">${p.G||0}</td><td style="font-family:var(--mono)">${_fmtIP(p.IP)}</td><td style="font-family:var(--mono)">${p.n||0}</td><td style="font-family:var(--mono)">${p.K||0}</td><td style="font-family:var(--mono)">${p.BB||0}</td><td style="font-family:var(--mono)">${p.H||0}</td><td style="font-family:var(--mono)">${p.HR||0}</td>
-      <td style="font-family:var(--mono);font-weight:600">${p.era!=null?p.era.toFixed(2):'-'}</td><td style="font-family:var(--mono)">${p.fip!=null?p.fip.toFixed(2):'-'}</td><td style="font-family:var(--mono)">${whip.toFixed(2)}</td><td style="font-family:var(--mono)">${(p.k9||0).toFixed(1)}</td><td style="font-family:var(--mono)">${(p.kPct||0).toFixed(1)}</td><td style="font-family:var(--mono)">${(p.bbPct||0).toFixed(1)}</td><td style="font-family:var(--mono)">${(p.kbb||0).toFixed(2)}</td><td style="font-family:var(--mono);color:var(--amber)">${p.pwar!=null?p.pwar.toFixed(2):'-'}</td></tr>`; });
-  }
+    </div>`;
+  // 컬럼 정의 (key=정렬키, f=포맷, num=숫자여부)
+  const f3 = v=>(v||0).toFixed(3).replace(/^0/,'');
+  const batCols = [
+    {k:'name',l:'선수',f:b=>b.name,txt:1},{k:'team',l:'팀',f:b=>_normalizeTeam(_playerTeam(b.name,'batter'))||'-',txt:1},
+    {k:'PA',l:'타석',f:b=>b.PA||0},{k:'AB',l:'타수',f:b=>b.AB||0},{k:'H',l:'안타',f:b=>b.H||0},
+    {k:'h2B',l:'2B',f:b=>b.h2B||0},{k:'h3B',l:'3B',f:b=>b.h3B||0},{k:'HR',l:'홈런',f:b=>b.HR||0},
+    {k:'TB',l:'총루타',f:b=>b.TB||0},{k:'BB',l:'볼넷',f:b=>b.BB||0},{k:'K',l:'삼진',f:b=>b.K||0},
+    {k:'avg',l:'타율',f:b=>f3(b.avg),hl:1},{k:'obp',l:'출루',f:b=>f3(b.obp)},{k:'slg',l:'장타',f:b=>f3(b.slg)},
+    {k:'ops',l:'OPS',f:b=>f3(b.ops),hl:1},{k:'iso',l:'ISO',f:b=>f3(b.iso)},{k:'babip',l:'BABIP',f:b=>f3(b.babip)},
+    {k:'woba',l:'wOBA',f:b=>f3(b.woba)},{k:'wrcPlus',l:'wRC+',f:b=>(b.wrcPlus||0).toFixed(0)},{k:'owar',l:'oWAR',f:b=>(b.owar||0).toFixed(2),amber:1}
+  ];
+  const pitCols = [
+    {k:'name',l:'선수',f:p=>p.name,txt:1},{k:'team',l:'팀',f:p=>_normalizeTeam(_playerTeam(p.name,'pitcher'))||'-',txt:1},
+    {k:'G',l:'경기',f:p=>p.G||0},{k:'IP',l:'이닝',f:p=>_fmtIP(p.IP)},{k:'n',l:'투구',f:p=>p.n||0},
+    {k:'K',l:'탈삼진',f:p=>p.K||0},{k:'BB',l:'볼넷',f:p=>p.BB||0},{k:'H',l:'피안타',f:p=>p.H||0},{k:'HR',l:'피홈런',f:p=>p.HR||0},
+    {k:'era',l:'ERA',f:p=>p.era!=null?p.era.toFixed(2):'-',hl:1,asc:1},{k:'fip',l:'FIP',f:p=>p.fip!=null?p.fip.toFixed(2):'-',asc:1},
+    {k:'whip',l:'WHIP',f:p=>p.IP>0?((p.H+p.BB)/p.IP).toFixed(2):'-',asc:1},
+    {k:'k9',l:'K/9',f:p=>(p.k9||0).toFixed(1)},{k:'kPct',l:'K%',f:p=>(p.kPct||0).toFixed(1)},{k:'bbPct',l:'BB%',f:p=>(p.bbPct||0).toFixed(1),asc:1},
+    {k:'kbb',l:'K/BB',f:p=>(p.kbb||0).toFixed(2)},{k:'pwar',l:'pWAR',f:p=>p.pwar!=null?p.pwar.toFixed(2):'-',amber:1}
+  ];
+  const cols = isB ? batCols : pitCols;
+  const sampleKey = isB?'PA':'IP', qVal = isB?Q.qPA:Q.qIP;
+  // 정렬 상태
+  if(!window._leagueRecSort) window._leagueRecSort={};
+  const sortState = window._leagueRecSort[isB?'b':'p'] || {key:(isB?'ops':'pwar'), dir:'desc'};
+  window._leagueRecSort[isB?'b':'p'] = sortState;
+
+  let rows = (isB?rec.batters:rec.pitchers).slice();
+  if(hideUnq) rows = rows.filter(r=>(r[sampleKey]||0)>=qVal);
+  // 정렬: 규정충족 우선 후 선택 정렬키
+  const sc = cols.find(c=>c.k===sortState.key) || cols[0];
+  rows.sort((a,b)=>{
+    const qa=(a[sampleKey]||0)>=qVal, qb=(b[sampleKey]||0)>=qVal;
+    if(qa!==qb) return qa?-1:1;
+    let av=a[sortState.key], bv=b[sortState.key];
+    if(sc.txt){ av=String(av||''); bv=String(bv||''); return sortState.dir==='desc'?bv.localeCompare(av):av.localeCompare(bv); }
+    av=+av||0; bv=+bv||0; return sortState.dir==='desc'?bv-av:av-bv;
+  });
+
+  html += `<div class="tbl-wrap"><table class="data-table"><thead><tr>`;
+  cols.forEach(c=>{
+    const active=sortState.key===c.k;
+    const arrow=active?(sortState.dir==='desc'?' ▼':' ▲'):'';
+    html += `<th onclick="_leagueSortRecords('${isB?'b':'p'}','${c.k}',${c.asc?1:0})" style="cursor:pointer;${active?'color:var(--amber)':''}" title="클릭하여 정렬">${c.l}${arrow}</th>`;
+  });
+  html += `</tr></thead><tbody>`;
+  rows.forEach(r=>{
+    const unq=(r[sampleKey]||0)<qVal;
+    html += `<tr style="${unq?'opacity:.45':''}" title="${unq?(isB?'규정타석':'규정이닝')+' 미달':''}">`;
+    cols.forEach((c,ci)=>{
+      const style = ci===0?'font-weight:600':(c.txt?'color:var(--muted);font-size:11px':`font-family:var(--mono)${c.hl?';font-weight:600':''}${c.amber?';color:var(--amber)':''}`);
+      const mark = (ci===0&&unq)?' <span style="font-size:9px;color:var(--muted)">°</span>':'';
+      html += `<td style="${style}">${c.f(r)}${mark}</td>`;
+    });
+    html += `</tr>`;
+  });
   return html + '</tbody></table></div></div>';
+}
+// 팀기록 정렬 토글
+function _leagueSortTeams(key, asc){
+  if(!window._leagueTeamSort) window._leagueTeamSort={key:'war',dir:'desc'};
+  const c=window._leagueTeamSort;
+  if(c.key===key){ c.dir=c.dir==='desc'?'asc':'desc'; } else { c.key=key; c.dir=asc?'asc':'desc'; }
+  renderLeaguePage();
+}
+// 기록실 정렬 토글
+function _leagueSortRecords(tab, key, asc){
+  if(!window._leagueRecSort) window._leagueRecSort={};
+  const cur = window._leagueRecSort[tab]||{};
+  if(cur.key===key){ cur.dir = cur.dir==='desc'?'asc':'desc'; }
+  else { cur.key=key; cur.dir = asc?'asc':'desc'; }  // 낮을수록 좋은 지표(ERA등)는 기본 오름차순
+  window._leagueRecSort[tab]=cur;
+  renderLeaguePage();
 }
 // 팀 기록실 (팀별 합산 성적)
 function _renderLeagueTeamRecords(season, games){
@@ -22540,21 +22593,45 @@ function _renderLeagueTeamRecords(season, games){
     [i.teamA,i.teamB].forEach(t=>{const n=_normalizeTeam(t); if(n) leagueTeams.add(n);}); });
   // 팀별 타격/투수 합산 (리그전 출전팀만)
   const teams={};
+  const ini=t=>({team:t,PA:0,AB:0,H:0,h2B:0,h3B:0,HR:0,TB:0,BB:0,K:0,owar:0, IP:0,pK:0,pBB:0,pH:0,pHR:0,era_w:0,fip_w:0,pwar:0});
   rec.batters.forEach(b=>{ const t=_normalizeTeam(_playerTeam(b.name,'batter')); if(!t||!leagueTeams.has(t))return;
-    if(!teams[t])teams[t]={team:t,PA:0,AB:0,H:0,HR:0,owar:0,IP:0,K:0,BBp:0,Hp:0,era_w:0,pwar:0};
-    teams[t].PA+=b.PA||0; teams[t].AB+=b.AB||0; teams[t].H+=b.H||0; teams[t].HR+=b.HR||0; teams[t].owar+=b.owar||0; });
+    if(!teams[t])teams[t]=ini(t); const T=teams[t];
+    T.PA+=b.PA||0; T.AB+=b.AB||0; T.H+=b.H||0; T.h2B+=b.h2B||0; T.h3B+=b.h3B||0; T.HR+=b.HR||0; T.TB+=b.TB||0; T.BB+=b.BB||0; T.K+=b.K||0; T.owar+=b.owar||0; });
   rec.pitchers.forEach(p=>{ const t=_normalizeTeam(_playerTeam(p.name,'pitcher')); if(!t||!leagueTeams.has(t))return;
-    if(!teams[t])teams[t]={team:t,PA:0,AB:0,H:0,HR:0,owar:0,IP:0,K:0,BBp:0,Hp:0,era_w:0,pwar:0};
-    teams[t].IP+=p.IP||0; teams[t].K+=p.K||0; teams[t].BBp+=p.BB||0; teams[t].Hp+=p.H||0; teams[t].pwar+=p.pwar||0;
-    if(p.era!=null&&p.IP>0) teams[t].era_w += p.era*p.IP; });
-  const arr=Object.values(teams).map(t=>({...t, avg:t.AB>0?t.H/t.AB:0, era:t.IP>0?t.era_w/t.IP:null, war:(t.owar||0)+(t.pwar||0)}))
-    .sort((a,b)=>(b.war||0)-(a.war||0));
-  let html = `<div class="card section"><div class="card-title">👥 ${season} 팀 기록</div><div class="tbl-wrap"><table class="data-table">
-    <thead><tr><th>팀</th><th>팀타율</th><th>홈런</th><th>oWAR</th><th>팀ERA</th><th>탈삼진</th><th>pWAR</th><th>총WAR</th></tr></thead><tbody>`;
-  arr.forEach(t=>{ html += `<tr><td style="font-weight:600">${_teamLogoHTML(t.team,20)}${t.team}</td>
-    <td style="font-family:var(--mono)">${t.avg.toFixed(3).replace(/^0/,'')}</td><td style="font-family:var(--mono)">${t.HR}</td><td style="font-family:var(--mono)">${t.owar.toFixed(1)}</td>
-    <td style="font-family:var(--mono)">${t.era!=null?t.era.toFixed(2):'-'}</td><td style="font-family:var(--mono)">${t.K}</td><td style="font-family:var(--mono)">${t.pwar.toFixed(1)}</td>
-    <td style="font-family:var(--mono);font-weight:700;color:var(--amber)">${t.war.toFixed(1)}</td></tr>`; });
+    if(!teams[t])teams[t]=ini(t); const T=teams[t];
+    T.IP+=p.IP||0; T.pK+=p.K||0; T.pBB+=p.BB||0; T.pH+=p.H||0; T.pHR+=p.HR||0; T.pwar+=p.pwar||0;
+    if(p.era!=null&&p.IP>0) T.era_w+=p.era*p.IP; if(p.fip!=null&&p.IP>0) T.fip_w+=p.fip*p.IP; });
+  const arr=Object.values(teams).map(t=>({...t,
+    avg:t.AB>0?t.H/t.AB:0, obp:t.PA>0?(t.H+t.BB)/t.PA:0, slg:t.AB>0?t.TB/t.AB:0,
+    ops:(t.AB>0?t.TB/t.AB:0)+(t.PA>0?(t.H+t.BB)/t.PA:0),
+    era:t.IP>0?t.era_w/t.IP:null, fip:t.IP>0?t.fip_w/t.IP:null, whip:t.IP>0?(t.pH+t.pBB)/t.IP:null,
+    war:(t.owar||0)+(t.pwar||0)
+  }));
+  // 정렬 상태
+  if(!window._leagueTeamSort) window._leagueTeamSort={key:'war',dir:'desc'};
+  const ts=window._leagueTeamSort;
+  const teamCols=[
+    {k:'team',l:'팀',f:t=>`${_teamLogoHTML(t.team,24)}${t.team}`,txt:1},
+    {k:'avg',l:'타율',f:t=>t.avg.toFixed(3).replace(/^0/,'')},{k:'obp',l:'출루',f:t=>t.obp.toFixed(3).replace(/^0/,'')},
+    {k:'slg',l:'장타',f:t=>t.slg.toFixed(3).replace(/^0/,'')},{k:'ops',l:'OPS',f:t=>t.ops.toFixed(3).replace(/^0/,''),hl:1},
+    {k:'H',l:'안타',f:t=>t.H},{k:'HR',l:'홈런',f:t=>t.HR},{k:'BB',l:'볼넷',f:t=>t.BB},
+    {k:'owar',l:'oWAR',f:t=>t.owar.toFixed(1)},
+    {k:'era',l:'ERA',f:t=>t.era!=null?t.era.toFixed(2):'-',asc:1},{k:'fip',l:'FIP',f:t=>t.fip!=null?t.fip.toFixed(2):'-',asc:1},
+    {k:'whip',l:'WHIP',f:t=>t.whip!=null?t.whip.toFixed(2):'-',asc:1},
+    {k:'pK',l:'탈삼진',f:t=>t.pK},{k:'pwar',l:'pWAR',f:t=>t.pwar.toFixed(1)},
+    {k:'war',l:'총WAR',f:t=>t.war.toFixed(1),amber:1}
+  ];
+  const sc=teamCols.find(c=>c.k===ts.key)||teamCols[0];
+  arr.sort((a,b)=>{ if(sc.txt) return ts.dir==='desc'?String(b[ts.key]).localeCompare(String(a[ts.key])):String(a[ts.key]).localeCompare(String(b[ts.key]));
+    const av=+a[ts.key]||0, bv=+b[ts.key]||0; return ts.dir==='desc'?bv-av:av-bv; });
+  let html = `<div class="card section"><div class="card-title">👥 ${season} 팀 기록</div><div class="tbl-wrap"><table class="data-table"><thead><tr>`;
+  teamCols.forEach(c=>{ const active=ts.key===c.k; const arrow=active?(ts.dir==='desc'?' ▼':' ▲'):'';
+    html += `<th onclick="_leagueSortTeams('${c.k}',${c.asc?1:0})" style="cursor:pointer;${active?'color:var(--amber)':''}">${c.l}${arrow}</th>`; });
+  html += `</tr></thead><tbody>`;
+  arr.forEach(t=>{ html += `<tr>`;
+    teamCols.forEach((c,ci)=>{ const style=ci===0?'font-weight:600':`font-family:var(--mono)${c.hl?';font-weight:600':''}${c.amber?';font-weight:700;color:var(--amber)':''}`;
+      html += `<td style="${style}">${c.f(t)}</td>`; });
+    html += `</tr>`; });
   return html + '</tbody></table></div></div>';
 }
 
@@ -22629,7 +22706,7 @@ function renderLeaguePage(){
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
       <div class="card-title" style="margin:0">📋 ${curSeason} ${curPhase} 순위표</div>
       <div style="display:flex;align-items:center;gap:8px">
-        <span style="font-size:10px;color:var(--muted)">기본 시즌: <b style="color:var(--amber)">${WBD_CURRENT_SEASON}</b></span>
+        <span style="font-size:10px;color:var(--muted)">기본 시즌: <b style="color:var(--amber)">${_seasonDisplay(WBD_CURRENT_SEASON)}</b></span>
         ${seasonNames.length>=2?`<button onclick="openSeasonCompare()" style="font-size:11px;padding:4px 10px;background:var(--bg2);color:var(--muted);border:1px solid var(--border);border-radius:6px;cursor:pointer" title="시즌 비교">📊 시즌 비교</button>`:''}
         <button onclick="openLeagueLogoManager()" style="font-size:11px;padding:4px 10px;background:var(--bg2);color:var(--muted);border:1px solid var(--border);border-radius:6px;cursor:pointer" title="팀 로고 관리">🎨 로고</button>
       </div>
@@ -22640,7 +22717,7 @@ function renderLeaguePage(){
     const dc = s.diff>0?'#4ade80':s.diff<0?'#f87171':'var(--muted)';
     html += `<tr>
       <td style="font-family:var(--mono);font-weight:700;color:${i===0?'var(--amber)':'var(--text)'}">${i+1}</td>
-      <td style="font-weight:600;cursor:pointer" onclick="toggleLeagueTeam('${s.team.replace(/'/g,"\\'")}')"  title="로스터 보기">${_teamLogoHTML(s.team)}${s.team} <span style="font-size:9px;color:var(--muted)">▾</span></td>
+      <td style="font-weight:600;cursor:pointer" onclick="toggleLeagueTeam('${s.team.replace(/'/g,"\\'")}')"  title="로스터 보기"><span style="display:inline-flex;align-items:center;gap:8px;font-size:14px">${_teamLogoHTML(s.team,30)}${s.team}</span> <span style="font-size:10px;color:var(--muted)">▾</span></td>
       <td style="font-family:var(--mono)">${s.g}</td>
       <td style="font-family:var(--mono)">${s.w}</td>
       <td style="font-family:var(--mono)">${s.l}</td>
