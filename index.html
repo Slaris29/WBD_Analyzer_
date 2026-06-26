@@ -8605,47 +8605,49 @@ function calcGameDecisions(gamePitches, info){
   }
   // 끝내기 보정: score 미반영이면 마지막 투구가 결승
   if(leadIdx<0) leadIdx=data.length-1;
-  // 결승 시점에 던지던 승리팀 투수 (그 시점 half가 loseHalf공격=winHalf투수일 때)
-  // 결승점은 승팀 공격 때 나므로, 그 직전/당시 수비한 패팀이 아니라, 그 이닝 승팀 투수 = 직전 수비이닝 투수
-  // 간이: 결승 시점 이닝 번호 이하에서 마지막으로 던진 승리팀 투수
-  const leadInn = +data[leadIdx].inn;
+  // V11.1 fix: 승리투수 = 결승점 시점에 "이미 등판한"(firstIdx<=leadIdx) 승팀 투수 중 마지막.
+  //   결승점 이후 등판한 투수(firstIdx>leadIdx)는 승리 아님 → 세이브/홀드 후보.
+  //   이닝 번호가 아니라 투구 인덱스(시간 순서)로 비교해야 정확
+  //   (예: 9회초 결승점 후 9회말 새 투수 등판 시 그 투수는 승리 아님).
   let winner=null;
   for(const s of winPs){
-    const sInn=+data[s.firstIdx].inn;
-    if(sInn<=leadInn) winner=s;  // 결승 이닝까지 등판한 마지막 승팀 투수
+    if(s.firstIdx<=leadIdx) winner=s;  // 결승점 시점까지 등판한 마지막 승팀 투수
   }
   if(!winner) winner=winStarter;
-  // 선발 5이닝 규칙: winner가 선발인데 5이닝 미만이면 다음 투수
+  // 선발 5이닝 규칙: winner가 선발인데 5이닝 미만이면 다음(결승점 이전 등판) 투수
   const starterOuts=(pg[winStarter.name]||{}).outs||0;
   if(winner===winStarter && starterOuts<15 && winPs.length>1){
-    winner=winPs[1];
+    // 결승점 이전 등판한 두 번째 투수
+    if(winPs[1] && winPs[1].firstIdx<=leadIdx) winner=winPs[1];
   }
   if(winner) result.W=winner.name;
 
   // ── 패전투수(L) ──
-  //   결승점을 허용한 패배팀 투수. 결승 시점에 던지던 패팀 투수.
+  //   결승점을 허용한 패배팀 투수 = 결승점 시점(leadIdx)에 던지고 있던 패팀 투수.
   let loser=null;
   for(const s of losePs){
-    const sFirst=+data[s.firstIdx].inn, sLast=+data[s.lastIdx].inn;
-    if(sFirst<=leadInn && leadInn<=sLast+1) loser=s;
+    if(s.firstIdx<=leadIdx && leadIdx<=s.lastIdx) { loser=s; break; }  // 결승점 시점 등판 중
   }
-  if(!loser) loser=losePs[losePs.length-1];  // 폴백: 마지막 패팀 투수
+  if(!loser){ // 폴백: 결승점 직전까지 등판한 마지막 패팀 투수
+    for(const s of losePs){ if(s.firstIdx<=leadIdx) loser=s; }
+  }
+  if(!loser) loser=losePs[losePs.length-1];
   if(loser) result.L=loser.name;
 
   // ── 세이브(S) / 홀드(H) ──
-  //   승리팀에 구원투수가 있을 때. 마지막 투수가 리드 지키고 끝냈으면 세이브(선발승이 아닐 때).
-  //   중간 구원투수가 리드 물려주고 내려갔으면 홀드.
+  //   승리투수 이후 등판해 리드 지킨 투수들. 마지막 투수가 경기 끝까지 리드 지키면 세이브.
+  //   승리투수와 마무리 사이 중간계투는 홀드.
   if(winPs.length>1){
     const closer=winPs[winPs.length-1];
-    // 마지막 투수가 승리투수가 아니면 세이브 후보
-    if(closer.name!==result.W){
-      const cOuts=(pg[closer.name]||{}).outs||0, cRuns=(pg[closer.name]||{}).runs||0;
-      // 세이브: 리드 지키고 경기 종료 (최소 1아웃, 3점차 이내 or 1이닝+)
+    // 마지막 투수가 승리투수가 아니고, 승리투수보다 나중에(또는 결승점 이후) 등판했으면 세이브
+    if(closer.name!==result.W && closer.firstIdx>(winner?winner.firstIdx:-1)){
+      const cOuts=(pg[closer.name]||{}).outs||0;
       const margin=Math.abs(finalA-finalB);
       if(cOuts>=1 && (margin<=3 || cOuts>=3)) result.S=closer.name;
     }
-    // 홀드: 선발과 마지막(승/세이브) 사이 중간계투들 중 리드 유지하고 내려간 투수
-    for(let i=1;i<winPs.length-1;i++){
+    // 홀드: 승리투수 다음 ~ 마무리 이전 중간계투 (리드 유지 강판)
+    const winIdx = winPs.findIndex(s=>s.name===result.W);
+    for(let i=Math.max(1,winIdx+1);i<winPs.length-1;i++){
       const mid=winPs[i];
       if(mid.name!==result.W && mid.name!==result.S) result.H.push(mid.name);
     }
