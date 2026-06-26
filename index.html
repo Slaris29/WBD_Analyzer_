@@ -22239,6 +22239,185 @@ function _leagueDefaultSeason(seasons){
   if(!names.length) return null;
   return names.sort((a,b)=>seasons[b].count-seasons[a].count)[0];  // 폴백: 최다 경기 시즌
 }
+// 포스트시즌 결과창 (대진/시리즈 결과 중심)
+function _renderLeaguePostseason(season, phase, games){
+  if(!games.length) return `<div class="card section" style="padding:30px;text-align:center;color:var(--muted)">${season} ${phase} 경기 데이터가 없습니다.</div>`;
+  // 경기별 결과 (날짜순)
+  const results = games.map(g=>{
+    const info=_parseGameName(g.name);
+    const {totalA,totalB}=_computeInningScores(g.pitches);
+    return {date:info.date||'', tA:_normalizeTeam(info.teamA), tB:_normalizeTeam(info.teamB), sA:totalA, sB:totalB};
+  }).filter(r=>r.tA&&r.tB).sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+
+  // 팀별 시리즈 전적 (맞대결 승수 집계 → 시리즈 형태 파악)
+  const matchups={};
+  results.forEach(r=>{
+    const key=[r.tA,r.tB].sort().join(' vs ');
+    if(!matchups[key]) matchups[key]={teams:[r.tA,r.tB].sort(), w:{}};
+    const winner = r.sA>r.sB ? r.tA : (r.sB>r.sA ? r.tB : null);
+    if(winner) matchups[key].w[winner]=(matchups[key].w[winner]||0)+1;
+  });
+
+  let html = `<div class="card section" style="margin-bottom:16px">
+    <div class="card-title">🏆 ${season} ${phase}</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:10px">${games.length}경기 · 정규시즌과 분리된 포스트시즌 기록</div>`;
+
+  // 시리즈별 카드
+  const series=Object.values(matchups);
+  if(series.length){
+    html += `<div style="display:flex;flex-direction:column;gap:10px">`;
+    series.forEach(m=>{
+      const [t1,t2]=m.teams; const w1=m.w[t1]||0, w2=m.w[t2]||0;
+      const lead1=w1>w2, lead2=w2>w1;
+      html += `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bg2);border-radius:8px">
+        <span style="flex:1;text-align:right;font-weight:${lead1?'700':'500'};color:${lead1?'var(--amber)':'var(--text)'}">${t1} ${_teamLogoHTML(t1,22)}</span>
+        <span style="font-family:var(--mono);font-weight:700;font-size:16px;min-width:60px;text-align:center">${w1} - ${w2}</span>
+        <span style="flex:1;text-align:left;font-weight:${lead2?'700':'500'};color:${lead2?'var(--amber)':'var(--text)'}">${_teamLogoHTML(t2,22)} ${t2}</span>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+  html += `</div>`;
+
+  // 경기별 상세 결과
+  html += `<div class="card section"><div class="card-title">📅 경기 결과</div><div style="display:flex;flex-direction:column;gap:6px">`;
+  results.forEach((r,i)=>{
+    const aWin=r.sA>r.sB, bWin=r.sB>r.sA;
+    html += `<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg2);border-radius:7px;font-size:12px">
+      <span style="color:var(--muted);font-size:10px;min-width:20px">${i+1}</span>
+      <span style="color:var(--muted);font-size:10.5px;min-width:72px">${r.date||'-'}</span>
+      <span style="flex:1;text-align:right;font-weight:${aWin?'700':'400'};color:${aWin?'var(--text)':'var(--muted)'}">${r.tA} ${_teamLogoHTML(r.tA,18)}</span>
+      <span style="font-family:var(--mono);font-weight:700;min-width:54px;text-align:center">${r.sA} : ${r.sB}</span>
+      <span style="flex:1;text-align:left;font-weight:${bWin?'700':'400'};color:${bWin?'var(--text)':'var(--muted)'}">${_teamLogoHTML(r.tB,18)} ${r.tB}</span>
+    </div>`;
+  });
+  html += `</div></div>`;
+  return html;
+}
+
+function _leagueSeasonStats(seasonName){
+  const games = GAMES.filter(g=>(g.category||'')==='league'&&(g.seasonName||g.groupName||g.name)===seasonName&&(g.phaseName||'정규시즌')==='정규시즌');
+  const gameIds=new Set(games.map(g=>g.id));
+  const saved=new Set(activeGameIds);
+  activeGameIds.clear(); gameIds.forEach(id=>activeGameIds.add(id)); rebuildG();
+  const savedC=window._recordsCache; window._recordsCache={key:null,batters:null,pitchers:null};
+  let rec; try{ rec=_computeRecordsData(); }catch(e){ rec={batters:[],pitchers:[]}; }
+  activeGameIds.clear(); saved.forEach(id=>activeGameIds.add(id)); rebuildG();
+  window._recordsCache=savedC;
+  const bQ=rec.batters.filter(b=>b.AB>=10), pQ=rec.pitchers.filter(p=>p.n>=30);
+  const bestBat=bQ.slice().sort((a,b)=>(b.owar||0)-(a.owar||0))[0];
+  const bestPit=pQ.slice().sort((a,b)=>(b.pwar||0)-(a.pwar||0))[0];
+  const lgAvg=bQ.length?(bQ.reduce((s,b)=>s+(b.H||0),0)/Math.max(1,bQ.reduce((s,b)=>s+(b.AB||0),0))):0;
+  return {games:games.length, batters:rec.batters.length, pitchers:rec.pitchers.length,
+    lgAvg, bestBat:bestBat?{n:bestBat.name,v:bestBat.owar}:null, bestPit:bestPit?{n:bestPit.name,v:bestPit.pwar}:null,
+    topHR:bQ.slice().sort((a,b)=>(b.HR||0)-(a.HR||0))[0]};
+}
+function openSeasonCompare(){
+  const seasonsObj=_leagueSeasons();
+  const names=Object.keys(seasonsObj).sort();
+  if(names.length<2){ _toast('시즌 비교 불가','비교하려면 시즌이 2개 이상 필요합니다'); return; }
+  const s1=names[names.length-1], s2=names[names.length-2];
+  let modal=document.getElementById('_cmp_modal'); if(modal) modal.remove();
+  modal=document.createElement('div'); modal.id='_cmp_modal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  modal.onclick=e=>{ if(e.target===modal) modal.remove(); };
+  const opts=names.map(n=>`<option value="${n}">${n}</option>`).join('');
+  modal.innerHTML=`<div style="background:var(--bg);border:1px solid var(--border);border-radius:12px;max-width:600px;width:100%;max-height:85vh;overflow:auto;padding:20px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div style="font-size:16px;font-weight:700">📊 시즌 비교</div>
+      <button onclick="document.getElementById('_cmp_modal').remove()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer">✕</button>
+    </div>
+    <div style="display:flex;gap:10px;margin-bottom:14px;align-items:center">
+      <select id="_cmp_s1" onchange="_renderSeasonCompare()" style="flex:1;font-size:12px;padding:6px;background:var(--bg2);color:var(--text);border:1px solid var(--border);border-radius:6px">${opts}</select>
+      <span style="color:var(--muted)">vs</span>
+      <select id="_cmp_s2" onchange="_renderSeasonCompare()" style="flex:1;font-size:12px;padding:6px;background:var(--bg2);color:var(--text);border:1px solid var(--border);border-radius:6px">${opts}</select>
+    </div>
+    <div id="_cmp_body"></div>
+  </div>`;
+  document.body.appendChild(modal);
+  document.getElementById('_cmp_s1').value=s1;
+  document.getElementById('_cmp_s2').value=s2;
+  _renderSeasonCompare();
+}
+function _renderSeasonCompare(){
+  const s1=document.getElementById('_cmp_s1').value, s2=document.getElementById('_cmp_s2').value;
+  const a=_leagueSeasonStats(s1), b=_leagueSeasonStats(s2);
+  const row=(label,va,vb,fmt)=>{ fmt=fmt||(x=>x);
+    return `<tr><td style="color:var(--muted);font-size:11px">${label}</td><td style="font-family:var(--mono);text-align:center;font-weight:600">${fmt(va)}</td><td style="font-family:var(--mono);text-align:center;font-weight:600">${fmt(vb)}</td></tr>`; };
+  let h2=`<table class="data-table" style="width:100%"><thead><tr><th></th><th style="text-align:center">${s1}</th><th style="text-align:center">${s2}</th></tr></thead><tbody>`;
+  h2+=row('경기 수',a.games,b.games);
+  h2+=row('타자 수',a.batters,b.batters);
+  h2+=row('투수 수',a.pitchers,b.pitchers);
+  h2+=row('리그 타율',a.lgAvg,b.lgAvg,x=>x.toFixed(3).replace(/^0/,''));
+  h2+=row('최고 타자(oWAR)',a.bestBat,b.bestBat,x=>x?`${x.n} (${(x.v||0).toFixed(1)})`:'-');
+  h2+=row('최고 투수(pWAR)',a.bestPit,b.bestPit,x=>x?`${x.n} (${(x.v||0).toFixed(1)})`:'-');
+  h2+=row('최다 홈런',a.topHR,b.topHR,x=>x?`${x.name} (${x.HR})`:'-');
+  h2+='</tbody></table>';
+  document.getElementById('_cmp_body').innerHTML=h2;
+}
+
+// 리그전 기록실 (해당 시즌 정규시즌 선수 전체 기록 — 타자/투수 토글)
+if(!window._leagueRecTab) window._leagueRecTab = 'batter';
+function _withSeasonGames(games, fn){
+  const ids=new Set(games.map(g=>g.id)); const saved=new Set(activeGameIds);
+  activeGameIds.clear(); ids.forEach(id=>activeGameIds.add(id)); rebuildG();
+  const sc=window._recordsCache; window._recordsCache={key:null,batters:null,pitchers:null};
+  let out; try{ out=fn(); }catch(e){ out=null; }
+  activeGameIds.clear(); saved.forEach(id=>activeGameIds.add(id)); rebuildG();
+  window._recordsCache=sc;
+  return out;
+}
+function _renderLeagueRecords(season, games){
+  const rec = _withSeasonGames(games, ()=>_computeRecordsData());
+  if(!rec) return '<div class="card section" style="padding:30px;text-align:center;color:var(--muted)">기록 집계 실패</div>';
+  const isB = window._leagueRecTab==='batter';
+  let html = `<div class="card section">
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <button onclick="window._leagueRecTab='batter';renderLeaguePage()" style="font-size:12px;padding:6px 14px;border-radius:6px;border:1px solid var(--border);background:${isB?'var(--amber)':'var(--bg2)'};color:${isB?'#000':'var(--muted)'};font-weight:600;cursor:pointer">🏏 타자</button>
+      <button onclick="window._leagueRecTab='pitcher';renderLeaguePage()" style="font-size:12px;padding:6px 14px;border-radius:6px;border:1px solid var(--border);background:${!isB?'var(--amber)':'var(--bg2)'};color:${!isB?'#000':'var(--muted)'};font-weight:600;cursor:pointer">⚾ 투수</button>
+      <span style="margin-left:auto;font-size:10.5px;color:var(--muted);align-self:center">${season} 정규시즌</span>
+    </div><div class="tbl-wrap"><table class="data-table">`;
+  if(isB){
+    const bs = rec.batters.filter(b=>b.PA>=5).sort((a,b)=>(b.ops||0)-(a.ops||0));
+    html += `<thead><tr><th>선수</th><th>팀</th><th>타석</th><th>타수</th><th>안타</th><th>2루타</th><th>홈런</th><th>타율</th><th>출루</th><th>장타</th><th>OPS</th><th>wOBA</th><th>oWAR</th></tr></thead><tbody>`;
+    bs.forEach(b=>{ html += `<tr><td style="font-weight:600">${b.name}</td><td style="color:var(--muted);font-size:11px">${_normalizeTeam(_playerTeam(b.name,'batter'))||'-'}</td>
+      <td style="font-family:var(--mono)">${b.PA||0}</td><td style="font-family:var(--mono)">${b.AB||0}</td><td style="font-family:var(--mono)">${b.H||0}</td><td style="font-family:var(--mono)">${b.h2B||0}</td><td style="font-family:var(--mono)">${b.HR||0}</td>
+      <td style="font-family:var(--mono);font-weight:600">${(b.avg||0).toFixed(3).replace(/^0/,'')}</td><td style="font-family:var(--mono)">${(b.obp||0).toFixed(3).replace(/^0/,'')}</td><td style="font-family:var(--mono)">${(b.slg||0).toFixed(3).replace(/^0/,'')}</td>
+      <td style="font-family:var(--mono);font-weight:600">${(b.ops||0).toFixed(3).replace(/^0/,'')}</td><td style="font-family:var(--mono)">${(b.woba||0).toFixed(3).replace(/^0/,'')}</td><td style="font-family:var(--mono);color:var(--amber)">${(b.owar||0).toFixed(2)}</td></tr>`; });
+  } else {
+    const ps = rec.pitchers.filter(p=>p.IP>=1).sort((a,b)=>(b.pwar||0)-(a.pwar||0));
+    html += `<thead><tr><th>선수</th><th>팀</th><th>이닝</th><th>투구</th><th>탈삼진</th><th>볼넷</th><th>피안타</th><th>피홈런</th><th>ERA</th><th>FIP</th><th>WHIP</th><th>pWAR</th></tr></thead><tbody>`;
+    ps.forEach(p=>{ const whip=(p.IP>0)?((p.H+p.BB)/p.IP):0;
+      html += `<tr><td style="font-weight:600">${p.name}</td><td style="color:var(--muted);font-size:11px">${_normalizeTeam(_playerTeam(p.name,'pitcher'))||'-'}</td>
+      <td style="font-family:var(--mono)">${(p.IP||0).toFixed(1)}</td><td style="font-family:var(--mono)">${p.n||0}</td><td style="font-family:var(--mono)">${p.K||0}</td><td style="font-family:var(--mono)">${p.BB||0}</td><td style="font-family:var(--mono)">${p.H||0}</td><td style="font-family:var(--mono)">${p.HR||0}</td>
+      <td style="font-family:var(--mono);font-weight:600">${p.era!=null?p.era.toFixed(2):'-'}</td><td style="font-family:var(--mono)">${p.fip!=null?p.fip.toFixed(2):'-'}</td><td style="font-family:var(--mono)">${whip.toFixed(2)}</td><td style="font-family:var(--mono);color:var(--amber)">${p.pwar!=null?p.pwar.toFixed(2):'-'}</td></tr>`; });
+  }
+  return html + '</tbody></table></div></div>';
+}
+// 팀 기록실 (팀별 합산 성적)
+function _renderLeagueTeamRecords(season, games){
+  const rec = _withSeasonGames(games, ()=>_computeRecordsData());
+  if(!rec) return '<div class="card section" style="padding:30px;text-align:center;color:var(--muted)">집계 실패</div>';
+  // 팀별 타격/투수 합산
+  const teams={};
+  rec.batters.forEach(b=>{ const t=_normalizeTeam(_playerTeam(b.name,'batter')); if(!t)return;
+    if(!teams[t])teams[t]={team:t,PA:0,AB:0,H:0,HR:0,owar:0,IP:0,K:0,BBp:0,Hp:0,era_w:0,pwar:0};
+    teams[t].PA+=b.PA||0; teams[t].AB+=b.AB||0; teams[t].H+=b.H||0; teams[t].HR+=b.HR||0; teams[t].owar+=b.owar||0; });
+  rec.pitchers.forEach(p=>{ const t=_normalizeTeam(_playerTeam(p.name,'pitcher')); if(!t)return;
+    if(!teams[t])teams[t]={team:t,PA:0,AB:0,H:0,HR:0,owar:0,IP:0,K:0,BBp:0,Hp:0,era_w:0,pwar:0};
+    teams[t].IP+=p.IP||0; teams[t].K+=p.K||0; teams[t].BBp+=p.BB||0; teams[t].Hp+=p.H||0; teams[t].pwar+=p.pwar||0;
+    if(p.era!=null&&p.IP>0) teams[t].era_w += p.era*p.IP; });
+  const arr=Object.values(teams).map(t=>({...t, avg:t.AB>0?t.H/t.AB:0, era:t.IP>0?t.era_w/t.IP:null, war:(t.owar||0)+(t.pwar||0)}))
+    .sort((a,b)=>(b.war||0)-(a.war||0));
+  let html = `<div class="card section"><div class="card-title">👥 ${season} 팀 기록</div><div class="tbl-wrap"><table class="data-table">
+    <thead><tr><th>팀</th><th>팀타율</th><th>홈런</th><th>oWAR</th><th>팀ERA</th><th>탈삼진</th><th>pWAR</th><th>총WAR</th></tr></thead><tbody>`;
+  arr.forEach(t=>{ html += `<tr><td style="font-weight:600">${_teamLogoHTML(t.team,20)}${t.team}</td>
+    <td style="font-family:var(--mono)">${t.avg.toFixed(3).replace(/^0/,'')}</td><td style="font-family:var(--mono)">${t.HR}</td><td style="font-family:var(--mono)">${t.owar.toFixed(1)}</td>
+    <td style="font-family:var(--mono)">${t.era!=null?t.era.toFixed(2):'-'}</td><td style="font-family:var(--mono)">${t.K}</td><td style="font-family:var(--mono)">${t.pwar.toFixed(1)}</td>
+    <td style="font-family:var(--mono);font-weight:700;color:var(--amber)">${t.war.toFixed(1)}</td></tr>`; });
+  return html + '</tbody></table></div></div>';
+}
+
 function renderLeaguePage(){
   const el = document.getElementById('league-content');
   if(!el) return;
@@ -22263,6 +22442,28 @@ function renderLeaguePage(){
   // 해당 시즌·페이즈 게임만
   const games = GAMES.filter(g => (g.category||'')==='league' && (g.seasonName||g.groupName||g.name)===curSeason && (g.phaseName||'정규시즌')===curPhase);
 
+  // V10.3: 포스트시즌은 순위표 대신 대진 결과 중심으로 분리 렌더
+  const isPost = curPhase !== '정규시즌';
+  if(isPost){
+    el.innerHTML = _renderLeaguePostseason(curSeason, curPhase, games);
+    return;
+  }
+
+  // ── 허브 탭 (순위/리더보드 · 기록실 · 팀기록) ──
+  if(!window._leagueTab) window._leagueTab = 'home';
+  const tab = window._leagueTab;
+  const tabBar = `<div style="display:flex;gap:6px;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:0">
+    ${[['home','🏆 순위·리더보드'],['records','📚 기록실'],['teams','👥 팀 기록']].map(([k,lbl])=>
+      `<button onclick="window._leagueTab='${k}';renderLeaguePage()" style="font-size:12px;padding:8px 14px;background:none;border:none;border-bottom:2px solid ${tab===k?'var(--amber)':'transparent'};color:${tab===k?'var(--amber)':'var(--muted)'};font-weight:${tab===k?'700':'400'};cursor:pointer">${lbl}</button>`
+    ).join('')}
+  </div>`;
+
+  // 기록실 탭 / 팀기록 탭이면 별도 렌더 후 종료
+  if(tab === 'records'){ el.innerHTML = tabBar + _renderLeagueRecords(curSeason, games); return; }
+  if(tab === 'teams'){ el.innerHTML = tabBar + _renderLeagueTeamRecords(curSeason, games); return; }
+  // 이하 home 탭 (순위표+리더보드+최근경기) — 맨 앞에 탭바 삽입용 마커
+  window._leagueTabBar = tabBar;
+
   // ── 팀 순위표 ──
   const teams = {};
   games.forEach(g => {
@@ -22283,10 +22484,14 @@ function renderLeaguePage(){
   const leader = standings[0];
   standings.forEach(s=>{ s.gb = leader ? ((leader.w - s.w) + (s.l - leader.l))/2 : 0; });
 
-  let html = `<div class="card section" style="margin-bottom:16px">
+  let html = (window._leagueTabBar||'') + `<div class="card section" style="margin-bottom:16px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
       <div class="card-title" style="margin:0">📋 ${curSeason} ${curPhase} 순위표</div>
-      <span style="font-size:10px;color:var(--muted)">기본 시즌: <b style="color:var(--amber)">${WBD_CURRENT_SEASON}</b></span>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:10px;color:var(--muted)">기본 시즌: <b style="color:var(--amber)">${WBD_CURRENT_SEASON}</b></span>
+        ${seasonNames.length>=2?`<button onclick="openSeasonCompare()" style="font-size:11px;padding:4px 10px;background:var(--bg2);color:var(--muted);border:1px solid var(--border);border-radius:6px;cursor:pointer" title="시즌 비교">📊 시즌 비교</button>`:''}
+        <button onclick="openLeagueLogoManager()" style="font-size:11px;padding:4px 10px;background:var(--bg2);color:var(--muted);border:1px solid var(--border);border-radius:6px;cursor:pointer" title="팀 로고 관리">🎨 로고</button>
+      </div>
     </div>
     <div class="tbl-wrap"><table class="data-table">
     <thead><tr><th>순위</th><th>팀</th><th>경기</th><th>승</th><th>패</th><th>무</th><th>승률</th><th>게임차</th><th>득점</th><th>실점</th><th>득실차</th></tr></thead><tbody>`;
@@ -22360,6 +22565,27 @@ function renderLeaguePage(){
   html += _lbCard('🎯 ERA TOP5', top(pQ,'era',5,false), [{label:'ERA',fmt:r=>r.era!=null?r.era.toFixed(2):'-',hl:1},{label:'이닝',fmt:r=>r.IP.toFixed(1)},{label:'탈삼진',fmt:r=>r.K}]);
   html += _lbCard('⭐ pWAR TOP5', top(pQ,'pwar'), [{label:'pWAR',fmt:r=>(r.pwar!=null?r.pwar.toFixed(2):'-'),hl:1},{label:'ERA',fmt:r=>r.era!=null?r.era.toFixed(2):'-'},{label:'이닝',fmt:r=>r.IP.toFixed(1)}]);
   html += `</div>`;
+
+  // ── 최근 경기 결과 (스코어보드, 최신순) ──
+  const results = games.map(g=>{
+    const info=_parseGameName(g.name);
+    const {totalA, totalB}=_computeInningScores(g.pitches);
+    return {date:info.date||'', tA:_normalizeTeam(info.teamA), tB:_normalizeTeam(info.teamB), sA:totalA, sB:totalB};
+  }).filter(r=>r.tA&&r.tB).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  if(results.length){
+    html += `<div class="card section" style="margin-bottom:16px"><div class="card-title">📅 최근 경기 결과</div><div style="display:flex;flex-direction:column;gap:6px">`;
+    results.slice(0,15).forEach(r=>{
+      const aWin=r.sA>r.sB, bWin=r.sB>r.sA;
+      html += `<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg2);border-radius:7px;font-size:12px">
+        <span style="color:var(--muted);font-size:10.5px;min-width:72px">${r.date||'-'}</span>
+        <span style="flex:1;text-align:right;font-weight:${aWin?'700':'400'};color:${aWin?'var(--text)':'var(--muted)'}">${r.tA} ${_teamLogoHTML(r.tA,18)}</span>
+        <span style="font-family:var(--mono);font-weight:700;min-width:54px;text-align:center">${r.sA} : ${r.sB}</span>
+        <span style="flex:1;text-align:left;font-weight:${bWin?'700':'400'};color:${bWin?'var(--text)':'var(--muted)'}">${_teamLogoHTML(r.tB,18)} ${r.tB}</span>
+      </div>`;
+    });
+    if(results.length>15) html += `<div style="font-size:10.5px;color:var(--muted);text-align:center;margin-top:4px">최근 15경기 표시 · 전체 ${results.length}경기</div>`;
+    html += `</div></div>`;
+  }
 
   el.innerHTML = html;
 }
