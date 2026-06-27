@@ -15058,6 +15058,7 @@ function _scoutGeneratePitcherReport(data){
   //     BB%: p10=0, p25=0 (BB% 0이 흔함)
   // ───────────────────────────────────────
   const strengths = [];
+  const weaknesses = [];
   
   if(data.overall.ba < 0.280 && data.overall.ab >= 30){
     strengths.push(`<b>⚾ 압도적 피안타율 ${fmt3(data.overall.ba)}</b> (${data.overall.hits}/${data.overall.ab}) — 평균 ${fmt3(lg.pitcherBA)} 대비 매우 낮음. 안타 거의 안 맞음.`);
@@ -15167,8 +15168,6 @@ function _scoutGeneratePitcherReport(data){
   //     하드힛%: p50=50, p75=54.5
   //     BB%: p75=3.7, p90=4.76
   // ───────────────────────────────────────
-  const weaknesses = [];
-  
   if(data.overall.ba > 0.450 && data.overall.ab >= 30){
     weaknesses.push(`<b>⚾ 피안타율 ${fmt3(data.overall.ba)} 높음</b> — 평균 ${fmt3(lg.pitcherBA)} 대비 안타 잘 맞음.`);
   }
