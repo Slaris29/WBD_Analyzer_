@@ -8705,10 +8705,15 @@ function calcPitcherGameStats(gamePitches){
         const outDelta=(+nextInHalf.out||0)-(+p.out||0);
         if(outDelta>0)s.outs+=outDelta;
       }else{
-        // 이닝 마지막 투구 - 3번째 아웃
-        // 이전 out이 2였으면 +1 (3번째 아웃 발생해서 이닝 종료)
-        // 이전 out이 0,1이었으면 그 투구가 마지막 = +1
-        s.outs+=Math.max(0, 3-(+p.out||0));
+        // 이닝(또는 경기)의 마지막 투구.
+        // V11.1 fix: 끝내기처럼 안타/홈런/볼넷/사구로 끝난 경우는 아웃이 아니므로 이닝을 채우지 않음.
+        //   정상적으로 아웃으로 이닝이 끝난 경우만 3아웃까지 채운다.
+        const lastIsOut = !( (+p.result===4) || (+p['1BSafe']===1&&+p.ev>0) || (+p.result===5) || (+p.result===6) );
+        if(lastIsOut){
+          s.outs+=Math.max(0, 3-(+p.out||0));  // 정상 3아웃 종료
+        }else{
+          s.outs+=(+p.out||0);  // 출루로 끝남: 그때까지 누적된 아웃만 (그 타석은 아웃 아님)
+        }
       }
       
       if(+p.ev>0&&(+p['1BSafe']===1||+p.result===4))s.hits++;
