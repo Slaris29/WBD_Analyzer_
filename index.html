@@ -22681,7 +22681,7 @@ function _renderLeagueLeaders(season, games){
   html += grid(
     card('ISO (순장타)','규정',top(bQ,'iso'),[{label:'ISO',fmt:r=>f3(r.iso),hl:1},{label:'장타',fmt:r=>f3(r.slg)},{label:'홈런',fmt:r=>r.HR}])+
     card('BABIP','규정',top(bQ,'babip'),[{label:'BABIP',fmt:r=>f3(r.babip),hl:1},{label:'타율',fmt:r=>f3(r.avg)},{label:'안타',fmt:r=>r.H}])+
-    card('oWAR','규정',top(bQ,'owar'),[{label:'oWAR',fmt:r=>(r.owar||0).toFixed(2),hl:1},{label:'wRC+',fmt:r=>(r.wrcPlus||0).toFixed(0)},{label:'타석',fmt:r=>r.PA}])
+    card('oWAR','누적',top(bAll,'owar'),[{label:'oWAR',fmt:r=>(r.owar||0).toFixed(2),hl:1},{label:'wRC+',fmt:r=>(r.wrcPlus||0).toFixed(0)},{label:'타석',fmt:r=>r.PA}])
   );
 
   // 타격 — 누적 (전체)
@@ -22710,7 +22710,7 @@ function _renderLeagueLeaders(season, games){
     card('K/BB','규정',top(pQ,'kbb'),[{label:'K/BB',fmt:r=>(r.kbb||0).toFixed(2),hl:1},{label:'탈삼진',fmt:r=>r.K},{label:'볼넷',fmt:r=>r.BB}])
   );
   html += grid(
-    card('pWAR','규정',top(pQ,'pwar'),[{label:'pWAR',fmt:r=>r.pwar!=null?r.pwar.toFixed(2):'-',hl:1},{label:'ERA',fmt:r=>r.era!=null?r.era.toFixed(2):'-'},{label:'이닝',fmt:r=>_fmtIP(r.IP)}])
+    card('pWAR','누적',top(pAll,'pwar'),[{label:'pWAR',fmt:r=>r.pwar!=null?r.pwar.toFixed(2):'-',hl:1},{label:'ERA',fmt:r=>r.era!=null?r.era.toFixed(2):'-'},{label:'이닝',fmt:r=>_fmtIP(r.IP)}])
   );
 
   // 투수 — 누적 (전체)
@@ -22761,7 +22761,7 @@ function _renderLeagueRecords(season, games){
     {k:'TB',l:'총루타',f:b=>b.TB||0,cum:1},{k:'BB',l:'볼넷',f:b=>b.BB||0,cum:1},{k:'K',l:'삼진',f:b=>b.K||0,cum:1},
     {k:'avg',l:'타율',f:b=>f3(b.avg),hl:1},{k:'obp',l:'출루',f:b=>f3(b.obp)},{k:'slg',l:'장타',f:b=>f3(b.slg)},
     {k:'ops',l:'OPS',f:b=>f3(b.ops),hl:1},{k:'iso',l:'ISO',f:b=>f3(b.iso)},{k:'babip',l:'BABIP',f:b=>f3(b.babip)},
-    {k:'woba',l:'wOBA',f:b=>f3(b.woba)},{k:'wrcPlus',l:'wRC+',f:b=>(b.wrcPlus||0).toFixed(0)},{k:'owar',l:'oWAR',f:b=>(b.owar||0).toFixed(2),amber:1}
+    {k:'woba',l:'wOBA',f:b=>f3(b.woba)},{k:'wrcPlus',l:'wRC+',f:b=>(b.wrcPlus||0).toFixed(0)},{k:'owar',l:'oWAR',f:b=>(b.owar||0).toFixed(2),amber:1,cum:1}
   ];
   const pitCols = [
     {k:'name',l:'선수',f:p=>p.name,txt:1},{k:'team',l:'팀',f:p=>{const t=PT.pitcher[p.name];return t?`<span style="display:inline-flex;align-items:center;gap:5px">${_teamLogoHTML(t,18)}${t}</span>`:'-';},txt:1},
@@ -22774,7 +22774,7 @@ function _renderLeagueRecords(season, games){
     {k:'era',l:'ERA',f:p=>p.era!=null?p.era.toFixed(2):'-',hl:1,asc:1},{k:'fip',l:'FIP',f:p=>p.fip!=null?p.fip.toFixed(2):'-',asc:1},
     {k:'whip',l:'WHIP',f:p=>p.IP>0?((p.H+p.BB)/p.IP).toFixed(2):'-',asc:1},
     {k:'k9',l:'K/9',f:p=>(p.k9||0).toFixed(1)},{k:'kPct',l:'K%',f:p=>(p.kPct||0).toFixed(1)},{k:'bbPct',l:'BB%',f:p=>(p.bbPct||0).toFixed(1),asc:1},
-    {k:'kbb',l:'K/BB',f:p=>(p.kbb||0).toFixed(2)},{k:'pwar',l:'pWAR',f:p=>p.pwar!=null?p.pwar.toFixed(2):'-',amber:1}
+    {k:'kbb',l:'K/BB',f:p=>(p.kbb||0).toFixed(2)},{k:'pwar',l:'pWAR',f:p=>p.pwar!=null?p.pwar.toFixed(2):'-',amber:1,cum:1}
   ];
   const cols = isB ? batCols : pitCols;
   const sampleKey = isB?'PA':'IP', qVal = isB?Q.qPA:Q.qIP;
