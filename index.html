@@ -22782,7 +22782,7 @@ function _renderLeagueLeaders(season, games){
     let h2=`<div class="card section" style="flex:1;min-width:260px"><div class="card-title" style="font-size:13px;display:flex;align-items:center;gap:6px">${title} ${badge?`<span style="font-size:8.5px;padding:1px 5px;border-radius:4px;background:var(--bg2);color:var(--muted);font-weight:400">${badge}</span>`:''}</div>
       <div class="tbl-wrap"><table class="data-table"><thead><tr><th>#</th><th>선수</th>${cols.map(c=>`<th>${c.label}</th>`).join('')}</tr></thead><tbody>`;
     if(!rows.length) h2+=`<tr><td colspan="${cols.length+2}" style="text-align:center;color:var(--muted);padding:12px">해당 없음</td></tr>`;
-    rows.forEach((r,i)=>{ h2+=`<tr><td style="font-family:var(--mono);color:${i===0?'var(--amber)':'var(--muted)'}">${i+1}</td><td style="font-weight:600"><span style="display:inline-flex;align-items:center;gap:5px">${(()=>{const t=PT.batter[r.name]||PT.pitcher[r.name];return t?_teamLogoHTML(t,16):'';})()}${r.name}${(()=>{const pos=POS[r.name];return pos?`<span style="font-size:9px;color:var(--muted);margin-left:4px;padding:1px 4px;background:var(--card2);border-radius:3px">${_posKor(pos)}</span>`:'';})()}</span></td>${cols.map(c=>`<td style="font-family:var(--mono)${c.hl?';color:var(--amber);font-weight:600':''}">${c.fmt(r)}</td>`).join('')}</tr>`; });
+    rows.forEach((r,i)=>{ h2+=`<tr><td style="font-family:var(--mono);color:${i===0?'var(--amber)':'var(--muted)'}">${i+1}</td><td style="font-weight:600"><span style="display:inline-flex;align-items:center;gap:5px">${(()=>{const t=PT.batter[r.name]||PT.pitcher[r.name];return t?_teamLogoHTML(t,16):'';})()}${(()=>{const _sn=String(r.name).replace(/\\/g,'\\\\').replace(/'/g,"\\'");const _ty=PT.batter[r.name]?'batter':(PT.pitcher[r.name]?'pitcher':'batter');return `<span style="cursor:pointer;color:var(--amber)" onclick="openCardDetail('${_sn}','${_ty}')" title="선수 카드 보기">${r.name}</span>`;})()}${(()=>{const pos=POS[r.name];return pos?`<span style="font-size:9px;color:var(--muted);margin-left:4px;padding:1px 4px;background:var(--card2);border-radius:3px">${_posKor(pos)}</span>`:'';})()}</span></td>${cols.map(c=>`<td style="font-family:var(--mono)${c.hl?';color:var(--amber);font-weight:600':''}">${c.fmt(r)}</td>`).join('')}</tr>`; });
     return h2+'</tbody></table></div></div>';
   };
   const f3=v=>(v||0).toFixed(3).replace(/^0/,'');
@@ -22893,7 +22893,7 @@ function _renderLeagueRecords(season, games){
   // 컬럼 정의 (key=정렬키, f=포맷, num=숫자여부)
   const f3 = v=>(v||0).toFixed(3).replace(/^0/,'');
   const batCols = [
-    {k:'name',l:'선수',f:b=>b.name,txt:1},{k:'team',l:'팀',f:b=>{const t=PT.batter[b.name];return t?`<span style="display:inline-flex;align-items:center;gap:5px">${_teamLogoHTML(t,18)}${t}</span>`:'-';},txt:1},
+    {k:'name',l:'선수',f:b=>{const _sn=String(b.name).replace(/\\/g,'\\\\').replace(/'/g,"\\'");return `<span style="cursor:pointer;color:var(--amber);font-weight:600" onclick="openCardDetail('${_sn}','batter')" title="선수 카드 보기">${b.name}</span>`;},txt:1},{k:'team',l:'팀',f:b=>{const t=PT.batter[b.name];return t?`<span style="display:inline-flex;align-items:center;gap:5px">${_teamLogoHTML(t,18)}${t}</span>`:'-';},txt:1},
     {k:'pos',l:'POS',f:b=>_posKor(POS[b.name]),txt:1},
     {k:'PA',l:'타석',f:b=>b.PA||0,cum:1},{k:'AB',l:'타수',f:b=>b.AB||0,cum:1},{k:'H',l:'안타',f:b=>b.H||0,cum:1},
     {k:'h2B',l:'2B',f:b=>b.h2B||0,cum:1},{k:'h3B',l:'3B',f:b=>b.h3B||0,cum:1},{k:'HR',l:'홈런',f:b=>b.HR||0,cum:1},
@@ -22903,7 +22903,7 @@ function _renderLeagueRecords(season, games){
     {k:'woba',l:'wOBA',f:b=>f3(b.woba)},{k:'wrcPlus',l:'wRC+',f:b=>(b.wrcPlus||0).toFixed(0)},{k:'owar',l:'oWAR',f:b=>(b.owar||0).toFixed(2),amber:1,cum:1}
   ];
   const pitCols = [
-    {k:'name',l:'선수',f:p=>p.name,txt:1},{k:'team',l:'팀',f:p=>{const t=PT.pitcher[p.name];return t?`<span style="display:inline-flex;align-items:center;gap:5px">${_teamLogoHTML(t,18)}${t}</span>`:'-';},txt:1},
+    {k:'name',l:'선수',f:p=>{const _sn=String(p.name).replace(/\\/g,'\\\\').replace(/'/g,"\\'");return `<span style="cursor:pointer;color:var(--amber);font-weight:600" onclick="openCardDetail('${_sn}','pitcher')" title="선수 카드 보기">${p.name}</span>`;},txt:1},{k:'team',l:'팀',f:p=>{const t=PT.pitcher[p.name];return t?`<span style="display:inline-flex;align-items:center;gap:5px">${_teamLogoHTML(t,18)}${t}</span>`:'-';},txt:1},
     {k:'G',l:'경기',f:p=>p.G||0,cum:1},
     {k:'_W',l:'승',f:p=>_d(p.name,'W'),get:p=>_d(p.name,'W'),cum:1},{k:'_L',l:'패',f:p=>_d(p.name,'L'),get:p=>_d(p.name,'L'),cum:1},
     {k:'_S',l:'세이브',f:p=>_d(p.name,'S'),get:p=>_d(p.name,'S'),cum:1},{k:'_H',l:'홀드',f:p=>_d(p.name,'H'),get:p=>_d(p.name,'H'),cum:1},
@@ -23020,14 +23020,62 @@ function _renderLeagueTeamRecords(season, games){
   const sc=teamCols.find(c=>c.k===ts.key)||teamCols[0];
   arr.sort((a,b)=>{ if(sc.txt) return ts.dir==='desc'?String(b[ts.key]).localeCompare(String(a[ts.key])):String(a[ts.key]).localeCompare(String(b[ts.key]));
     const av=+a[ts.key]||0, bv=+b[ts.key]||0; return ts.dir==='desc'?bv-av:av-bv; });
-  let html = `<div class="card section"><div class="card-title">👥 ${season} 팀 기록</div><div class="tbl-wrap"><table class="data-table"><thead><tr>`;
-  teamCols.forEach(c=>{ const active=ts.key===c.k; const arrow=active?(ts.dir==='desc'?' ▼':' ▲'):'';
+  // 타격/투수 컬럼 분리
+  const teamBatCols=[
+    {k:'team',l:'팀',f:t=>`${_teamLogoHTML(t.team,24)}${t.team}`,txt:1},
+    {k:'PA',l:'타석',f:t=>t.PA},{k:'H',l:'안타',f:t=>t.H},{k:'h2B',l:'2B',f:t=>t.h2B},{k:'HR',l:'홈런',f:t=>t.HR},
+    {k:'BB',l:'볼넷',f:t=>t.BB},{k:'K',l:'삼진',f:t=>t.K},
+    {k:'avg',l:'타율',f:t=>t.avg.toFixed(3).replace(/^0/,'')},{k:'obp',l:'출루',f:t=>t.obp.toFixed(3).replace(/^0/,'')},
+    {k:'slg',l:'장타',f:t=>t.slg.toFixed(3).replace(/^0/,'')},{k:'ops',l:'OPS',f:t=>t.ops.toFixed(3).replace(/^0/,''),hl:1},
+    {k:'owar',l:'oWAR',f:t=>t.owar.toFixed(2),amber:1}
+  ];
+  const teamPitCols=[
+    {k:'team',l:'팀',f:t=>`${_teamLogoHTML(t.team,24)}${t.team}`,txt:1},
+    {k:'IP',l:'이닝',f:t=>_fmtIP(t.IP)},{k:'pK',l:'탈삼진',f:t=>t.pK},{k:'pBB',l:'볼넷',f:t=>t.pBB},
+    {k:'pH',l:'피안타',f:t=>t.pH},{k:'pHR',l:'피홈런',f:t=>t.pHR},
+    {k:'era',l:'ERA',f:t=>t.era!=null?t.era.toFixed(2):'-',asc:1,hl:1},{k:'fip',l:'FIP',f:t=>t.fip!=null?t.fip.toFixed(2):'-',asc:1},
+    {k:'whip',l:'WHIP',f:t=>t.whip!=null?t.whip.toFixed(2):'-',asc:1},
+    {k:'pwar',l:'pWAR',f:t=>t.pwar.toFixed(2),amber:1}
+  ];
+  // 서브탭 (타격/투수)
+  if(!window._leagueTeamRecTab) window._leagueTeamRecTab='batting';
+  const trTab=window._leagueTeamRecTab;
+  const cols = trTab==='batting'?teamBatCols:teamPitCols;
+  // 정렬 적용
+  const sc2=cols.find(c=>c.k===ts.key)||cols[0];
+  arr.sort((a,b)=>{ if(sc2.txt) return ts.dir==='desc'?String(b[ts.key]||'').localeCompare(String(a[ts.key]||'')):String(a[ts.key]||'').localeCompare(String(b[ts.key]||''));
+    const av=+a[ts.key]||0, bv=+b[ts.key]||0; return ts.dir==='desc'?bv-av:av-bv; });
+
+  const openTeam=window._leagueOpenTeam;
+  let html = `<div class="card section"><div class="card-title">👥 ${season} 팀 기록</div>
+    <div style="display:flex;gap:6px;margin-bottom:12px">
+      <button onclick="window._leagueTeamRecTab='batting';renderLeaguePage()" style="font-size:12px;padding:6px 14px;border-radius:6px;border:1px solid var(--border);background:${trTab==='batting'?'var(--amber)':'var(--bg2)'};color:${trTab==='batting'?'#000':'var(--muted)'};font-weight:600;cursor:pointer">🏏 팀 타격</button>
+      <button onclick="window._leagueTeamRecTab='pitching';renderLeaguePage()" style="font-size:12px;padding:6px 14px;border-radius:6px;border:1px solid var(--border);background:${trTab==='pitching'?'var(--amber)':'var(--bg2)'};color:${trTab==='pitching'?'#000':'var(--muted)'};font-weight:600;cursor:pointer">⚾ 팀 투수</button>
+      <span style="margin-left:auto;font-size:10.5px;color:var(--muted);align-self:center">팀 이름 클릭 → 로스터 펼치기</span>
+    </div>
+    <div class="tbl-wrap"><table class="data-table"><thead><tr>`;
+  cols.forEach(c=>{ const active=ts.key===c.k; const arrow=active?(ts.dir==='desc'?' ▼':' ▲'):'';
     html += `<th onclick="_leagueSortTeams('${c.k}',${c.asc?1:0})" style="cursor:pointer;${active?'color:var(--amber)':''}">${c.l}${arrow}</th>`; });
   html += `</tr></thead><tbody>`;
-  arr.forEach(t=>{ html += `<tr>`;
-    teamCols.forEach((c,ci)=>{ const style=ci===0?'font-weight:600':`font-family:var(--mono)${c.hl?';font-weight:600':''}${c.amber?';font-weight:700;color:var(--amber)':''}`;
-      html += `<td style="${style}">${c.f(t)}</td>`; });
-    html += `</tr>`; });
+  arr.forEach(t=>{
+    const isOpen=openTeam===t.team;
+    html += `<tr${isOpen?' style="background:var(--bg2)"':''}>`;
+    cols.forEach((c,ci)=>{
+      if(ci===0){
+        const _tn=String(t.team).replace(/'/g,"\\'");
+        html += `<td style="font-weight:600;cursor:pointer" onclick="toggleLeagueTeam('${_tn}')" title="로스터 보기"><span style="display:inline-flex;align-items:center;gap:6px">${c.f(t)}</span> <span style="font-size:10px;color:var(--muted)">${isOpen?'▴':'▾'}</span></td>`;
+      }else{
+        const style=`font-family:var(--mono)${c.hl?';font-weight:600':''}${c.amber?';font-weight:700;color:var(--amber)':''}`;
+        html += `<td style="${style}">${c.f(t)}</td>`;
+      }
+    });
+    html += `</tr>`;
+    // 펼친 팀이면 로스터 행 삽입
+    if(isOpen){
+      const rosterHtml=_withSeasonGames(games, ()=>_renderLeagueTeamRoster(t.team, games));
+      html += `<tr><td colspan="${cols.length}" style="padding:0;background:var(--bg)">${rosterHtml}</td></tr>`;
+    }
+  });
   return html + '</tbody></table></div></div>';
 }
 
