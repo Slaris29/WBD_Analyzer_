@@ -22989,10 +22989,14 @@ function _renderLeagueTeamRecords(season, games){
     [i.teamA,i.teamB].forEach(t=>{const n=_normalizeTeam(t); if(n) leagueTeams.add(n);}); });
   // 팀별 타격/투수 합산 (리그전 출전팀만)
   const teams={};
-  const ini=t=>({team:t,PA:0,AB:0,H:0,h2B:0,h3B:0,HR:0,TB:0,BB:0,K:0,owar:0, IP:0,pK:0,pBB:0,pH:0,pHR:0,era_w:0,fip_w:0,pwar:0});
+  const ini=t=>({team:t,PA:0,AB:0,H:0,h2B:0,h3B:0,HR:0,TB:0,BB:0,K:0,owar:0,woba_w:0,wrc_w:0,wraa:0, IP:0,pK:0,pBB:0,pH:0,pHR:0,era_w:0,fip_w:0,pwar:0});
   rec.batters.forEach(b=>{ const t=PT.batter[b.name]; if(!t||!leagueTeams.has(t))return;
     if(!teams[t])teams[t]=ini(t); const T=teams[t];
-    T.PA+=b.PA||0; T.AB+=b.AB||0; T.H+=b.H||0; T.h2B+=b.h2B||0; T.h3B+=b.h3B||0; T.HR+=b.HR||0; T.TB+=b.TB||0; T.BB+=b.BB||0; T.K+=b.K||0; T.owar+=b.owar||0; });
+    T.PA+=b.PA||0; T.AB+=b.AB||0; T.H+=b.H||0; T.h2B+=b.h2B||0; T.h3B+=b.h3B||0; T.HR+=b.HR||0; T.TB+=b.TB||0; T.BB+=b.BB||0; T.K+=b.K||0; T.owar+=b.owar||0;
+    // wOBA·wRC+는 PA 가중 평균 (팀 단위). wRAA는 누적 합산 가능
+    if(b.woba!=null) T.woba_w+=(b.woba)*(b.PA||0);
+    if(b.wrcPlus!=null) T.wrc_w+=(b.wrcPlus)*(b.PA||0);
+    if(b.wraa!=null) T.wraa+=b.wraa; });
   rec.pitchers.forEach(p=>{ const t=PT.pitcher[p.name]; if(!t||!leagueTeams.has(t))return;
     if(!teams[t])teams[t]=ini(t); const T=teams[t];
     T.IP+=p.IP||0; T.pK+=p.K||0; T.pBB+=p.BB||0; T.pH+=p.H||0; T.pHR+=p.HR||0; T.pwar+=p.pwar||0;
@@ -23000,7 +23004,11 @@ function _renderLeagueTeamRecords(season, games){
   const arr=Object.values(teams).map(t=>({...t,
     avg:t.AB>0?t.H/t.AB:0, obp:t.PA>0?(t.H+t.BB)/t.PA:0, slg:t.AB>0?t.TB/t.AB:0,
     ops:(t.AB>0?t.TB/t.AB:0)+(t.PA>0?(t.H+t.BB)/t.PA:0),
+    iso:t.AB>0?(t.TB-t.H)/t.AB:0,  // 순장타율 = 장타 - 타율
+    bbPct:t.PA>0?t.BB/t.PA*100:0, kPct:t.PA>0?t.K/t.PA*100:0,
+    woba:t.PA>0?t.woba_w/t.PA:0, wrcPlus:t.PA>0?t.wrc_w/t.PA:0,
     era:t.IP>0?t.era_w/t.IP:null, fip:t.IP>0?t.fip_w/t.IP:null, whip:t.IP>0?(t.pH+t.pBB)/t.IP:null,
+    k9:t.IP>0?t.pK/t.IP*9:0, bb9:t.IP>0?t.pBB/t.IP*9:0, kbb:t.pBB>0?t.pK/t.pBB:(t.pK>0?99:0),
     war:(t.owar||0)+(t.pwar||0)
   }));
   // 정렬 상태
@@ -23021,12 +23029,15 @@ function _renderLeagueTeamRecords(season, games){
   arr.sort((a,b)=>{ if(sc.txt) return ts.dir==='desc'?String(b[ts.key]).localeCompare(String(a[ts.key])):String(a[ts.key]).localeCompare(String(b[ts.key]));
     const av=+a[ts.key]||0, bv=+b[ts.key]||0; return ts.dir==='desc'?bv-av:av-bv; });
   // 타격/투수 컬럼 분리
+  const _f3=v=>(v||0).toFixed(3).replace(/^0/,'');
   const teamBatCols=[
     {k:'team',l:'팀',f:t=>`${_teamLogoHTML(t.team,24)}${t.team}`,txt:1},
-    {k:'PA',l:'타석',f:t=>t.PA},{k:'H',l:'안타',f:t=>t.H},{k:'h2B',l:'2B',f:t=>t.h2B},{k:'HR',l:'홈런',f:t=>t.HR},
+    {k:'PA',l:'타석',f:t=>t.PA},{k:'H',l:'안타',f:t=>t.H},{k:'h2B',l:'2B',f:t=>t.h2B},{k:'h3B',l:'3B',f:t=>t.h3B},{k:'HR',l:'홈런',f:t=>t.HR},
     {k:'BB',l:'볼넷',f:t=>t.BB},{k:'K',l:'삼진',f:t=>t.K},
-    {k:'avg',l:'타율',f:t=>t.avg.toFixed(3).replace(/^0/,'')},{k:'obp',l:'출루',f:t=>t.obp.toFixed(3).replace(/^0/,'')},
-    {k:'slg',l:'장타',f:t=>t.slg.toFixed(3).replace(/^0/,'')},{k:'ops',l:'OPS',f:t=>t.ops.toFixed(3).replace(/^0/,''),hl:1},
+    {k:'avg',l:'타율',f:t=>_f3(t.avg)},{k:'obp',l:'출루',f:t=>_f3(t.obp)},
+    {k:'slg',l:'장타',f:t=>_f3(t.slg)},{k:'ops',l:'OPS',f:t=>_f3(t.ops),hl:1},
+    {k:'iso',l:'ISO',f:t=>_f3(t.iso)},{k:'bbPct',l:'BB%',f:t=>t.bbPct.toFixed(1)},{k:'kPct',l:'K%',f:t=>t.kPct.toFixed(1)},
+    {k:'woba',l:'wOBA',f:t=>_f3(t.woba)},{k:'wrcPlus',l:'wRC+',f:t=>t.wrcPlus.toFixed(0),hl:1},
     {k:'owar',l:'oWAR',f:t=>t.owar.toFixed(2),amber:1}
   ];
   const teamPitCols=[
@@ -23035,6 +23046,7 @@ function _renderLeagueTeamRecords(season, games){
     {k:'pH',l:'피안타',f:t=>t.pH},{k:'pHR',l:'피홈런',f:t=>t.pHR},
     {k:'era',l:'ERA',f:t=>t.era!=null?t.era.toFixed(2):'-',asc:1,hl:1},{k:'fip',l:'FIP',f:t=>t.fip!=null?t.fip.toFixed(2):'-',asc:1},
     {k:'whip',l:'WHIP',f:t=>t.whip!=null?t.whip.toFixed(2):'-',asc:1},
+    {k:'k9',l:'K/9',f:t=>t.k9.toFixed(2)},{k:'bb9',l:'BB/9',f:t=>t.bb9.toFixed(2),asc:1},{k:'kbb',l:'K/BB',f:t=>t.kbb>=99?'∞':t.kbb.toFixed(2)},
     {k:'pwar',l:'pWAR',f:t=>t.pwar.toFixed(2),amber:1}
   ];
   // 서브탭 (타격/투수)
