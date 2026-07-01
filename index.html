@@ -22698,6 +22698,23 @@ function _leaguePitcherDecisions(games){
 
 // V11: 시즌 게임 기준 선수→팀 매핑 (전체 활성데이터가 아니라 해당 시즌 출전 팀)
 //   half=1=초(원정/teamA), half=0=말(홈/teamB). 타자는 공격팀, 투수는 수비팀.
+// V11.3: 시즌 게임 기준 선수→주 포지션 매핑.
+//   기존 _computeDefenseData()의 byPlayer[name].primaryPos를 재사용 (검증된 포지션 로직).
+//   시즌 게임만 활성화된 상태(_withSeasonGames 내부)에서 호출해야 그 시즌 기준이 됨.
+function _leaguePlayerPositions(games){
+  return _withSeasonGames(games, ()=>{
+    const map={};
+    try{
+      const dd=_computeDefenseData();
+      const bp=dd.byPlayer||{};
+      for(const n in bp){ if(bp[n].primaryPos && bp[n].primaryPos!=='?') map[_canonPlayer(n)]=bp[n].primaryPos; }
+    }catch(e){}
+    return map;
+  });
+}
+const _POS_KOR={P:'투수',C:'포수','1B':'1루','2B':'2루','3B':'3루',SS:'유격',LF:'좌익',CF:'중견',RF:'우익'};
+function _posKor(p){ return _POS_KOR[p]||p||'-'; }
+
 function _leaguePlayerTeams(games){
   const bat={}, pit={};  // name → {team: count}
   games.forEach(g=>{
@@ -22736,6 +22753,7 @@ function _renderLeagueLeaders(season, games){
   const rec = _withSeasonGames(games, ()=>_computeRecordsData());
   if(!rec) return '<div class="card section" style="padding:30px;text-align:center;color:var(--muted)">집계 실패</div>';
   const PT = _leaguePlayerTeams(games);
+  const POS = _leaguePlayerPositions(games);
   const DEC = _leaguePitcherDecisions(games);
   const Q = _leagueQualThresholds(games);
   const bAll = rec.batters, pAll = rec.pitchers;
@@ -22756,7 +22774,7 @@ function _renderLeagueLeaders(season, games){
     let h2=`<div class="card section" style="flex:1;min-width:260px"><div class="card-title" style="font-size:13px;display:flex;align-items:center;gap:6px">${title} ${badge?`<span style="font-size:8.5px;padding:1px 5px;border-radius:4px;background:var(--bg2);color:var(--muted);font-weight:400">${badge}</span>`:''}</div>
       <div class="tbl-wrap"><table class="data-table"><thead><tr><th>#</th><th>선수</th>${cols.map(c=>`<th>${c.label}</th>`).join('')}</tr></thead><tbody>`;
     if(!rows.length) h2+=`<tr><td colspan="${cols.length+2}" style="text-align:center;color:var(--muted);padding:12px">해당 없음</td></tr>`;
-    rows.forEach((r,i)=>{ h2+=`<tr><td style="font-family:var(--mono);color:${i===0?'var(--amber)':'var(--muted)'}">${i+1}</td><td style="font-weight:600"><span style="display:inline-flex;align-items:center;gap:5px">${(()=>{const t=PT.batter[r.name]||PT.pitcher[r.name];return t?_teamLogoHTML(t,16):'';})()}${r.name}</span></td>${cols.map(c=>`<td style="font-family:var(--mono)${c.hl?';color:var(--amber);font-weight:600':''}">${c.fmt(r)}</td>`).join('')}</tr>`; });
+    rows.forEach((r,i)=>{ h2+=`<tr><td style="font-family:var(--mono);color:${i===0?'var(--amber)':'var(--muted)'}">${i+1}</td><td style="font-weight:600"><span style="display:inline-flex;align-items:center;gap:5px">${(()=>{const t=PT.batter[r.name]||PT.pitcher[r.name];return t?_teamLogoHTML(t,16):'';})()}${r.name}${(()=>{const pos=POS[r.name];return pos?`<span style="font-size:9px;color:var(--muted);margin-left:4px;padding:1px 4px;background:var(--card2);border-radius:3px">${_posKor(pos)}</span>`:'';})()}</span></td>${cols.map(c=>`<td style="font-family:var(--mono)${c.hl?';color:var(--amber);font-weight:600':''}">${c.fmt(r)}</td>`).join('')}</tr>`; });
     return h2+'</tbody></table></div></div>';
   };
   const f3=v=>(v||0).toFixed(3).replace(/^0/,'');
@@ -22840,6 +22858,7 @@ function _renderLeagueRecords(season, games){
   const rec = _withSeasonGames(games, ()=>_computeRecordsData());
   if(!rec) return '<div class="card section" style="padding:30px;text-align:center;color:var(--muted)">기록 집계 실패</div>';
   const PT = _leaguePlayerTeams(games);  // 시즌 기준 선수→팀
+  const POS = _leaguePlayerPositions(games);  // 시즌 기준 주 포지션
   const DEC = _leaguePitcherDecisions(games);  // 승/패/세이브/홀드/QS
   const _d = (n,k)=>(DEC[n]&&DEC[n][k])||0;
   const isB = window._leagueRecTab==='batter';
@@ -22857,6 +22876,7 @@ function _renderLeagueRecords(season, games){
   const f3 = v=>(v||0).toFixed(3).replace(/^0/,'');
   const batCols = [
     {k:'name',l:'선수',f:b=>b.name,txt:1},{k:'team',l:'팀',f:b=>{const t=PT.batter[b.name];return t?`<span style="display:inline-flex;align-items:center;gap:5px">${_teamLogoHTML(t,18)}${t}</span>`:'-';},txt:1},
+    {k:'pos',l:'POS',f:b=>_posKor(POS[b.name]),txt:1},
     {k:'PA',l:'타석',f:b=>b.PA||0,cum:1},{k:'AB',l:'타수',f:b=>b.AB||0,cum:1},{k:'H',l:'안타',f:b=>b.H||0,cum:1},
     {k:'h2B',l:'2B',f:b=>b.h2B||0,cum:1},{k:'h3B',l:'3B',f:b=>b.h3B||0,cum:1},{k:'HR',l:'홈런',f:b=>b.HR||0,cum:1},
     {k:'TB',l:'총루타',f:b=>b.TB||0,cum:1},{k:'BB',l:'볼넷',f:b=>b.BB||0,cum:1},{k:'K',l:'삼진',f:b=>b.K||0,cum:1},
@@ -23164,6 +23184,7 @@ function _renderLeagueTeamRoster(team, games){
   let rec;
   try { rec = _computeRecordsData(); } catch(e){ return ''; }
   const PT = _leaguePlayerTeams(games);
+  const POS = _leaguePlayerPositions(games);
   const bat = rec.batters.filter(b=>PT.batter[b.name]===team);
   const pit = rec.pitchers.filter(p=>PT.pitcher[p.name]===team);
   if(!bat.length && !pit.length) return `<div style="padding:14px;color:var(--muted);font-size:12px">${team} 소속 선수 기록을 찾을 수 없습니다.</div>`;
@@ -23173,8 +23194,8 @@ function _renderLeagueTeamRoster(team, games){
     <div style="font-size:13px;font-weight:700;margin-bottom:8px">${_teamLogoHTML(team,28)} ${team} 로스터</div>`;
   if(bat.length){
     const _f3=v=>(v||0).toFixed(3).replace(/^0/,'');
-    h2 += `<div style="font-size:11px;color:var(--muted);margin:6px 0 3px">타자 (${bat.length})</div><div class="tbl-wrap"><table class="data-table"><thead><tr><th>선수</th><th>타석</th><th>타수</th><th>안타</th><th>2B</th><th>홈런</th><th>볼넷</th><th>삼진</th><th>타율</th><th>출루</th><th>장타</th><th>OPS</th><th>wOBA</th><th>wRC+</th><th>oWAR</th></tr></thead><tbody>`;
-    bat.forEach(b=>{ const _sn=String(b.name).replace(/\\/g,'\\\\').replace(/'/g,"\\'"); h2 += `<tr><td style="font-weight:600;cursor:pointer;color:var(--amber)" onclick="openCardDetail('${_sn}','batter')" title="선수 카드 보기">${b.name}</td><td style="font-family:var(--mono)">${b.PA||0}</td><td style="font-family:var(--mono)">${b.AB||0}</td><td style="font-family:var(--mono)">${b.H||0}</td><td style="font-family:var(--mono)">${b.h2B||0}</td><td style="font-family:var(--mono)">${b.HR||0}</td><td style="font-family:var(--mono)">${b.BB||0}</td><td style="font-family:var(--mono)">${b.K||0}</td><td style="font-family:var(--mono);font-weight:600">${_f3(b.avg)}</td><td style="font-family:var(--mono)">${_f3(b.obp)}</td><td style="font-family:var(--mono)">${_f3(b.slg)}</td><td style="font-family:var(--mono);font-weight:600">${_f3(b.ops)}</td><td style="font-family:var(--mono)">${_f3(b.woba)}</td><td style="font-family:var(--mono)">${(b.wrcPlus||0).toFixed(0)}</td><td style="font-family:var(--mono);color:var(--amber)">${(b.owar||0).toFixed(2)}</td></tr>`; });
+    h2 += `<div style="font-size:11px;color:var(--muted);margin:6px 0 3px">타자 (${bat.length})</div><div class="tbl-wrap"><table class="data-table"><thead><tr><th>선수</th><th>POS</th><th>타석</th><th>타수</th><th>안타</th><th>2B</th><th>홈런</th><th>볼넷</th><th>삼진</th><th>타율</th><th>출루</th><th>장타</th><th>OPS</th><th>wOBA</th><th>wRC+</th><th>oWAR</th></tr></thead><tbody>`;
+    bat.forEach(b=>{ const _sn=String(b.name).replace(/\\/g,'\\\\').replace(/'/g,"\\'"); h2 += `<tr><td style="font-weight:600;cursor:pointer;color:var(--amber)" onclick="openCardDetail('${_sn}','batter')" title="선수 카드 보기">${b.name}</td><td style="font-size:11px;color:var(--muted)">${_posKor(POS[b.name])}</td><td style="font-family:var(--mono)">${b.PA||0}</td><td style="font-family:var(--mono)">${b.AB||0}</td><td style="font-family:var(--mono)">${b.H||0}</td><td style="font-family:var(--mono)">${b.h2B||0}</td><td style="font-family:var(--mono)">${b.HR||0}</td><td style="font-family:var(--mono)">${b.BB||0}</td><td style="font-family:var(--mono)">${b.K||0}</td><td style="font-family:var(--mono);font-weight:600">${_f3(b.avg)}</td><td style="font-family:var(--mono)">${_f3(b.obp)}</td><td style="font-family:var(--mono)">${_f3(b.slg)}</td><td style="font-family:var(--mono);font-weight:600">${_f3(b.ops)}</td><td style="font-family:var(--mono)">${_f3(b.woba)}</td><td style="font-family:var(--mono)">${(b.wrcPlus||0).toFixed(0)}</td><td style="font-family:var(--mono);color:var(--amber)">${(b.owar||0).toFixed(2)}</td></tr>`; });
     h2 += '</tbody></table></div>';
   }
   if(pit.length){
