@@ -21501,7 +21501,8 @@ function _generateTeamScoutReport(teamName){
   
   const rankInLeague = (pct) => {
     const n = leagueTeamStats.length;
-    const rank = Math.max(1, Math.round(n - pct * n));
+    // V11.3 fix: pct=이하팀비율. 순위 = n - (이하 팀 수) + 1. (이전 +1 누락으로 2위가 1위로 뜸)
+    const rank = Math.max(1, Math.min(n, Math.round(n - pct * n + 1)));
     return `리그 ${rank}/${n}위권`;
   };
   
