@@ -21295,23 +21295,30 @@ function _computeAllTeamStats(){
   
   const teamBatStats = {}, teamPitchStats = {};
   
-  // G 한 번 순회로 모든 팀 동시 집계
+  // V11.3: 타석 경계 + isHit/isAB 정의를 기록실(_computeRecordsData)과 통일.
+  //   - isHit: 낫아웃 출루(ev=0) 제외 → (1BSafe===1 && ev>0) || HR
+  //   - AB/H/HR/BB는 '타석 종료 투구'에서만 카운트 (한 타석 여러 투구 중복 방지)
+  //   - AB = 볼넷(5)·사구(6) 아닌 모든 타석 (기록실과 동일)
+  //   - EV·스윙·체이스는 개별 투구(구질) 기준이라 모든 투구 순회 유지
   for(let i=0; i<G.length; i++){
     const d = G[i];
     const bName = d.bName, pName = d.pName;
     const r = +d.result;
-    const isHit = +d['1BSafe']===1 || r===4;
-    const isAB = isHit || r===1 || r===2;
-    
+    const isHit = (+d['1BSafe']===1 && +d.ev>0) || r===4;  // 기록실과 동일 (낫아웃 제외)
+    // 타석 종료 여부: 다음 투구가 다른 타석이거나 확정 종료 이벤트(HR/BB/HBP)
+    const next = G[i+1];
+    const isPAEnd = !next || (r>=4&&r<=6) || d._gameId!==next._gameId || d.inn!==next.inn || d.half!==next.half || d.bName!==next.bName || d.pName!==next.pName;
+    const isAB = isPAEnd && r!==5 && r!==6;  // 타석 종료 & 볼넷·사구 아님 (기록실과 동일)
+
     if(bName && batterTeamMap[bName]){
       const t = batterTeamMap[bName];
       if(!teamBatStats[t]) teamBatStats[t] = emptyAccum();
       const a = teamBatStats[t];
       a.bN++;
-      if(isHit) a.bHits++;
+      if(isPAEnd && isHit) a.bHits++;   // 안타는 타석 종료 시점에만
       if(isAB) a.bAB++;
-      if(r===4) a.bHR++;
-      if(r===5) a.bBB++;
+      if(isPAEnd && r===4) a.bHR++;
+      if(isPAEnd && r===5) a.bBB++;
       const ev = +d.ev;
       if(ev > 0){
         a.bBDCnt++;
@@ -21329,16 +21336,16 @@ function _computeAllTeamStats(){
         if(d.bSwing) a.bOutZSw++;
       }
     }
-    
+
     if(pName && pitcherTeamMap[pName]){
       const t = pitcherTeamMap[pName];
       if(!teamPitchStats[t]) teamPitchStats[t] = emptyPAccum();
       const a = teamPitchStats[t];
       a.pN++;
-      if(isHit) a.pHits++;
+      if(isPAEnd && isHit) a.pHits++;
       if(isAB) a.pAB++;
-      if(r===4) a.pHR++;
-      if(r===5) a.pBB++;
+      if(isPAEnd && r===4) a.pHR++;
+      if(isPAEnd && r===5) a.pBB++;
       if(d.bSwing){
         a.pSw++;
         if(+d.call !== 2) a.pWh++;
@@ -21371,7 +21378,10 @@ function _computeAllTeamStats(){
   allTeamNames.forEach(t => {
     if(t === '_unknown_') return;
     const s = accumToStats(teamBatStats[t], teamPitchStats[t]);
-    if(s.bAB < 50 || s.pAB < 50) return;
+    // V11.3: 표본 컷 완화 (50→10) + 조건 AND화. 경기 수 적은 리그(리그 초반) 대응.
+    //   이전엔 타수·피타수 둘 중 하나라도 50 미만이면 제외 → 1경기 한 팀이 순위·백분위에서 통째로 빠짐.
+    //   이제 타격·투수 표본이 둘 다 극소(각 10 미만)일 때만 제외. 한쪽이라도 있으면 포함.
+    if(s.bAB < 10 && s.pAB < 10) return;
     leagueTeamStats.push({team: t, ...s});
   });
   
