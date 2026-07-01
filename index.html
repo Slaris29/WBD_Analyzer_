@@ -22705,14 +22705,19 @@ function _leaguePlayerPositions(games){
   return _withSeasonGames(games, ()=>{
     const map={};
     try{
-      const dd=_computeDefenseData();
-      const bp=dd.byPlayer||{};
-      for(const n in bp){ if(bp[n].primaryPos && bp[n].primaryPos!=='?') map[_canonPlayer(n)]=bp[n].primaryPos; }
+      // 타자·투수 모든 선수에 대해 주 포지션 계산 (getPrimaryPosition은 DH·투수까지 처리)
+      const names=new Set([...(window._cache.batterNames||[]),...(window._cache.pitcherNames||[])]);
+      names.forEach(n=>{
+        try{
+          const pp=getPrimaryPosition(n);
+          if(pp && pp.name) map[_canonPlayer(n)]=pp.name;  // 'SS','DH','P' 등 약어
+        }catch(e){}
+      });
     }catch(e){}
     return map;
   });
 }
-const _POS_KOR={P:'투수',C:'포수','1B':'1루','2B':'2루','3B':'3루',SS:'유격',LF:'좌익',CF:'중견',RF:'우익'};
+const _POS_KOR={P:'투수',C:'포수','1B':'1루','2B':'2루','3B':'3루',SS:'유격',LF:'좌익',CF:'중견',RF:'우익',DH:'지명'};
 function _posKor(p){ return _POS_KOR[p]||p||'-'; }
 
 function _leaguePlayerTeams(games){
@@ -22865,13 +22870,23 @@ function _renderLeagueRecords(season, games){
   const Q = _leagueQualThresholds(games);
   if(window._leagueHideUnqual===undefined) window._leagueHideUnqual=false;
   const hideUnq = window._leagueHideUnqual;
+  if(window._leagueRecPosFilter===undefined) window._leagueRecPosFilter='all';
+  if(window._leagueRecTeamFilter===undefined) window._leagueRecTeamFilter='all';
+  const posFilter = window._leagueRecPosFilter, teamFilter = window._leagueRecTeamFilter;
+  // 필터 옵션 만들기
+  const _posOrder=['P','C','1B','2B','3B','SS','LF','CF','RF','DH'];
+  const _leagueTeamsList=(()=>{const s=new Set();games.forEach(g=>{const i=_parseGameName(g.name);[i.teamA,i.teamB].forEach(t=>{const n=_normalizeTeam(t);if(n)s.add(n);});});return[...s].sort();})();
+  const posBtn=(val,label)=>`<button onclick="window._leagueRecPosFilter='${val}';renderLeaguePage()" style="font-size:10.5px;padding:4px 9px;border-radius:5px;border:1px solid var(--border);background:${posFilter===val?'#39ff8a':'var(--bg2)'};color:${posFilter===val?'#000':'var(--muted)'};cursor:pointer;font-weight:${posFilter===val?'700':'500'}">${label}</button>`;
+  const teamOpts=`<option value="all">전체 팀</option>`+_leagueTeamsList.map(t=>`<option value="${t.replace(/"/g,'&quot;')}" ${teamFilter===t?'selected':''}>${t}</option>`).join('');
   let html = `<div class="card section">
-    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
+    <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
       <button onclick="window._leagueRecTab='batter';renderLeaguePage()" style="font-size:12px;padding:6px 14px;border-radius:6px;border:1px solid var(--border);background:${isB?'var(--amber)':'var(--bg2)'};color:${isB?'#000':'var(--muted)'};font-weight:600;cursor:pointer">🏏 타자</button>
       <button onclick="window._leagueRecTab='pitcher';renderLeaguePage()" style="font-size:12px;padding:6px 14px;border-radius:6px;border:1px solid var(--border);background:${!isB?'var(--amber)':'var(--bg2)'};color:${!isB?'#000':'var(--muted)'};font-weight:600;cursor:pointer">⚾ 투수</button>
       <button onclick="window._leagueHideUnqual=!window._leagueHideUnqual;renderLeaguePage()" style="font-size:11px;padding:6px 12px;border-radius:6px;border:1px solid var(--border);background:${hideUnq?'var(--amber)':'var(--bg2)'};color:${hideUnq?'#000':'var(--muted)'};cursor:pointer" title="규정 미달 선수 숨기기">${hideUnq?'☑':'☐'} 규정미달 제외</button>
+      <select onchange="window._leagueRecTeamFilter=this.value;renderLeaguePage()" style="font-size:11px;padding:5px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--text);cursor:pointer">${teamOpts}</select>
       <span style="margin-left:auto;font-size:10.5px;color:var(--muted);align-self:center">${season} 정규시즌 · ${isB?`규정타석 ${Q.qPA.toFixed(0)}`:`규정이닝 ${_fmtIP(Q.qIP)}`} (${Q.games}경기 기준) · <span style="color:var(--muted);opacity:.6">흐린 행=규정미달</span></span>
-    </div>`;
+    </div>
+    ${isB?`<div style="display:flex;gap:5px;margin-bottom:12px;flex-wrap:wrap;align-items:center"><span style="font-size:10.5px;color:var(--muted);margin-right:3px">포지션:</span>${posBtn('all','전체')}${_posOrder.map(pk=>posBtn(pk,_posKor(pk))).join('')}</div>`:''}`;
   // 컬럼 정의 (key=정렬키, f=포맷, num=숫자여부)
   const f3 = v=>(v||0).toFixed(3).replace(/^0/,'');
   const batCols = [
@@ -22906,6 +22921,9 @@ function _renderLeagueRecords(season, games){
 
   let rows = (isB?rec.batters:rec.pitchers).slice();
   if(hideUnq) rows = rows.filter(r=>(r[sampleKey]||0)>=qVal);
+  // V11.3: 포지션 필터 (타자만) + 팀 필터
+  if(isB && posFilter!=='all') rows = rows.filter(r=>POS[r.name]===posFilter);
+  if(teamFilter!=='all'){ const tmap=isB?PT.batter:PT.pitcher; rows = rows.filter(r=>tmap[r.name]===teamFilter); }
   // 정렬: 규정충족 우선 후 선택 정렬키
   const sc = cols.find(c=>c.k===sortState.key) || cols[0];
   const getVal = (r,c)=> c.get ? c.get(r) : r[c.k];  // 계산 컬럼(_W 등)은 get 사용
@@ -27047,12 +27065,13 @@ function calcFieldingInnings(name){
   return {posInnings, totalInnings};
 }
 
-// 주 포지션 반환 (가장 많이 뛴 포지션 이름) - DH(9) 제외
+// 주 포지션 반환 (가장 많이 뛴 포지션 이름)
+// V11.3: DH(9)도 다른 포지션과 동등하게 최다 이닝 경쟁에 포함.
+//   (MLB 관례: DH도 엄연한 포지션 슬롯. 예: DH 88이닝 > 포수 49이닝 → 주 포지션 DH)
 function getPrimaryPosition(name){
   const {posInnings}=calcFieldingInnings(name);
-  const entries=Object.entries(posInnings).filter(([p,_])=>+p!==9); // DH(9) 제외
+  const entries=Object.entries(posInnings);  // DH 포함 전체
   if(entries.length===0){
-    if(posInnings[9])return {pos:9,name:'DH',long:'지명타자',innings:posInnings[9]};
     return null;
   }
   entries.sort((a,b)=>b[1]-a[1]);
