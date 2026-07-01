@@ -4254,8 +4254,8 @@ function renderPitcherHeader(pitcherName,pd){
   const bWar=hasBatting?calcBatterWAR(pitcherName):0;
   const totalWar=pWar+bWar;
   const warHTML=hasBatting
-    ?`<span class="ph-badge" style="background:linear-gradient(90deg,#ff8c44,#cc44ff);color:#fff;border:none;font-weight:700" title="투타 겸업 총합">⚔️ 투타 ${totalWar.toFixed(1)} WAR</span><span class="ph-badge" style="background:linear-gradient(90deg,#1976d2,#64b5f6);color:#fff;border:none;font-weight:700;font-size:11px" title="투수 부분">⚾ 투수 ${pWar.toFixed(1)} WAR</span><span class="ph-badge" style="background:linear-gradient(90deg,#e91e63,#ff8caa);color:#fff;border:none;font-weight:700;font-size:11px" title="타자 부분">🏏 타자 ${bWar.toFixed(1)} WAR</span>`
-    :`<span class="ph-badge" style="background:linear-gradient(90deg,#1976d2,#64b5f6);color:#fff;border:none;font-weight:700" title="투수 WAR (sabermetrics-style, 환경 평균 대비)">⚾ 투수 ${pWar.toFixed(1)} WAR</span>`;
+    ?`<span class="ph-badge" style="background:linear-gradient(90deg,#ff8c44,#cc44ff);color:#fff;border:none;font-weight:700" title="투타 겸업 총합">⚔️ 투타 ${totalWar.toFixed(2)} WAR</span><span class="ph-badge" style="background:linear-gradient(90deg,#1976d2,#64b5f6);color:#fff;border:none;font-weight:700;font-size:11px" title="투수 부분">⚾ 투수 ${pWar.toFixed(2)} WAR</span><span class="ph-badge" style="background:linear-gradient(90deg,#e91e63,#ff8caa);color:#fff;border:none;font-weight:700;font-size:11px" title="타자 부분">🏏 타자 ${bWar.toFixed(2)} WAR</span>`
+    :`<span class="ph-badge" style="background:linear-gradient(90deg,#1976d2,#64b5f6);color:#fff;border:none;font-weight:700" title="투수 WAR (sabermetrics-style, 환경 평균 대비)">⚾ 투수 ${pWar.toFixed(2)} WAR</span>`;
   document.getElementById('pitcher-header').innerHTML=`
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap">
       <div style="width:56px;height:56px;border-radius:50%;overflow:hidden;border:2px solid var(--amber);box-shadow:0 0 10px rgba(245,217,35,0.3);flex-shrink:0">${(()=>{
@@ -5273,8 +5273,8 @@ function renderBatterHeader(batterName,bd){
   const pWar_h=hasPitching_h?calcPitcherWAR(batterName):0;
   const totalWar_h=bWar_h+pWar_h;
   const warHTML_h=hasPitching_h
-    ?'<span class="ph-badge" style="background:linear-gradient(90deg,#ff8c44,#cc44ff);color:#fff;border:none;font-weight:700" title="투타 겸업 총합">⚔️ 투타 '+totalWar_h.toFixed(1)+' WAR</span><span class="ph-badge" style="background:linear-gradient(90deg,#e91e63,#ff8caa);color:#fff;border:none;font-weight:700;font-size:11px" title="타자 부분">🏏 타자 '+bWar_h.toFixed(1)+' WAR</span><span class="ph-badge" style="background:linear-gradient(90deg,#1976d2,#64b5f6);color:#fff;border:none;font-weight:700;font-size:11px" title="투수 부분">⚾ 투수 '+pWar_h.toFixed(1)+' WAR</span>'
-    :'<span class="ph-badge" style="background:linear-gradient(90deg,#e91e63,#ff8caa);color:#fff;border:none;font-weight:700" title="타자 WAR (wOBA-style, 환경 평균 대비)">🏏 타자 '+bWar_h.toFixed(1)+' WAR</span>';
+    ?'<span class="ph-badge" style="background:linear-gradient(90deg,#ff8c44,#cc44ff);color:#fff;border:none;font-weight:700" title="투타 겸업 총합">⚔️ 투타 '+totalWar_h.toFixed(2)+' WAR</span><span class="ph-badge" style="background:linear-gradient(90deg,#e91e63,#ff8caa);color:#fff;border:none;font-weight:700;font-size:11px" title="타자 부분">🏏 타자 '+bWar_h.toFixed(2)+' WAR</span><span class="ph-badge" style="background:linear-gradient(90deg,#1976d2,#64b5f6);color:#fff;border:none;font-weight:700;font-size:11px" title="투수 부분">⚾ 투수 '+pWar_h.toFixed(2)+' WAR</span>'
+    :'<span class="ph-badge" style="background:linear-gradient(90deg,#e91e63,#ff8caa);color:#fff;border:none;font-weight:700" title="타자 WAR (wOBA-style, 환경 평균 대비)">🏏 타자 '+bWar_h.toFixed(2)+' WAR</span>';
 
   document.getElementById('batter-header').innerHTML=
     '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">'
@@ -9818,7 +9818,7 @@ function _renderWARLeaderboard(cat){
         <td style="font-family:var(--mono);color:#39ff8a">${r.ip}</td>
         <td style="font-family:var(--mono);color:#ff4560">${r.era}</td>
         <td style="font-family:var(--mono);color:#ff8800">${r.ks}</td>
-        <td style="font-family:var(--mono);color:${warColor};font-weight:800;font-size:14px">${r.war.toFixed(1)}</td>
+        <td style="font-family:var(--mono);color:${warColor};font-weight:800;font-size:14px">${r.war.toFixed(2)}</td>
       </tr>`;
     } else if(cat==='war-batter'){
       html+=`<tr onclick="${goto}" style="cursor:pointer">
@@ -9829,7 +9829,7 @@ function _renderWARLeaderboard(cat){
         <td style="font-family:var(--mono);color:#39ff8a">${r.hits}</td>
         <td style="font-family:var(--mono);color:#ffd700">${r.hrs}</td>
         <td style="font-family:var(--mono);font-weight:600">${r.avg}</td>
-        <td style="font-family:var(--mono);color:${warColor};font-weight:800;font-size:14px">${r.war.toFixed(1)}</td>
+        <td style="font-family:var(--mono);color:${warColor};font-weight:800;font-size:14px">${r.war.toFixed(2)}</td>
       </tr>`;
     } else { // total
       const tag=r.isHybrid?'<span style="background:linear-gradient(90deg,#ff8c44,#cc44ff);color:#fff;padding:2px 6px;border-radius:3px;font-size:9px">⚔️ 겸업</span>':r.type==='pitcher'?'<span style="color:#88ccff;font-size:10px">⚾ 투수</span>':'<span style="color:#ff6b8a;font-size:10px">🏏 타자</span>';
@@ -9837,9 +9837,9 @@ function _renderWARLeaderboard(cat){
         <td>${i+1}</td><td style="font-weight:600">${r.name}</td>
         <td>${tag}</td>
         <td style="color:var(--muted);font-size:10px">${r.team}</td>
-        <td style="font-family:var(--mono);color:${r.pWar?'#88ccff':'var(--muted)'}">${r.pWar?r.pWar.toFixed(1):'—'}</td>
-        <td style="font-family:var(--mono);color:${r.bWar?'#ff6b8a':'var(--muted)'}">${r.bWar?r.bWar.toFixed(1):'—'}</td>
-        <td style="font-family:var(--mono);color:${warColor};font-weight:800;font-size:15px">${r.war.toFixed(1)}</td>
+        <td style="font-family:var(--mono);color:${r.pWar?'#88ccff':'var(--muted)'}">${r.pWar?r.pWar.toFixed(2):'—'}</td>
+        <td style="font-family:var(--mono);color:${r.bWar?'#ff6b8a':'var(--muted)'}">${r.bWar?r.bWar.toFixed(2):'—'}</td>
+        <td style="font-family:var(--mono);color:${warColor};font-weight:800;font-size:15px">${r.war.toFixed(2)}</td>
       </tr>`;
     }
   });
@@ -10301,7 +10301,7 @@ function _renderGroupAnalysisPage(sel){
       <div style="font-size:12px;color:#88ccff;font-weight:600;margin-bottom:8px">⚾ 투수 종합${lowPCount>0?` <span style="font-size:9px;color:#4a7aaa;font-weight:400">(평균은 충분한 ${pCards.length}/${allPCards.length}명)</span>`:''}</div>
       <div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
         <div><div style="font-size:10px;color:var(--muted)">평균 OVR</div><div style="font-size:24px;font-weight:900;color:${cardOvrColor(avgPOvr)};font-family:var(--mono)">${pCards.length?avgPOvr.toFixed(0):'-'}</div></div>
-        <div><div style="font-size:10px;color:var(--muted)">합산 WAR</div><div style="font-size:24px;font-weight:900;color:var(--amber);font-family:var(--mono)">${totalPWar.toFixed(1)}</div></div>
+        <div><div style="font-size:10px;color:var(--muted)">합산 WAR</div><div style="font-size:24px;font-weight:900;color:var(--amber);font-family:var(--mono)">${totalPWar.toFixed(2)}</div></div>
         <div><div style="font-size:10px;color:var(--muted)">투구</div><div style="font-size:24px;font-weight:900;font-family:var(--mono)">${pitcherDataAll.length}</div></div>
       </div>
     </div>
@@ -10309,7 +10309,7 @@ function _renderGroupAnalysisPage(sel){
       <div style="font-size:12px;color:#ff6b8a;font-weight:600;margin-bottom:8px">🏏 타자 종합${lowBCount>0?` <span style="font-size:9px;color:#4a7aaa;font-weight:400">(평균은 충분한 ${bCards.length}/${allBCards.length}명)</span>`:''}</div>
       <div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
         <div><div style="font-size:10px;color:var(--muted)">평균 OVR</div><div style="font-size:24px;font-weight:900;color:${cardOvrColor(avgBOvr)};font-family:var(--mono)">${bCards.length?avgBOvr.toFixed(0):'-'}</div></div>
-        <div><div style="font-size:10px;color:var(--muted)">합산 WAR</div><div style="font-size:24px;font-weight:900;color:var(--amber);font-family:var(--mono)">${totalBWar.toFixed(1)}</div></div>
+        <div><div style="font-size:10px;color:var(--muted)">합산 WAR</div><div style="font-size:24px;font-weight:900;color:var(--amber);font-family:var(--mono)">${totalBWar.toFixed(2)}</div></div>
         <div><div style="font-size:10px;color:var(--muted)">타구</div><div style="font-size:24px;font-weight:900;font-family:var(--mono)">${batterDataAll.length}</div></div>
       </div>
     </div>
@@ -10340,7 +10340,7 @@ function _renderGroupAnalysisPage(sel){
         </div>
         <div style="position:relative;width:100%;aspect-ratio:1/1;border-radius:6px;overflow:hidden;${lowBorder};margin-bottom:6px;background:#0f1828">${photoHTML}</div>
         <div style="font-size:12px;font-weight:600;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px">${name}</div>
-        <div style="font-size:10px;color:var(--muted);text-align:center;font-family:var(--mono)">WAR ${(war||0).toFixed(1)}</div>
+        <div style="font-size:10px;color:var(--muted);text-align:center;font-family:var(--mono)">WAR ${(war||0).toFixed(2)}</div>
       </div>
     </div>`;
   };
@@ -11050,9 +11050,10 @@ function calcPitcherWAR(name){
 }
 function _calcPitcherWARImpl(name){
   // V10.1: 기록실 pWAR로 통합 — FIP(WBD 리그 RA9 보정) 기반
+  // V11.3: n>=15 컷 제거. WAR는 누적 스탯이라 최소 투구 제한 부적절(기록실 pwar와 통일).
   try {
     const r = _computeRecordsData().pitchers.find(p => p.name === String(name));
-    if(r && r.pwar != null && r.n >= 15) return +r.pwar.toFixed(2);
+    if(r && r.pwar != null && r.n > 0) return +r.pwar.toFixed(2);
   } catch(e){}
   return 0;
 }
@@ -11066,9 +11067,11 @@ function calcBatterWAR(name){
 }
 function _calcBatterWARImpl(name){
   // V10.1: 기록실 oWAR로 통합 — 안타 분류(2/3루타) + WBD 환경 보정 wOBA/wRAA/RPW 기반
+  // V11.3: PA>=5 컷 제거. WAR는 누적 스탯이라 타석이 적으면 값도 작게 나오므로
+  //   인위적 최소 타석 제한은 부적절(리그전 기록실 owar와 불일치 원인이었음). 실제 값으로 통일.
   try {
     const r = _computeRecordsData().batters.find(b => b.name === String(name));
-    if(r && r.PA >= 5) return +r.owar.toFixed(2);
+    if(r && r.PA > 0) return +r.owar.toFixed(2);
   } catch(e){}
   return 0;
 }
@@ -11294,10 +11297,10 @@ function renderAwardsPage(){
     if(type==='hybrid') gotoFn='goToBatter'; // 겸업은 일단 타자 페이지로
     else gotoFn=type==='pitcher'?'goToPitcher':'goToBatter';
     // hybrid 표시 (투타 통합)
-    const hybridLabel=type==='hybrid'?`<div style="font-size:10px;color:#cc44ff;margin-bottom:4px">⚔️ 투타 겸업 · P:${winner.pWar.toFixed(1)} / B:${winner.bWar.toFixed(1)}</div>`:'';
+    const hybridLabel=type==='hybrid'?`<div style="font-size:10px;color:#cc44ff;margin-bottom:4px">⚔️ 투타 겸업 · P:${winner.pWar.toFixed(2)} / B:${winner.bWar.toFixed(2)}</div>`:'';
     // WAR 부가 표시 (메인 metric이 WAR이 아닐 때만)
     const warSub=showWar&&metricLabel!=='WAR'&&winner.war!=null
-      ?`<div style="font-size:10px;color:var(--muted);margin-top:4px">WAR <b style="color:#ffd700">${winner.war.toFixed(1)}</b></div>`:'';
+      ?`<div style="font-size:10px;color:var(--muted);margin-top:4px">WAR <b style="color:#ffd700">${winner.war.toFixed(2)}</b></div>`:'';
     return `<div class="card" style="border:2px solid ${color};box-shadow:0 0 20px ${color}44;text-align:center;padding:18px;cursor:pointer;transition:transform .2s" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''" onclick="${gotoFn}('${String(winner.name).replace(/'/g,"\\'")}')">
       <div style="font-size:40px;margin-bottom:6px">${icon}</div>
       <div style="font-size:12px;font-weight:700;color:${color};letter-spacing:1px;margin-bottom:2px">${title}</div>
@@ -11339,11 +11342,11 @@ function renderAwardsPage(){
 
   // 메인 어워드 (타자 MVP + 투수 MVP/사이영 + 통합 MVP)
   html+='<div class="grid3 section">';
-  if(batMvp)html+=awardCard('🏏','타자 MVP','Batter MVP',{...batMvp,type:'batter'},batMvp.war.toFixed(1),'WAR','#ff6b8a');
+  if(batMvp)html+=awardCard('🏏','타자 MVP','Batter MVP',{...batMvp,type:'batter'},batMvp.war.toFixed(2),'WAR','#ff6b8a');
   else html+=awardCard('🏏','타자 MVP','Batter MVP',null,null,null,'#ff6b8a');
-  if(cy)html+=awardCard('👑','투수 MVP','Cy Young (Pitcher MVP)',{...cy,type:'pitcher'},cy.war.toFixed(1),'WAR','#88ccff');
+  if(cy)html+=awardCard('👑','투수 MVP','Cy Young (Pitcher MVP)',{...cy,type:'pitcher'},cy.war.toFixed(2),'WAR','#88ccff');
   else html+=awardCard('👑','투수 MVP','Cy Young (Pitcher MVP)',null,null,null,'#88ccff');
-  if(mvp)html+=awardCard('🏆','통합 MVP','Overall MVP',mvp,mvp.war.toFixed(1),'WAR','#ffd700');
+  if(mvp)html+=awardCard('🏆','통합 MVP','Overall MVP',mvp,mvp.war.toFixed(2),'WAR','#ffd700');
   else html+=awardCard('🏆','통합 MVP','Overall MVP',null,null,null,'#ffd700');
   html+='</div>';
 
@@ -11396,7 +11399,7 @@ function renderAwardsPage(){
   html+=awardCard('🔐','세이브왕','Save Leader',saveKing?{...saveKing,type:'pitcher'}:null,saveKing?saveKing.SV:null,'세이브','#60a5fa');
   html+=awardCard('🤝','홀드왕','Hold Leader',holdKing?{...holdKing,type:'pitcher'}:null,holdKing?holdKing.HLD:null,'홀드','#a78bfa');
   html+=awardCard('💎','퀄리티스타트왕','QS Leader',qsKing?{...qsKing,type:'pitcher'}:null,qsKing?qsKing.QS:null,'QS','#fbbf24');
-  html+=awardCard('⭐','신인왕','Rookie of the Year',rookie,rookie?rookie.war.toFixed(1):null,'WAR','#44aaff');
+  html+=awardCard('⭐','신인왕','Rookie of the Year',rookie,rookie?rookie.war.toFixed(2):null,'WAR','#44aaff');
   html+='</div>';
 
   // WAR 리더보드
@@ -11408,7 +11411,7 @@ function renderAwardsPage(){
     html+=`<tr onclick="goToPitcher('${String(p.name).replace(/'/g,"\\'")}')" style="cursor:pointer">
       <td>${i+1}</td>
       <td style="font-weight:600">${p.name}</td>
-      <td style="font-family:var(--mono);color:var(--amber);font-weight:700">${p.war.toFixed(1)}</td>
+      <td style="font-family:var(--mono);color:var(--amber);font-weight:700">${p.war.toFixed(2)}</td>
       <td style="font-family:var(--mono)">${p.ks}</td>
       <td style="font-family:var(--mono)">${p.baAgainst.toFixed(3).replace(/^0/,'')}</td>
     </tr>`;
@@ -11421,7 +11424,7 @@ function renderAwardsPage(){
     html+=`<tr onclick="goToBatter('${String(b.name).replace(/'/g,"\\'")}')" style="cursor:pointer">
       <td>${i+1}</td>
       <td style="font-weight:600">${b.name}</td>
-      <td style="font-family:var(--mono);color:var(--amber);font-weight:700">${b.war.toFixed(1)}</td>
+      <td style="font-family:var(--mono);color:var(--amber);font-weight:700">${b.war.toFixed(2)}</td>
       <td style="font-family:var(--mono)">${b.hrs}</td>
       <td style="font-family:var(--mono)">${b.avg.toFixed(3).replace(/^0/,'')}</td>
     </tr>`;
@@ -22659,8 +22662,8 @@ function _renderSeasonCompare(){
   h2+=row('타자 수',a.batters,b.batters);
   h2+=row('투수 수',a.pitchers,b.pitchers);
   h2+=row('리그 타율',a.lgAvg,b.lgAvg,x=>x.toFixed(3).replace(/^0/,''));
-  h2+=row('최고 타자(oWAR)',a.bestBat,b.bestBat,x=>x?`${x.n} (${(x.v||0).toFixed(1)})`:'-');
-  h2+=row('최고 투수(pWAR)',a.bestPit,b.bestPit,x=>x?`${x.n} (${(x.v||0).toFixed(1)})`:'-');
+  h2+=row('최고 타자(oWAR)',a.bestBat,b.bestBat,x=>x?`${x.n} (${(x.v||0).toFixed(2)})`:'-');
+  h2+=row('최고 투수(pWAR)',a.bestPit,b.bestPit,x=>x?`${x.n} (${(x.v||0).toFixed(2)})`:'-');
   h2+=row('최다 홈런',a.topHR,b.topHR,x=>x?`${x.name} (${x.HR})`:'-');
   h2+='</tbody></table>';
   document.getElementById('_cmp_body').innerHTML=h2;
@@ -23008,11 +23011,11 @@ function _renderLeagueTeamRecords(season, games){
     {k:'avg',l:'타율',f:t=>t.avg.toFixed(3).replace(/^0/,'')},{k:'obp',l:'출루',f:t=>t.obp.toFixed(3).replace(/^0/,'')},
     {k:'slg',l:'장타',f:t=>t.slg.toFixed(3).replace(/^0/,'')},{k:'ops',l:'OPS',f:t=>t.ops.toFixed(3).replace(/^0/,''),hl:1},
     {k:'H',l:'안타',f:t=>t.H},{k:'HR',l:'홈런',f:t=>t.HR},{k:'BB',l:'볼넷',f:t=>t.BB},
-    {k:'owar',l:'oWAR',f:t=>t.owar.toFixed(1)},
+    {k:'owar',l:'oWAR',f:t=>t.owar.toFixed(2)},
     {k:'era',l:'ERA',f:t=>t.era!=null?t.era.toFixed(2):'-',asc:1},{k:'fip',l:'FIP',f:t=>t.fip!=null?t.fip.toFixed(2):'-',asc:1},
     {k:'whip',l:'WHIP',f:t=>t.whip!=null?t.whip.toFixed(2):'-',asc:1},
-    {k:'pK',l:'탈삼진',f:t=>t.pK},{k:'pwar',l:'pWAR',f:t=>t.pwar.toFixed(1)},
-    {k:'war',l:'총WAR',f:t=>t.war.toFixed(1),amber:1}
+    {k:'pK',l:'탈삼진',f:t=>t.pK},{k:'pwar',l:'pWAR',f:t=>t.pwar.toFixed(2)},
+    {k:'war',l:'총WAR',f:t=>t.war.toFixed(2),amber:1}
   ];
   const sc=teamCols.find(c=>c.k===ts.key)||teamCols[0];
   arr.sort((a,b)=>{ if(sc.txt) return ts.dir==='desc'?String(b[ts.key]).localeCompare(String(a[ts.key])):String(a[ts.key]).localeCompare(String(b[ts.key]));
@@ -24294,7 +24297,7 @@ function _renderMyTeamStats(team){
   
   return `<div class="grid3">
     <div class="card stat" style="text-align:center"><div style="font-size:11px;color:var(--muted);text-transform:uppercase">투수 OVR</div><div style="font-size:30px;font-weight:900;color:${cardOvrColor(avgPOvr)};font-family:var(--mono)">${avgPOvr||'-'}</div><div style="font-size:11px;color:var(--muted)">${pitcherName||'미선택'}</div></div>
-    <div class="card stat" style="text-align:center"><div style="font-size:11px;color:var(--muted);text-transform:uppercase">타자 평균 OVR (${bCards.length}/${dhName?'9':'9'})${dhName?' · DH':''}</div><div style="font-size:30px;font-weight:900;color:${cardOvrColor(avgBOvr)};font-family:var(--mono)">${avgBOvr||'-'}</div><div style="font-size:11px;color:var(--muted)">합산 WAR ${totalWar.toFixed(1)}</div></div>
+    <div class="card stat" style="text-align:center"><div style="font-size:11px;color:var(--muted);text-transform:uppercase">타자 평균 OVR (${bCards.length}/${dhName?'9':'9'})${dhName?' · DH':''}</div><div style="font-size:30px;font-weight:900;color:${cardOvrColor(avgBOvr)};font-family:var(--mono)">${avgBOvr||'-'}</div><div style="font-size:11px;color:var(--muted)">합산 WAR ${totalWar.toFixed(2)}</div></div>
     <div class="card stat" style="text-align:center"><div style="font-size:11px;color:var(--muted);text-transform:uppercase">팀 종합 점수</div><div style="font-size:30px;font-weight:900;color:var(--amber);font-family:var(--mono)">${teamScore.toFixed(0)}</div><div style="font-size:11px;color:var(--muted)">${players.length}/10 채움 ${dhName?'(DH)':''}</div></div>
   </div>`;
 }
@@ -25156,8 +25159,8 @@ function _runSimActual(idA,idB,n){
       }).join('')}
     </div>`:''}
     <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);font-size:11px;color:var(--muted);display:grid;grid-template-columns:1fr 1fr;gap:6px">
-      <div>${teamA.name}: 투 <b style="color:var(--text)">${powerA.pitching.toFixed(0)}</b> · 타 <b style="color:var(--text)">${powerA.batting.toFixed(0)}</b> · WAR <b style="color:var(--text)">${(powerA.pitcherWar+powerA.batterWar).toFixed(1)}</b></div>
-      <div>${teamB.name}: 투 <b style="color:var(--text)">${powerB.pitching.toFixed(0)}</b> · 타 <b style="color:var(--text)">${powerB.batting.toFixed(0)}</b> · WAR <b style="color:var(--text)">${(powerB.pitcherWar+powerB.batterWar).toFixed(1)}</b></div>
+      <div>${teamA.name}: 투 <b style="color:var(--text)">${powerA.pitching.toFixed(0)}</b> · 타 <b style="color:var(--text)">${powerA.batting.toFixed(0)}</b> · WAR <b style="color:var(--text)">${(powerA.pitcherWar+powerA.batterWar).toFixed(2)}</b></div>
+      <div>${teamB.name}: 투 <b style="color:var(--text)">${powerB.pitching.toFixed(0)}</b> · 타 <b style="color:var(--text)">${powerB.batting.toFixed(0)}</b> · WAR <b style="color:var(--text)">${(powerB.pitcherWar+powerB.batterWar).toFixed(2)}</b></div>
     </div>
   </div>`;
   document.getElementById('sim-result').innerHTML=html;
@@ -27158,7 +27161,7 @@ function renderFieldingLeaderboard(posFilter='all'){
           <span style="color:var(--muted);font-size:10px;width:16px">${i+1}</span>
           <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</span>
           <span title="OVR" style="font-family:var(--mono);color:${ovrCol};font-weight:700;font-size:10px">${p.OVR}</span>
-          <span title="${p.type==='pitcher'?'투수 WAR':'타자 WAR'}" style="font-family:var(--mono);color:var(--amber);font-weight:700;font-size:10px">${p.WAR.toFixed(1)}</span>
+          <span title="${p.type==='pitcher'?'투수 WAR':'타자 WAR'}" style="font-family:var(--mono);color:var(--amber);font-weight:700;font-size:10px">${p.WAR.toFixed(2)}</span>
           <span style="font-family:var(--mono);color:${POS_COLORS[pos]};font-weight:700;font-size:10px">${p.posInnings[pos]}ip</span>
         </div>`;
       });
@@ -27188,7 +27191,7 @@ function renderFieldingLeaderboard(posFilter='all'){
           <td style="color:var(--muted);font-size:11px">${r.team}</td>
           <td><span style="color:${POS_COLORS[r.primary.pos]};font-family:var(--mono);font-weight:700">${r.primary.name}</span></td>
           <td style="font-family:var(--mono);color:${ovrCol};font-weight:700">${r.OVR}</td>
-          <td style="font-family:var(--mono);color:var(--amber);font-weight:700">${r.WAR.toFixed(1)}</td>
+          <td style="font-family:var(--mono);color:var(--amber);font-weight:700">${r.WAR.toFixed(2)}</td>
           <td style="font-family:var(--mono);color:var(--amber);font-weight:700">${r.posCount}개</td>
           <td style="font-family:var(--mono)">${r.totalInnings}</td>
           <td>${posBadges}</td>
@@ -27247,7 +27250,7 @@ function renderFieldingLeaderboard(posFilter='all'){
         <td style="color:var(--muted);font-size:11px">${r.team}</td>
         <td><span style="color:${POS_COLORS[r.primary.pos]};font-family:var(--mono);font-weight:700">${r.primary.name}</span></td>
         <td style="font-family:var(--mono);color:${ovrCol};font-weight:700">${r.OVR}</td>
-        <td title="${r.type==='pitcher'?'투수 WAR':'타자 WAR'}" style="font-family:var(--mono);color:var(--amber);font-weight:700">${r.WAR.toFixed(1)}</td>
+        <td title="${r.type==='pitcher'?'투수 WAR':'타자 WAR'}" style="font-family:var(--mono);color:var(--amber);font-weight:700">${r.WAR.toFixed(2)}</td>
         <td style="font-family:var(--mono);color:${POS_COLORS[pos]};font-size:16px;font-weight:700">${posInn}</td>
         <td style="font-family:var(--mono);color:var(--muted)">${r.totalInnings}</td>
         <td style="font-family:var(--mono);color:var(--amber)">${pct}%</td>
@@ -27556,7 +27559,7 @@ function renderBestLineup(){
       <text x="${coord.x}" y="${coord.y+3}" font-size="12" fill="#fff" text-anchor="middle" font-weight="700" font-family="sans-serif">${top.name.slice(0,10)}</text>
       <text x="${coord.x-34}" y="${coord.y+20}" font-size="13" fill="${ovrCol}" text-anchor="middle" font-weight="900" font-family="monospace">${top.card.OVR}</text>
       <text x="${coord.x-34}" y="${coord.y+28}" font-size="7" fill="#8896ad" text-anchor="middle" font-family="monospace">OVR</text>
-      <text x="${coord.x+2}" y="${coord.y+20}" font-size="12" fill="var(--amber)" text-anchor="middle" font-weight="700" font-family="monospace">${top.war.toFixed(1)}</text>
+      <text x="${coord.x+2}" y="${coord.y+20}" font-size="12" fill="var(--amber)" text-anchor="middle" font-weight="700" font-family="monospace">${top.war.toFixed(2)}</text>
       <text x="${coord.x+2}" y="${coord.y+28}" font-size="7" fill="#8896ad" text-anchor="middle" font-family="monospace">WAR</text>
       <text x="${coord.x+34}" y="${coord.y+20}" font-size="11" fill="#39ff8a" text-anchor="middle" font-weight="700" font-family="monospace">${top.primaryInnings}</text>
       <text x="${coord.x+34}" y="${coord.y+28}" font-size="7" fill="#8896ad" text-anchor="middle" font-family="monospace">이닝</text>
@@ -27580,7 +27583,7 @@ function renderBestLineup(){
           <div style="font-size:10px;color:var(--muted);margin-top:2px">${dhTop.team}</div>
         </div>
         <div style="text-align:center"><div style="font-size:9px;color:var(--muted)">OVR</div><div style="font-family:var(--mono);color:${ovrCol};font-weight:900;font-size:20px">${dhTop.card.OVR}</div></div>
-        <div style="text-align:center"><div style="font-size:9px;color:var(--muted)">WAR</div><div style="font-family:var(--mono);color:var(--amber);font-weight:700;font-size:18px">${dhTop.war.toFixed(1)}</div></div>
+        <div style="text-align:center"><div style="font-size:9px;color:var(--muted)">WAR</div><div style="font-family:var(--mono);color:var(--amber);font-weight:700;font-size:18px">${dhTop.war.toFixed(2)}</div></div>
         <div style="text-align:center"><div style="font-size:9px;color:var(--muted)">이닝</div><div style="font-family:var(--mono);color:#39ff8a;font-weight:700;font-size:18px">${dhTop.primaryInnings}</div></div>
       </div>
     </div>`;
@@ -27644,7 +27647,7 @@ function renderBestLineup(){
     const showPos=sortDir!==0||rank===1;
     // 투수면 WAR 출처 표시
     const warTooltip=p.type==='pitcher'
-      ?`title="${pitcherMode==='batter'?'타자 WAR':pitcherMode==='total'?`P:${p.pWar.toFixed(1)} + B:${p.bWar.toFixed(1)} 합산`:'투수 WAR'}"`
+      ?`title="${pitcherMode==='batter'?'타자 WAR':pitcherMode==='total'?`P:${p.pWar.toFixed(2)} + B:${p.bWar.toFixed(2)} 합산`:'투수 WAR'}"`
       :'';
     html+=`<tr onclick="${gotoFn}('${String(p.name).replace(/'/g,"\\'")}')" style="cursor:pointer">
       <td>${showPos?`<div style="display:inline-flex;align-items:center;gap:4px"><span style="width:22px;height:22px;background:${col}22;border:1.5px solid ${col};border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:9px;color:${col};font-weight:900;font-family:var(--mono)">${POS_NAMES[pos]}</span><span style="font-size:10px;color:var(--muted)">${POS_LONG[pos]}</span></div>`:''}</td>
@@ -27652,7 +27655,7 @@ function renderBestLineup(){
       <td style="font-weight:600">${p.name}</td>
       <td style="color:var(--muted);font-size:11px">${p.team}</td>
       <td style="font-family:var(--mono);color:${ovrCol};font-weight:700">${p.card.OVR}</td>
-      <td ${warTooltip} style="font-family:var(--mono);color:var(--amber);font-weight:700">${p.war.toFixed(1)}</td>
+      <td ${warTooltip} style="font-family:var(--mono);color:var(--amber);font-weight:700">${p.war.toFixed(2)}</td>
       <td style="font-family:var(--mono);color:#39ff8a">${p.primaryInnings}</td>
     </tr>`;
   });
