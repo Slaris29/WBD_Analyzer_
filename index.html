@@ -8795,13 +8795,16 @@ function calcPitcherGameStats(gamePitches){
         if(outDelta>0)s.outs+=outDelta;
       }else{
         // 이닝(또는 경기)의 마지막 투구.
-        // V11.1 fix: 끝내기처럼 안타/홈런/볼넷/사구로 끝난 경우는 아웃이 아니므로 이닝을 채우지 않음.
-        //   정상적으로 아웃으로 이닝이 끝난 경우만 3아웃까지 채운다.
-        const lastIsOut = !( (+p.result===4) || (+p['1BSafe']===1&&+p.ev>0) || (+p.result===5) || (+p.result===6) );
-        if(lastIsOut){
-          s.outs+=Math.max(0, 3-(+p.out||0));  // 정상 3아웃 종료
+        // V11.2 fix: 이 투구가 "경기 전체의 마지막 투구"인지 확인.
+        //   - 경기 마지막 투구 + 출루(끝내기 안타/홈런/볼넷/사구)  → 아웃 아님, 채우지 않음
+        //   - 그 외(정상 이닝 종료)는 안타처럼 보여도 다음 이닝이 시작됐으므로 3아웃까지 채움
+        //     (예: out=2에서 친 안타 뒤 주루사로 3아웃 → 데이터엔 안타로 남지만 이닝 종료)
+        const isGameLastPitch = (sorted.indexOf(p) === sorted.length-1);
+        const isReach = ( (+p.result===4) || (+p['1BSafe']===1&&+p.ev>0) || (+p.result===5) || (+p.result===6) );
+        if(isGameLastPitch && isReach){
+          s.outs+=(+p.out||0);  // 끝내기: 그때까지 누적 아웃만 (마지막 타석은 아웃 아님)
         }else{
-          s.outs+=(+p.out||0);  // 출루로 끝남: 그때까지 누적된 아웃만 (그 타석은 아웃 아님)
+          s.outs+=Math.max(0, 3-(+p.out||0));  // 정상 이닝 종료: 3아웃까지 채움
         }
       }
       
