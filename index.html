@@ -11740,7 +11740,9 @@ const CHANGELOG = [
       {icon:'⚾', text:'<b>야구식 이닝 표기</b> — 7.667 → 7.2 (7과 2/3). 선수→팀 매핑을 해당 시즌 출전 기준으로(전체 활성 데이터 아님). 포스트시즌 분리 뷰·시즌 비교.'},
       {icon:'🔧', text:'<b>끝내기 득점·승패 판정 수정</b> — 끝내기 안타/홈런으로 미기록된 득점 보정(경기결과·투수 실점). 승/세이브 판정을 투구 순서 기반으로 정확화.'},
       {icon:'📊', text:'<b>기록실 정렬 개선</b> — 누적 스탯(승·세이브·홈런 등) 정렬 시 규정 구분 없이 순수 값순, 비율 스탯은 규정충족 우선. 규정미달 표시+제외 토글.'},
-      {icon:'📦', text:'<b>내보내기 schema v10</b> — <code>pitchers[i].season.advanced</code>에 결과기록 <code>{W, L, SV, HLD, QS, QSplus}</code> 추가. appVersion V11.0.'}
+      {icon:'📦', text:'<b>내보내기 schema v10</b> — <code>pitchers[i].season.advanced</code>에 결과기록 <code>{W, L, SV, HLD, QS, QSplus}</code> 추가. appVersion V11.0.'},
+      {icon:'🔗', text:'⭐ <b>선수 동일인 병합 신규</b> — 닉네임·계정 변경으로 이름이 다른 동일 인물을 최신 닉네임으로 통합(기록 합산). 프로필 관리 페이지의 <b>선수명 병합</b> 탭에서 추가·해제. 운영자 사전 설정(냥코·오띵/낑깡·아이쿤) + 유저 직접 등록 지원.'},
+      {icon:'👤', text:'<b>선수 인덱스 27명 추가</b> + <b>프로필 관리 페이지 개편</b> — 프로필 사진 매핑과 선수명 병합을 한 페이지 탭으로 통합.'}
     ]
   },
   {
@@ -23445,7 +23447,13 @@ function renderPfpManagerPage(){
   };
   
   let html = `<div class="container">
-    <h1 style="margin:0 0 6px">👤 프로필 사진 관리</h1>
+    <h1 style="margin:0 0 6px">👤 프로필 & 선수 관리</h1>
+    <div style="color:var(--muted);font-size:12px;margin-bottom:14px">프로필 사진 매핑과 동일 선수(닉네임/계정 변경) 병합을 관리합니다.</div>
+    <!-- 관리 탭 -->
+    <div style="display:flex;gap:6px;margin-bottom:18px;border-bottom:1px solid var(--border);flex-wrap:wrap">
+      ${(function(){const t=window._pfpMgrTab||'pfp';const mk=(id,label)=>`<button onclick="window._pfpMgrTab='${id}';renderPfpManagerPage()" style="background:${t===id?'var(--amber)':'transparent'};color:${t===id?'#111':'var(--text)'};border:none;border-bottom:2px solid ${t===id?'var(--amber)':'transparent'};padding:8px 16px;font-size:13px;font-weight:${t===id?'700':'500'};cursor:pointer;border-radius:4px 4px 0 0">${label}</button>`;return mk('pfp','🖼️ 프로필 사진')+mk('merge','🔗 선수명 병합');})()}
+    </div>
+    <div id="pfp-tab-pfp" style="display:${(window._pfpMgrTab||'pfp')==='pfp'?'block':'none'}">
     <div style="color:var(--muted);font-size:12px;margin-bottom:18px">WBD 공식 프로필 사진(<code>https://images.vrcbaseball.com/pfp/{인덱스}.png</code>)을 선수별로 매핑합니다.</div>
     
     <!-- 통계 카드 -->
@@ -23526,10 +23534,91 @@ function renderPfpManagerPage(){
       </div>
       <div style="font-size:10.5px;color:var(--muted);margin-top:8px">내가 추가/수정한 매핑(${stats.custom}개)만 백업됩니다. 기본 ${Object.keys(defaultMap).length}명 매핑은 코드에 내장.</div>
     </div>
+    </div><!-- /pfp tab -->
+    <div id="pfp-tab-merge" style="display:${(window._pfpMgrTab||'pfp')==='merge'?'block':'none'}">
+      ${_renderPlayerMergeSection()}
+    </div>
   </div>`;
   
   out.innerHTML = html;
 }
+
+// ─ 선수명 병합 섹션 (프로필 관리 페이지 내 탭) ─
+function _renderPlayerMergeSection(){
+  const merges = playerMergeList();
+  const active = merges.filter(m=>!m.disabled);
+  const disabled = merges.filter(m=>m.disabled);
+  // 현재 데이터에 등장한 모든 선수 이름 (병합 추가 드롭다운용)
+  const names=new Set();
+  if(typeof G!=='undefined'&&G&&G.length){ G.forEach(d=>{ if(d.bName)names.add(_canonPlayer(d.bName)); if(d.pName)names.add(_canonPlayer(d.pName)); }); }
+  const nameOpts=Array.from(names).sort().map(n=>`<option value="${String(n).replace(/"/g,'&quot;')}">${n}</option>`).join('');
+  const esc=s=>String(s).replace(/'/g,"\\'").replace(/"/g,'&quot;');
+
+  let html=`<div style="max-width:820px">
+    <div style="color:var(--muted);font-size:12px;margin-bottom:16px">닉네임이나 계정을 바꾼 <b>동일 인물</b>을 최신 닉네임으로 통합합니다. 옛 이름의 기록이 최신 이름으로 합산되어 기록실·리더보드·카드에 한 명으로 표시됩니다.</div>`;
+
+  // 새 병합 추가
+  html+=`<div class="card section" style="padding:16px;margin-bottom:18px;background:var(--card2)">
+    <div style="font-size:13px;font-weight:700;margin-bottom:12px">➕ 새 병합 추가</div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <input list="pmerge-names" id="pmerge-old" placeholder="옛 이름 (합쳐질 이름)" style="flex:1;min-width:180px;background:var(--card);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:4px;font-size:12px">
+      <span style="color:var(--amber);font-size:16px">→</span>
+      <input list="pmerge-names" id="pmerge-new" placeholder="최신 이름 (대표 이름)" style="flex:1;min-width:180px;background:var(--card);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:4px;font-size:12px">
+      <datalist id="pmerge-names">${nameOpts}</datalist>
+      <button onclick="_pmergeAddFromUI()" style="background:var(--amber);color:#111;border:none;padding:8px 16px;font-size:12px;font-weight:700;border-radius:4px;cursor:pointer">병합</button>
+    </div>
+    <div style="font-size:10.5px;color:var(--muted);margin-top:8px">예: <code>にゃんこ3K</code> → <code>にゃんこ65K</code> (왼쪽이 오른쪽으로 합쳐짐)</div>
+  </div>`;
+
+  // 활성 병합 목록
+  html+=`<div style="font-size:13px;font-weight:700;margin-bottom:8px">🔗 적용 중인 병합 (${active.length})</div>`;
+  if(active.length){
+    html+='<div class="tbl-wrap"><table class="data-table"><thead><tr><th>옛 이름</th><th></th><th>최신 이름 (표시)</th><th>구분</th><th>해제</th></tr></thead><tbody>';
+    active.forEach(m=>{
+      const badge=m.source==='user'?'<span style="font-size:10px;background:#39ff8a22;color:#39ff8a;padding:1px 6px;border-radius:3px">유저</span>':'<span style="font-size:10px;background:#88ccff22;color:#88ccff;padding:1px 6px;border-radius:3px">기본</span>';
+      html+=`<tr>
+        <td style="font-family:var(--mono);font-size:12px;color:var(--muted)">${m.old}</td>
+        <td style="color:var(--amber)">→</td>
+        <td style="font-family:var(--mono);font-size:12px;font-weight:600">${m.now}</td>
+        <td>${badge}</td>
+        <td><button onclick="_pmergeDisable('${esc(m.old)}')" title="병합 해제 (다시 따로)" style="background:rgba(255,69,96,0.1);color:#ff4560;border:1px solid #ff4560;padding:4px 10px;font-size:11px;border-radius:3px;cursor:pointer">해제</button></td>
+      </tr>`;
+    });
+    html+='</tbody></table></div>';
+  }else{
+    html+='<div style="padding:16px;color:var(--muted);font-size:12px;background:var(--card2);border-radius:6px">적용 중인 병합이 없습니다.</div>';
+  }
+
+  // 해제된 병합 (다시 켜기)
+  if(disabled.length){
+    html+=`<div style="font-size:13px;font-weight:700;margin:18px 0 8px;color:var(--muted)">⏸️ 해제된 병합 (${disabled.length})</div>`;
+    html+='<div class="tbl-wrap"><table class="data-table"><thead><tr><th>옛 이름</th><th></th><th>최신 이름</th><th>다시 켜기</th></tr></thead><tbody>';
+    disabled.forEach(m=>{
+      html+=`<tr style="opacity:.6">
+        <td style="font-family:var(--mono);font-size:12px">${m.old}</td>
+        <td style="color:var(--muted)">→</td>
+        <td style="font-family:var(--mono);font-size:12px">${m.now}</td>
+        <td><button onclick="_pmergeEnable('${esc(m.old)}')" style="background:rgba(57,255,138,0.1);color:#39ff8a;border:1px solid #39ff8a;padding:4px 10px;font-size:11px;border-radius:3px;cursor:pointer">병합 켜기</button></td>
+      </tr>`;
+    });
+    html+='</tbody></table></div>';
+  }
+
+  html+='</div>';
+  return html;
+}
+
+// UI 핸들러
+function _pmergeAddFromUI(){
+  const oldN=(document.getElementById('pmerge-old')||{}).value||'';
+  const newN=(document.getElementById('pmerge-new')||{}).value||'';
+  if(!oldN.trim()||!newN.trim()){ alert('옛 이름과 최신 이름을 모두 입력하세요.'); return; }
+  if(oldN.trim()===newN.trim()){ alert('같은 이름은 병합할 수 없습니다.'); return; }
+  playerMergeAdd(oldN.trim(), newN.trim());
+  rebuildG(); renderPfpManagerPage();
+}
+function _pmergeDisable(oldN){ playerMergeDisable(oldN); rebuildG(); renderPfpManagerPage(); }
+function _pmergeEnable(oldN){ playerMergeEnable(oldN); rebuildG(); renderPfpManagerPage(); }
 
 function _pfpRowHtml(e){
   const eff = e.effectiveIdx;
