@@ -5390,20 +5390,20 @@ function renderBatterSpray(){
   // 홈플레이트: lx=0, lz=-20 (스펙)
   // 내야방향: z- (더 음수 = 외야)
   // lx+: 좌측(3루/LF방향), lx-: 우측(1루/RF방향)
+  // ── V11.2 실측 FIELD_CONFIG 반영 ─────────────
   const HP ={lx:0,     lz:-20};
-  const SQ2=Math.SQRT2;
-  const BD=27.4;
-  const B1={lx:-(BD/SQ2), lz:-20-(BD/SQ2)};  // 1루 (lx=-19.4, lz=-39.4)
-  const B2={lx:0,          lz:-20-BD*SQ2};    // 2루 (lz=-58.8)
-  const B3={lx:+(BD/SQ2),  lz:-20-(BD/SQ2)};  // 3루 (lx=+19.4, lz=-39.4)
-  // 외야 펜스 (블루프린트: CF=118m, 파울라인=98m)
-  // z- 방향으로 전개: lz = -20 - 거리
-  const RFP={lx:-(98/SQ2),   lz:-20-(98/SQ2)}; // 우익폴 (lx=-69, lz=-89)
-  const RC ={lx:-50,          lz:-110};          // 우중 (lz=-110)
-  const CFR={lx:-20,          lz:-138};          // 중견 우측 (폭 40m)
-  const CFL={lx:+20,          lz:-138};          // 중견 좌측
-  const LC ={lx:+50,          lz:-110};          // 좌중
-  const LFP={lx:+(98/SQ2),   lz:-20-(98/SQ2)}; // 좌익폴 (lx=+69, lz=-89)
+  const MND={lx:0,     lz:-38.44};              // 마운드 중심
+  const B1={lx:-19.40, lz:-39.70};              // 1루 (실측)
+  const B2={lx:0,      lz:-59.10};              // 2루 (실측)
+  const B3={lx:+19.40, lz:-39.70};              // 3루 (실측)
+  // 외야 펜스 (실측: 좌우폴 74m, 좌우중간 (54.74,117.5), 중앙 135m)
+  const RFP={lx:-74.0,   lz:-94.30};            // 우익폴
+  const RC ={lx:-54.74,  lz:-117.50};           // 우중
+  const CFR={lx:-20.0,   lz:-135.0};            // 중견 우측
+  const CFC={lx:0,       lz:-135.0};            // 중앙 (신규)
+  const CFL={lx:+20.0,   lz:-135.0};            // 중견 좌측
+  const LC ={lx:+54.74,  lz:-117.50};           // 좌중
+  const LFP={lx:+74.0,   lz:-94.30};            // 좌익폴
 
   // ── 뷰 범위 계산 ─────────────────────────────────────────
   // 내야 모드: 내야 영역만 줌인 (±38m × HP~2루+여유)
@@ -5420,8 +5420,8 @@ function renderBatterSpray(){
     lxMin = Math.min(dataLxMin, B3.lx-8, -32); lxMax = Math.max(dataLxMax, B1.lx+8, 32);
     lzMin = Math.min(dataLzMin, B2.lz-8, -72);  lzMax = Math.max(dataLzMax, HP.lz+8, -12);
   } else {
-    const fieldLx=[HP.lx,B1.lx,B3.lx,RFP.lx,LFP.lx,CFR.lx,CFL.lx];
-    const fieldLz=[HP.lz,B2.lz,CFR.lz,RFP.lz];
+    const fieldLx=[HP.lx,B1.lx,B3.lx,RFP.lx,LFP.lx,CFR.lx,CFL.lx,RC.lx,LC.lx];
+    const fieldLz=[HP.lz,B2.lz,CFR.lz,CFC.lz,RFP.lz,RC.lz];
     const allLx=[...pts.map(d=>+d.lx||0),...fieldLx];
     const allLz=[...pts.map(d=>+d.lz||0),...fieldLz];
     lxMin=Math.min(...allLx)-6; lxMax=Math.max(...allLx)+6;
@@ -5445,10 +5445,11 @@ function renderBatterSpray(){
 
   // 외야 잔디 폴리곤 (내야 줌인 모드에서는 전체 배경만)
   if(!INFIELD_ZOOM){
-    const outPts=[hpP,rfpP,rcP,cfrP,cflP,lcP,lfpP].map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+    const cfcP=px(CFC);
+    const outPts=[hpP,rfpP,rcP,cfrP,cfcP,cflP,lcP,lfpP].map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
     items+=sEl('polygon',{points:outPts,fill:'#1e4010',stroke:'rgba(255,255,255,0.15)','stroke-width':'0.5'});
     // 외야 펜스 라인 (파울폴→외야→파울폴)
-    const fencePts=[rfpP,rcP,cfrP,cflP,lcP,lfpP].map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+    const fencePts=[rfpP,rcP,cfrP,cfcP,cflP,lcP,lfpP].map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
     items+=`<polyline points="${fencePts}" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.5"/>`;
     // 파울라인 (HP→파울폴)
     items+=`<line x1="${hpP.x.toFixed(1)}" y1="${hpP.y.toFixed(1)}" x2="${rfpP.x.toFixed(1)}" y2="${rfpP.y.toFixed(1)}" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>`;
@@ -5470,6 +5471,10 @@ function renderBatterSpray(){
 
 
   // 베이스 마커
+  // 마운드 (V11.2 신규)
+  const mndP=px(MND);
+  items+=sEl('circle',{cx:mndP.x.toFixed(1),cy:mndP.y.toFixed(1),r:'5',fill:'rgba(180,140,90,0.7)',stroke:'rgba(255,255,255,0.4)','stroke-width':'0.5'});
+
   [[hpP,'HP'],[b1P,'1B'],[b2P,'2B'],[b3P,'3B']].forEach(([p,lbl])=>{
     items+=sEl('rect',{x:(p.x-4).toFixed(1),y:(p.y-4).toFixed(1),width:'8',height:'8',fill:'white',rx:'1'});
     items+=sEl('text',{x:p.x.toFixed(1),y:(p.y-7).toFixed(1),fill:'rgba(255,255,255,0.6)','font-size':'7','text-anchor':'middle'},lbl);
