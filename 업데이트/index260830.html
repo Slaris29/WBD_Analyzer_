@@ -3672,31 +3672,12 @@ function _computeInningScores(data){
   // V10.3: 결과 기반 득점 보정 — 끝내기 안타/홈런은 게임이 '득점 후 상태'를 기록 안 해서
   //   scoreA/scoreB가 0인 채 끝남. 타석 결과(홈런/안타로 홈인한 주자)로 득점을 직접 더해 보정.
   let rbiA=0, rbiB=0;
-  // V11.6: 신규 포맷의 SIDE(공수교대)/END(경기종료) 마커 처리
-  //   · 스코어는 반드시 포함해야 함 — 끝내기 득점이 마커 행에만 기록됨
-  //     (실측 2R 16경기 중 4경기: 제외 시 3-4→3-3, 10-11→10-9 등으로 최종 스코어가 틀림)
-  //   · 다만 이닝 목록(innSet)에는 넣지 않음 — END의 inn이 실제 진행 이닝보다 크면
-  //     스코어보드에 빈 이닝이 생김(9회 경기가 10회로 표시)
-  const _isMarker = d => { const t = d.type==null?'':String(d.type).toUpperCase();
-                           return t==='SIDE'||t==='END'; };
-  let _lastRealInn = null;
   for(let j=0;j<data.length;j++){
-    const d=data[j];
-    const _mk=_isMarker(d);
-    // 마커 행의 이닝은 실제 진행 이닝보다 클 수 있음(END inn=10인 9회 경기 등).
-    //   → 이닝 목록엔 넣지 않고, 스코어는 "마지막 실제 이닝"에 귀속시켜
-    //     끝내기 득점이 스코어보드 이닝 합계에도 반영되게 함.
-    const inn = _mk ? (_lastRealInn!=null ? _lastRealInn : d.inn) : d.inn;
-    if(!_mk){ innSet.add(inn); _lastRealInn = inn; }
+    const d=data[j], inn=d.inn;
+    innSet.add(inn);
     const sA=+d.scoreA||0, sB=+d.scoreB||0;
     if(sA>totalA)totalA=sA;
     if(sB>totalB)totalB=sB;
-    if(_mk){
-      // 마커는 half가 실제 공격팀과 다를 수 있으므로 양쪽 모두 max 갱신(누락 보정용)
-      if(sA>(maxAByInn[inn]||0))maxAByInn[inn]=sA;
-      if(sB>(maxBByInn[inn]||0))maxBByInn[inn]=sB;
-      continue;
-    }
     const isHit=(+d.ev>0&&_isHitPlay(d))||+d.result===4;  // V11.3: 야수선택 제외
     // 이 타석으로 들어온 득점(타점): 홈런=주자수+1, 일반 안타로 홈인=scoreNote 방식과 동일
     let rbi=0;
@@ -9238,11 +9219,6 @@ function _xPvSum(pitches){
 function _isDummyPitch(d){
   if(!d) return true;
   if(d.pName === 'Forfeit' || d.bName === 'Forfeit') return true;
-  // V11.6: 신규 포맷(256컬럼)의 이닝교대(SIDE)·경기종료(END) 마커 행 — 실제 투구가 아님.
-  //   투수·타자 이름이 비어 있고 out/주자 상태만 담긴 행으로, 투구로 세면
-  //   이닝 계산에서 "그 이닝의 마지막 투구"로 잡혀 3아웃 채우기가 누락됨(5이닝→3.2이닝 오류).
-  const _t = d.type == null ? '' : String(d.type).toUpperCase();
-  if(_t === 'SIDE' || _t === 'END') return true;
   // ball/strk/call이 모두 null이면 더미
   if(d.ball == null && d.strk == null && d.call == null) return true;
   return false;
@@ -9591,10 +9567,7 @@ function calcGameDecisions(gamePitches, info){
 }
 
 function calcPitcherGameStats(gamePitches){
-  // V11.6 fix: 이닝교대(SIDE)·종료(END) 마커를 제거한 뒤 계산.
-  //   이 행들이 남아 있으면 각 이닝의 "마지막 투구"가 마커 행이 되어
-  //   실제 투수의 마지막 투구에 3아웃 채우기가 적용되지 않았음.
-  const sorted=gamePitches.filter(p=>!_isDummyPitch(p));
+  const sorted=[...gamePitches];
   const map={};
   
   const ensure=pn=>{
@@ -13925,8 +13898,6 @@ const CHANGELOG = [
     title: '🏆 팀 탭 전면 개편 · ⚔️ 상대 비교 · 📏 평가 지표 재설계 · ⚡ 성능 최적화',
     badge: '#ff8c44',
     changes: [
-      {icon:'🏁', text:'⭐⭐⭐ <b>끝내기 득점이 스코어보드에 누락되던 문제 수정 (신규 포맷)</b> — 신규 포맷은 끝내기 상황의 최종 득점을 <b>마지막 투구가 아니라 SIDE/END 마커 행에 기록</b>함(마지막 투구 시점은 득점 <b>전</b> 상태). 실측 2R 16경기 중 <b>4경기</b>에서 마커를 빼면 최종 스코어가 틀어짐(3-4→3-3, 10-11→10-9, 2-9→2-7, 2-3→2-2). 반대로 마커를 그대로 두면 <b>END의 이닝 번호가 실제보다 커서</b>(9회 경기에 END inn=10) 스코어보드에 빈 이닝이 생김. → 마커의 <b>스코어는 반영하되 이닝 목록에는 넣지 않고, 마지막 실제 이닝에 귀속</b>시키도록 수정. 결과: 16경기 전부 <b>이닝별 합계 = 최종 스코어</b> 일치 확인.'},
-      {icon:'🐛', text:'⭐⭐⭐ <b>투수 이닝이 실제보다 적게 집계되던 문제 수정 (신규 포맷)</b> — 5이닝 완투가 <b>3.2이닝</b>으로 표시되는 등 투수 이닝·ERA·WHIP·QS·pWAR이 전부 틀어지던 심각한 오류. 원인은 <b>신규 데이터 포맷(256컬럼)에 추가된 이닝교대 마커 행</b>(<code>type=SIDE</code>, 투수·타자명이 비어 있고 out/주자 상태만 담김). 이닝 계산은 "그 이닝의 마지막 투구"에 3아웃을 채우는 방식인데, <b>마커 행이 마지막이 되어 실제 투수의 마지막 투구가 3아웃 채우기 대상에서 제외</b>됐음 — 마커가 있는 이닝마다 아웃 1개씩 누락. 실측(2026-08-29 AT vs SS): 마커 있는 이닝은 2아웃, 없는 이닝만 3아웃으로 계산돼 5이닝이 11아웃(3.2이닝)으로 집계됨. → <code>_isDummyPitch</code>가 <b>SIDE·END 마커를 더미로 인식</b>하도록 하고, 이닝 계산 시 제거 후 처리. 수정 후 15아웃(5.0이닝)으로 정상화. <b>2R 16경기 전수 검증</b>: 수정 전 총아웃이 정상치의 60~70%(예: 9회 경기 54아웃 중 35아웃)였으나, 수정 후 전 경기가 정상 범위(51~60아웃)로 복구.'},
       {icon:'📏', text:'⭐⭐⭐ <b>내야 통과 타구 귀속 반경 — EV별 차등으로 재설계</b> — 기존 <b>12m 고정</b>은 강하게 빠져나간 타구까지 내야수 책임으로 잡아 과도했음. 경로거리를 고정하고 EV만 바꿔 비교한 결과 <b>같은 거리에서 EV만으로 처리율이 56%p 차이</b>(4~7m 구간: EV&lt;95 89.3% / 110~125 41.0% / 125+ 33.3%), 특히 <b>EV 125+는 9~12m에서 16건 중 0건(0%)</b>으로 물리적으로 닿을 수 없는 타구였음. 원인은 도달시간 — 같은 3m 거리에서 EV&lt;95는 2.41초, EV125+는 <b>1.62초</b>로 반응 여유가 33% 적음. → 각 구간 처리율이 40~50%가 되는 지점을 경계로 <b>EV 125+ 4m / 110~125 6m / 95~110 8m / 95 미만 11m</b> 적용. <br><b>검증</b>: 280개 파라미터 조합을 그리드 탐색하고 <b>두 시즌 교차 검증</b> — 채택안은 FW 78.4%·섬머 84.2%(평균 81.3%)로 최상위권이며 시즌 간 편차도 안정적. 기존 12m는 75.9%로 최하위. FW 단독 최적값(3/4/9/10)은 섬머에서 79.5%로 급락해 <b>과적합으로 확인·기각</b>. 물리 모델(감속계수 기반 도달시간)과 실측 체공시간 방식도 시험했으나 각각 77.3%·67.5%로 더 낮았음. <br><b>결과</b>: 귀속 건수 FW 412→241(−42%)·섬머 158→61(−61%), 내야 Brier FW −12.3%·섬머 −25.4% 개선. 팀 순위는 상위권이 소폭 내려가고 하위권이 올라가는 방향(기존 12m가 범위 넓은 팀에 과보상, 좁은 팀에 과페널티였음).'},
       {icon:'🔗', text:'⭐⭐⭐ <b>선수 병합(별칭)이 팀 판정에 적용되지 않던 문제 수정</b> — 병합된 선수(오띵__→낑깡__, にゃんこ3K→にゃんこ65K 등)의 <b>팀이 "—"로 잡히거나 기록이 갈리던 문제</b>. 원인은 별칭 정규화가 일부 경로에만 적용된 것: <code>_leaguePlayerTeams</code>(리그전 시즌 기준 팀 판정)와 <code>_computeTeamProfiles</code>(팀 프로파일 투구 집계)가 <b>원본 이름(bName/pName)을 그대로 키로 사용</b>해, 수비 쪽에서 정규화된 이름으로 조회하면 매칭이 실패했음. → 두 함수 모두 <code>_canonPlayer</code> 경유하도록 수정. 이제 <b>_rebuildCaches · 수비 · 리그전 팀판정 · 팀 프로파일 · 포지션 판정 전 경로</b>에서 병합이 일관되게 적용됨.'},
       {icon:'🔗', text:'⭐⭐ <b>선수 병합(별칭)이 수비 기록에 적용되지 않던 문제 수정</b> — 닉변·계정변경 병합(<code>_canonPlayer</code>)이 <b>투수명(pName)·타자명(bName)에만 적용</b>되고 <b>수비 집계에 쓰이는 포구자(cPlr)와 포지션별 선수명에는 적용되지 않았음</b>. 그 결과 같은 선수가 이름별로 갈려 수비 기록이 흩어지고, 팀 매칭이 안 되면 아예 어느 팀에도 집계되지 않았음(실제 사례: 2루 59기회가 팀 미상으로 누락되어 해당 팀 2루가 3기회로 표시). → <b>cPlr·9개 포지션명 전부 별칭 정규화</b> 적용. 원본 이름을 <code>_raw*</code>에 보관해 별칭을 바꿔도 항상 원본에서 다시 매핑하므로 중복 적용·오염 없음.'},
