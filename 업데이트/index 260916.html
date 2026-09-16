@@ -1015,31 +1015,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
       </div>
       <div class="card section"><div class="card-title">구속대별 타격 결과</div><div id="b-spd-band"></div></div>
       <div class="card section">
-        <div class="card-title">🎯 구속 × 구종 교차 매트릭스</div>
-        <div class="filter-row" style="margin-bottom:8px">
-          <span class="filter-label">지표</span>
-          <select id="b-cross-metric" onchange="renderBatterCrossMatrix()">
-            <option value="avg">안타율</option>
-            <option value="whiff">헛스윙%</option>
-            <option value="ev">평균 EV</option>
-            <option value="hpos">배트중심이탈(|hPos|)</option>
-          </select>
-          <span class="filter-label" style="margin-left:8px">구간</span>
-          <select id="b-cross-band" onchange="renderBatterCrossMatrix()">
-            <option value="3">3구간(빠/중/느)</option>
-            <option value="fine">세분(5km)</option>
-          </select>
-        </div>
-        <div class="tbl-wrap"><table class="data-table" id="b-cross-matrix"></table></div>
-        <div id="b-cross-note" style="font-size:11px;color:var(--muted);margin-top:6px"></div>
-      </div>
-      <div class="card section">
         <div class="card-title">구종별 대응 성적</div>
         <div class="tbl-wrap"><table class="data-table" id="b-pitch-table"></table></div>
-      </div>
-      <div class="card section"><div class="card-title">🕐 구속대별 타이밍·접촉 (시즌 비교)</div>
-        <div class="tbl-wrap"><table class="data-table" id="b-timing-split"></table></div>
-        <div style="font-size:11px;color:var(--muted);margin-top:6px">반응편차↓=타이밍 일관성, |hPos|↓=배트중심 적중</div>
       </div>
       <div class="card section"><div class="card-title">타격 반응 시간 분포 (hSec - pSec)</div><div id="b-timing"></div></div>
     </div>
@@ -3591,7 +3568,7 @@ function renderPitcherSubTab(idx){
 
 function renderBatterSubTab(idx){
   if(idx===0){renderBatterSpray();renderBarrel();renderBBQuality();renderLdegHist();renderSdegFan();}
-  else if(idx===1){renderSwingRadar();renderHpos();renderSpdBand();renderBatterCrossMatrix();renderBatterPitchTable();renderBatterTimingSplit();renderTiming();}
+  else if(idx===1){renderSwingRadar();renderHpos();renderSpdBand();renderBatterPitchTable();renderTiming();}
   else if(idx===2){renderCountTable();renderRunnerTable();renderHeightStats();renderResultPie();}
   else if(idx===3){batterLogPage=0;renderBatterLog();}
   else if(idx===4){renderBatterZoneSummary();renderBatterZoneMap();renderBatterZonePitchFilter();renderBatterZonePitchTable();renderBatterCountCategory();}
@@ -6356,127 +6333,6 @@ function renderTiming(){
   items+=sEl('text',{x:px,y:10,fill:'var(--muted)','font-size':'8'},'빠른 반응 →                    늦은 반응');
   const leg=`<div class="legend"><div class="legend-item"><div class="lsq" style="background:var(--green)"></div>안타</div><div class="legend-item"><div class="lsq" style="background:#607080"></div>아웃</div></div>`;
   document.getElementById('b-timing').innerHTML=leg+makeSVG(W,H,items);
-}
-
-// ─── 구속 × 구종 교차 매트릭스 ───
-function renderBatterCrossMatrix(){
-  const metric=(document.getElementById('b-cross-metric')||{}).value||'avg';
-  const bandMode=(document.getElementById('b-cross-band')||{}).value||'3';
-  const data=getBatterDataFiltered().filter(d=>d.spdK>0);
-  // 구속대 정의
-  let bands;
-  if(bandMode==='3'){
-    bands=[{k:'느린공',lo:0,hi:125},{k:'중간',lo:125,hi:133},{k:'빠른공',lo:133,hi:999}];
-  }else{
-    bands=[];
-    for(let s=105;s<150;s+=5)bands.push({k:s+'~',lo:s,hi:s+5});
-  }
-  const groups=Object.keys(PITCH_GROUPS);
-  // 셀 집계
-  function cell(bd,g){
-    const gd=data.filter(d=>{
-      const sp=+d.spdK; if(!(sp>=bd.lo&&sp<bd.hi))return false;
-      if(g!=='__ALL__'&&pitchGroup(d.pType,d)!==g)return false;
-      return true;
-    });
-    const swings=gd.filter(d=>d.bSwing).length;
-    const hsw=gd.filter(d=>d.bSwing&&+d.call!==2).length;
-    const ip=gd.filter(_isInPlay);
-    const ab=ip.length;
-    const hits=gd.filter(d=>_isHitPlay(d)).length;
-    const evVals=ip.map(d=>+d.ev).filter(v=>v>0);
-    const avgEV=evVals.length?evVals.reduce((a,b)=>a+b,0)/evVals.length:null;
-    const hposVals=ip.map(d=>Math.abs(+d.hPos)).filter(v=>!isNaN(v));
-    const avgHpos=hposVals.length?hposVals.reduce((a,b)=>a+b,0)/hposVals.length:null;
-    return {n:gd.length,swings,ab,hits,avg:ab?hits/ab:null,whiff:swings?hsw/swings*100:null,ev:avgEV,hpos:avgHpos};
-  }
-  // 값→색상 (지표별 좋음/나쁨 방향)
-  function color(v,metric){
-    if(v==null)return 'transparent';
-    let t; // 0(나쁨)~1(좋음)
-    if(metric==='avg')t=Math.max(0,Math.min(1,(v-0.15)/0.35));
-    else if(metric==='whiff')t=1-Math.max(0,Math.min(1,(v-10)/40));
-    else if(metric==='ev')t=Math.max(0,Math.min(1,(v-90)/35));
-    else if(metric==='hpos')t=1-Math.max(0,Math.min(1,(v-0.3)/0.5));
-    const r=Math.round(200-t*160),g=Math.round(60+t*140),b=70;
-    return `rgba(${r},${g},${b},0.55)`;
-  }
-  function fmt(c,metric){
-    if(c==null||c.n===0)return '<span style="color:#556">·</span>';
-    let v=c[metric],disp;
-    if(v==null)return '<span style="color:#556">-</span>';
-    if(metric==='avg')disp='.'+String(Math.round(v*1000)).padStart(3,'0');
-    else if(metric==='whiff')disp=v.toFixed(0)+'%';
-    else if(metric==='ev')disp=v.toFixed(0);
-    else disp=v.toFixed(2);
-    return `<span title="${c.n}구/${c.ab}타수" style="display:block;background:${color(v,metric)};border-radius:3px;padding:2px 0">${disp}<br><span style="font-size:8px;color:#99a">${c.ab>0?c.ab+'타':c.n+'구'}</span></span>`;
-  }
-  // 구종은 실제 등장한 것만
-  const activeGroups=groups.filter(g=>data.some(d=>pitchGroup(d.pType,d)===g));
-  let html='<thead><tr><th>구속대</th><th style="background:#2a3a4a">전체</th>';
-  activeGroups.forEach(g=>{html+=`<th style="color:${GROUP_COLORS[g]||'#888'}">${g}</th>`;});
-  html+='</tr></thead><tbody>';
-  bands.forEach(bd=>{
-    // 해당 구속대 데이터 없으면 스킵
-    const any=data.some(d=>+d.spdK>=bd.lo&&+d.spdK<bd.hi);
-    if(!any)return;
-    html+=`<tr><td style="font-weight:600">${bd.k}</td>`;
-    html+=`<td style="text-align:center;background:#1e2a36">${fmt(cell(bd,'__ALL__'),metric)}</td>`;
-    activeGroups.forEach(g=>{html+=`<td style="text-align:center">${fmt(cell(bd,g),metric)}</td>`;});
-    html+='</tr>';
-  });
-  html+='</tbody>';
-  document.getElementById('b-cross-matrix').innerHTML=html;
-  const noteMap={avg:'초록=고타율, 빨강=저타율',whiff:'초록=낮은헛스윙(좋음), 빨강=높은헛스윙',ev:'초록=강한타구, 빨강=약한타구',hpos:'초록=중심적중(좋음), 빨강=배트끝빗맞힘'};
-  document.getElementById('b-cross-note').textContent=noteMap[metric]||'';
-}
-
-// ─── 구속대별 타이밍·접촉 (시즌/라운드 비교) ───
-function renderBatterTimingSplit(){
-  const all=getBatterDataFiltered();
-  // 라운드 구분: 경기명 2026_08_12 기준 (window.R2_CUTOFF 있으면 사용)
-  const cut=(window.R2_CUTOFF||'2026_08_12');
-  // 경기명에서 YYYY_MM_DD 추출 (league_2025_11_14_... 또는 2026_09_13_... 모두 대응)
-  function gdate(d){
-    const nm=d._gameName||d.gameName||'';
-    const m=nm.match(/(\d{4})_(\d{2})_(\d{2})/);
-    return m?`${m[1]}_${m[2]}_${m[3]}`:'';
-  }
-  const eras=[
-    {k:'1R',f:d=>{const g=gdate(d);return g&&g<cut;}},
-    {k:'2R',f:d=>{const g=gdate(d);return g&&g>=cut;}},
-    {k:'전체',f:d=>true},
-  ];
-  const bands=[{k:'빠른공(133+)',lo:133,hi:999},{k:'중간(125-133)',lo:125,hi:133},{k:'느린공(<125)',lo:0,hi:125}];
-  function stat(era,bd){
-    const gd=all.filter(d=>era.f(d)&&+d.spdK>=bd.lo&&+d.spdK<bd.hi);
-    const gaps=gd.map(d=>+d.hSec-(+d.pSec)).filter(v=>v>0&&v<5);
-    const gapM=gaps.length?gaps.reduce((a,b)=>a+b,0)/gaps.length:null;
-    const gapSd=gaps.length>1?Math.sqrt(gaps.reduce((a,b)=>a+(b-gapM)**2,0)/gaps.length):null;
-    const ip=gd.filter(_isInPlay);
-    const hp=ip.map(d=>Math.abs(+d.hPos)).filter(v=>!isNaN(v));
-    const hpM=hp.length?hp.reduce((a,b)=>a+b,0)/hp.length:null;
-    const ev=ip.map(d=>+d.ev).filter(v=>v>0);
-    const evM=ev.length?ev.reduce((a,b)=>a+b,0)/ev.length:null;
-    const ab=ip.length,hits=gd.filter(_isHitPlay).length;
-    return {n:gd.length,gapM,gapSd,hpM,evM,avg:ab?hits/ab:null,ab};
-  }
-  let html='<thead><tr><th>구속대</th><th>시즌</th><th>반응</th><th>반응편차</th><th>|hPos|</th><th>EV</th><th>타율</th><th>타수</th></tr></thead><tbody>';
-  bands.forEach(bd=>{
-    eras.forEach((era,ei)=>{
-      const s=stat(era,bd);
-      if(s.n<2&&era.k!=='전체')return;
-      const g=s.gapM!=null?s.gapM.toFixed(3):'-';
-      const sd=s.gapSd!=null?s.gapSd.toFixed(3):'-';
-      const hp=s.hpM!=null?s.hpM.toFixed(2):'-';
-      const ev=s.evM!=null?s.evM.toFixed(0):'-';
-      const av=s.avg!=null?('.'+String(Math.round(s.avg*1000)).padStart(3,'0')):'-';
-      const bdCell=ei===0?`<td rowspan="3" style="font-weight:600;vertical-align:middle">${bd.k}</td>`:'';
-      html+=`<tr>${bdCell}<td style="color:var(--muted)">${era.k}</td><td>${g}</td><td>${sd}</td><td>${hp}</td><td>${ev}</td><td>${av}</td><td>${s.ab}</td></tr>`;
-    });
-  });
-  html+='</tbody>';
-  document.getElementById('b-timing-split').innerHTML=html;
 }
 
 /* ─── BATTER TAB C ─── */
