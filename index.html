@@ -177,6 +177,21 @@ select{background:#060e1a;border:1px solid var(--border);color:var(--text);font-
 select:focus{border-color:var(--amber)}
 .filter-row{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
 .filter-label{font-size:11px;color:var(--muted);letter-spacing:.5px}
+/* 구속 콤보박스 */
+.spd-combo{position:relative;display:inline-block;font-family:var(--mono)}
+.spd-combo-btn{display:inline-flex;align-items:center;gap:6px;background:var(--panel,#141e2c);border:1px solid var(--border,#2a3a4a);border-radius:6px;padding:5px 10px;cursor:pointer;color:var(--text,#e8eef4);font-size:13px;font-family:var(--mono);min-width:54px;justify-content:space-between;transition:border-color .15s}
+.spd-combo-btn:hover{border-color:var(--amber,#f5a623)}
+.spd-combo.open .spd-combo-btn{border-color:var(--amber,#f5a623)}
+.spd-combo-btn .arw{font-size:9px;color:var(--muted);transition:transform .15s}
+.spd-combo.open .spd-combo-btn .arw{transform:rotate(180deg)}
+.spd-combo-pop{position:absolute;top:calc(100% + 4px);left:0;z-index:200;background:#0e1826;border:1px solid var(--amber,#f5a623);border-radius:8px;padding:8px;box-shadow:0 8px 24px rgba(0,0,0,.5);display:none;width:180px}
+.spd-combo.open .spd-combo-pop{display:block}
+.spd-combo-pop input{width:100%;box-sizing:border-box;background:#1a2636;border:1px solid var(--border,#2a3a4a);border-radius:5px;padding:6px 8px;color:#fff;font-size:13px;font-family:var(--mono);margin-bottom:8px}
+.spd-combo-pop input:focus{outline:none;border-color:var(--amber,#f5a623)}
+.spd-combo-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;max-height:150px;overflow-y:auto}
+.spd-combo-opt{text-align:center;padding:5px 0;border-radius:4px;cursor:pointer;font-size:12px;color:var(--text,#cdd);background:#16202e;transition:background .1s}
+.spd-combo-opt:hover{background:var(--amber,#f5a623);color:#111}
+.spd-combo-opt.sel{background:var(--amber,#f5a623);color:#111;font-weight:700}
 /* ── SCOREBOARD ── */
 .scoreboard{background:#050c18;border:1px solid var(--border);border-radius:6px;overflow:auto}
 .scoreboard table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:13px}
@@ -1018,9 +1033,9 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
         <div class="card-title">🎯 상황별 대응 분석 (다중 필터)</div>
         <div class="filter-row" style="margin-bottom:6px;flex-wrap:wrap;gap:6px">
           <span class="filter-label">구속</span>
-          <input type="number" id="bf-spd-min" list="spd-marks-5" min="80" max="175" step="5" value="80" style="width:70px" oninput="renderBatterFilterAnalysis()">
+          <span id="bf-spd-min-combo"></span>
           <span style="color:var(--muted)">~</span>
-          <input type="number" id="bf-spd-max" list="spd-marks-5" min="80" max="175" step="5" value="175" style="width:70px" oninput="renderBatterFilterAnalysis()">
+          <span id="bf-spd-max-combo"></span>
           <span style="font-size:10px;color:var(--muted)">km/h</span>
           <span class="filter-label" style="margin-left:6px">코스</span>
           <select id="bf-zone" onchange="renderBatterFilterAnalysis()">
@@ -1149,9 +1164,9 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
           </div>
           <div class="filter-row" style="margin-bottom:10px;flex-wrap:wrap">
             <span class="filter-label">구속</span>
-            <input type="number" id="b-zone-spd-min" list="spd-marks-5" min="80" max="175" step="5" value="80" style="width:70px" oninput="renderBatterZoneMap();renderBatterZonePitchTable();renderBatterZoneSummary()">
+            <span id="b-zone-spd-min-combo"></span>
             <span style="color:var(--muted)">~</span>
-            <input type="number" id="b-zone-spd-max" list="spd-marks-5" min="80" max="175" step="5" value="175" style="width:70px" oninput="renderBatterZoneMap();renderBatterZonePitchTable();renderBatterZoneSummary()">
+            <span id="b-zone-spd-max-combo"></span>
             <span style="font-size:10px;color:var(--muted)">km/h</span>
           </div>
           <div id="b-zone-map"></div>
@@ -6385,14 +6400,60 @@ function renderTiming(){
   document.getElementById('b-timing').innerHTML=leg+makeSVG(W,H,items);
 }
 
-// 구속 입력(datalist 겸용) — 별도 초기화 불필요 (HTML value로 기본값 지정됨)
+// ───── 구속 콤보박스 (드롭다운 + 직접입력) ─────
+window._spdCombo=window._spdCombo||{};  // id → {value, onChange}
+function _buildSpdCombo(comboId, targetId, defVal, onChange){
+  const host=document.getElementById(comboId);
+  if(!host || host._built)return;
+  host._built=true;
+  const st={value:defVal};
+  window._spdCombo[targetId]=st;
+  host.className='spd-combo';
+  host.innerHTML=`<div class="spd-combo-btn"><span class="v">${defVal}</span><span class="arw">▼</span></div>
+    <div class="spd-combo-pop"><input type="number" placeholder="직접 입력" step="1"><div class="spd-combo-grid"></div></div>`;
+  const btn=host.querySelector('.spd-combo-btn');
+  const pop=host.querySelector('.spd-combo-pop');
+  const inp=host.querySelector('input');
+  const grid=host.querySelector('.spd-combo-grid');
+  // 그리드 옵션 (5km 단위)
+  let opts='';
+  for(let v=80;v<=175;v+=5)opts+=`<div class="spd-combo-opt${v===defVal?' sel':''}" data-v="${v}">${v}</div>`;
+  grid.innerHTML=opts;
+  function setVal(v,fire){
+    v=Math.max(60,Math.min(200,+v||0));
+    st.value=v;
+    host.querySelector('.spd-combo-btn .v').textContent=v;
+    grid.querySelectorAll('.spd-combo-opt').forEach(o=>o.classList.toggle('sel',+o.dataset.v===v));
+    if(fire!==false && typeof onChange==='function')onChange(v);
+  }
+  btn.onclick=e=>{e.stopPropagation();const wasOpen=host.classList.contains('open');
+    document.querySelectorAll('.spd-combo.open').forEach(c=>c.classList.remove('open'));
+    if(!wasOpen){host.classList.add('open');inp.value='';setTimeout(()=>inp.focus(),30);}};
+  grid.querySelectorAll('.spd-combo-opt').forEach(o=>{
+    o.onclick=e=>{e.stopPropagation();setVal(+o.dataset.v);host.classList.remove('open');};
+  });
+  inp.oninput=()=>{if(inp.value!=='')setVal(inp.value);};
+  inp.onkeydown=e=>{if(e.key==='Enter'){host.classList.remove('open');}};
+  inp.onclick=e=>e.stopPropagation();
+  pop.onclick=e=>e.stopPropagation();
+  return st;
+}
+// 외부 닫기
+document.addEventListener('click',()=>{document.querySelectorAll('.spd-combo.open').forEach(c=>c.classList.remove('open'));});
+// 값 읽기 헬퍼
+function _spdVal(targetId, def){const s=window._spdCombo[targetId];return s?s.value:def;}
+function _initSpdSelects(){
+  _buildSpdCombo('bf-spd-min-combo','bf-spd-min',80,()=>renderBatterFilterAnalysis());
+  _buildSpdCombo('bf-spd-max-combo','bf-spd-max',175,()=>renderBatterFilterAnalysis());
+  _buildSpdCombo('b-zone-spd-min-combo','b-zone-spd-min',80,()=>{renderBatterZoneMap();renderBatterZonePitchTable();renderBatterZoneSummary();});
+  _buildSpdCombo('b-zone-spd-max-combo','b-zone-spd-max',175,()=>{renderBatterZoneMap();renderBatterZonePitchTable();renderBatterZoneSummary();});
+}
 function _fillSpdSelect(){}
-function _initSpdSelects(){}
 // ─── 상황별 대응 분석 (다중 필터 + 묶어보기) ───
 function renderBatterFilterAnalysis(){
   _initSpdSelects();
   const gv=id=>{const e=document.getElementById(id);return e?e.value:'';};
-  const spdMin=+gv('bf-spd-min')||80, spdMax=+gv('bf-spd-max')||175;
+  const spdMin=_spdVal('bf-spd-min',80), spdMax=_spdVal('bf-spd-max',175);
   const zoneF=gv('bf-zone'), countF=gv('bf-count'), splitBy=gv('bf-splitby')||'pitch';
   let data=getBatterDataFiltered().filter(d=>+d.spdK>=spdMin&&+d.spdK<=spdMax);
   // 코스 필터 (몸쪽/바깥은 타자손 기준: 우타 zx+가 몸쪽)
@@ -9963,8 +10024,8 @@ function calcBatterGameStats(gamePitches){
 // ───── 타자 E-1: 존 영역별 종합 지표 ─────
 // E탭 존분석 공용 구속범위 필터
 function _passZoneSpdFilter(arr){
-  const mn=+((document.getElementById('b-zone-spd-min')||{}).value||80);
-  const mx=+((document.getElementById('b-zone-spd-max')||{}).value||175);
+  const mn=_spdVal('b-zone-spd-min',80);
+  const mx=_spdVal('b-zone-spd-max',175);
   if(mn<=80&&mx>=175)return arr;
   return arr.filter(d=>+d.spdK>=mn&&+d.spdK<=mx);
 }
@@ -14181,7 +14242,7 @@ const CHANGELOG = [
     badge: '#39ff8a',
     changes: [
       {icon:'🎯', text:'⭐⭐⭐ <b>타자 「상황별 대응 분석」 다중 필터 추가 (스윙 지표 탭)</b> — 같은 구종·구속이라도 코스·카운트에 따라 대응이 크게 다른데, 기존엔 구종별 대응 성적만 볼 수 있어 <b>\"이 타자가 어떤 구속을 어느 상황에서 강한가\"</b>를 파악할 수 없었음. → <b>구속 범위(슬라이더) · 코스(몸쪽/바깥/상/하/존안/존밖) · 카운트(초구/유리/불리/2스트라이크)</b> 3종 필터를 자유롭게 조합해 데이터를 좁히고, <b>「묶어보기」</b>로 그 안을 구종별·구속 5/10km 단위·코스 9분할·카운트별로 쪼개서 표시. 각 행에 <b>안타율·헛스윙%·EV·LA·|hPos|(배트중심이탈)·반응시간·배럴+%</b>를 색상 히트맵(초록=좋음/빨강=나쁨)과 함께 한눈에 표시, 전 열 클릭 정렬. 손잡이(우투/좌투) 필터와도 조합됨.'},
-      {icon:'🗺️', text:'⭐⭐ <b>존 분석(E탭)에 구속 범위 필터 추가</b> — 5×5 핫/콜드존·구종×존 상세·존 요약이 모두 <b>구속 범위(최소~최대 드롭다운, 5km 단위)</b>로 필터링됨. 구종 필터와 함께 쓰면 <b>\"빠른 직구를 몸쪽/바깥/상/하 어디서 잘 치나\"</b>처럼 구종+구속+코스를 결합한 정밀 분석 가능. 같은 직구라도 구속대별로 존 대응이 다른 것을 확인할 수 있음.'},
+      {icon:'🗺️', text:'⭐⭐ <b>존 분석(E탭)에 구속 범위 필터 추가</b> — 5×5 핫/콜드존·구종×존 상세·존 요약이 모두 <b>구속 범위(콤보박스 — 5km 눈금 선택 + 직접 입력 겸용)</b>로 필터링됨. 구종 필터와 함께 쓰면 <b>\"빠른 직구를 몸쪽/바깥/상/하 어디서 잘 치나\"</b>처럼 구종+구속+코스를 결합한 정밀 분석 가능. 같은 직구라도 구속대별로 존 대응이 다른 것을 확인할 수 있음.'},
       {icon:'🖱️', text:'⭐⭐⭐ <b>존 셀 클릭 → 상세 분석 모달</b> — 5×5 핫/콜드존에서 <b>아무 칸이나 클릭</b>하면 그 존(현재 구속·구종 필터 반영)의 상세 정보가 팝업으로 뜼. <b>요약 카드</b>(타율·장타율·헛스윙·평균EV·평균LA·|hPos|·배럴+%·홈런) + <b>구종별 대응 표</b> + <b>구속대별 대응 표</b>(5km 단위). 지도에서 색으로 대략 보고 → 궁금한 존을 클릭해 "이 코스에서 어떤 구종·구속에 강하고 약한지"를 한 번에 파고들 수 있음.'},
     ]
   },
@@ -33735,6 +33796,5 @@ function toggleGame(gid){
   document.head.appendChild(css);
 })();
 </script>
-<datalist id="spd-marks-5"><option value="80"><option value="85"><option value="90"><option value="95"><option value="100"><option value="105"><option value="110"><option value="115"><option value="120"><option value="125"><option value="130"><option value="135"><option value="140"><option value="145"><option value="150"><option value="155"><option value="160"><option value="165"><option value="170"><option value="175"></datalist>
 </body>
 </html>
