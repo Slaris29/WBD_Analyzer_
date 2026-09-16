@@ -1018,9 +1018,9 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
         <div class="card-title">🎯 상황별 대응 분석 (다중 필터)</div>
         <div class="filter-row" style="margin-bottom:6px;flex-wrap:wrap;gap:6px">
           <span class="filter-label">구속</span>
-          <select id="bf-spd-min" onchange="renderBatterFilterAnalysis()"></select>
+          <input type="number" id="bf-spd-min" list="spd-marks-5" min="80" max="175" step="5" value="80" style="width:70px" oninput="renderBatterFilterAnalysis()">
           <span style="color:var(--muted)">~</span>
-          <select id="bf-spd-max" onchange="renderBatterFilterAnalysis()"></select>
+          <input type="number" id="bf-spd-max" list="spd-marks-5" min="80" max="175" step="5" value="175" style="width:70px" oninput="renderBatterFilterAnalysis()">
           <span style="font-size:10px;color:var(--muted)">km/h</span>
           <span class="filter-label" style="margin-left:6px">코스</span>
           <select id="bf-zone" onchange="renderBatterFilterAnalysis()">
@@ -1149,9 +1149,9 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
           </div>
           <div class="filter-row" style="margin-bottom:10px;flex-wrap:wrap">
             <span class="filter-label">구속</span>
-            <select id="b-zone-spd-min" onchange="renderBatterZoneMap();renderBatterZonePitchTable();renderBatterZoneSummary()"></select>
+            <input type="number" id="b-zone-spd-min" list="spd-marks-5" min="80" max="175" step="5" value="80" style="width:70px" oninput="renderBatterZoneMap();renderBatterZonePitchTable();renderBatterZoneSummary()">
             <span style="color:var(--muted)">~</span>
-            <select id="b-zone-spd-max" onchange="renderBatterZoneMap();renderBatterZonePitchTable();renderBatterZoneSummary()"></select>
+            <input type="number" id="b-zone-spd-max" list="spd-marks-5" min="80" max="175" step="5" value="175" style="width:70px" oninput="renderBatterZoneMap();renderBatterZonePitchTable();renderBatterZoneSummary()">
             <span style="font-size:10px;color:var(--muted)">km/h</span>
           </div>
           <div id="b-zone-map"></div>
@@ -6385,18 +6385,9 @@ function renderTiming(){
   document.getElementById('b-timing').innerHTML=leg+makeSVG(W,H,items);
 }
 
-// 구속 드롭다운(5km 단위) 옵션 채우기 — 한 번만
-function _fillSpdSelect(id, defVal, isMax){
-  const sel=document.getElementById(id);
-  if(!sel||sel.options.length>0)return;
-  let html='';
-  for(let v=80;v<=175;v+=5){ html+=`<option value="${v}"${v===defVal?' selected':''}>${v}</option>`; }
-  sel.innerHTML=html;
-}
-function _initSpdSelects(){
-  _fillSpdSelect('bf-spd-min',80);_fillSpdSelect('bf-spd-max',175);
-  _fillSpdSelect('b-zone-spd-min',80);_fillSpdSelect('b-zone-spd-max',175);
-}
+// 구속 입력(datalist 겸용) — 별도 초기화 불필요 (HTML value로 기본값 지정됨)
+function _fillSpdSelect(){}
+function _initSpdSelects(){}
 // ─── 상황별 대응 분석 (다중 필터 + 묶어보기) ───
 function renderBatterFilterAnalysis(){
   _initSpdSelects();
@@ -33744,5 +33735,6 @@ function toggleGame(gid){
   document.head.appendChild(css);
 })();
 </script>
+<datalist id="spd-marks-5"><option value="80"><option value="85"><option value="90"><option value="95"><option value="100"><option value="105"><option value="110"><option value="115"><option value="120"><option value="125"><option value="130"><option value="135"><option value="140"><option value="145"><option value="150"><option value="155"><option value="160"><option value="165"><option value="170"><option value="175"></datalist>
 </body>
 </html>
