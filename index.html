@@ -10228,22 +10228,35 @@ function showZoneDetailModal(col,row){
   const inZone=(col>=1&&col<=3&&row>=1&&row<=3);
   function agg(arr){
     const sw=arr.filter(_isSwing).length, wh=arr.filter(_isWhiff).length;
+    const looking=arr.filter(d=>!d.bSwing&&+d.call===0).length; // 루킹 스트라이크
+    const foul=arr.filter(d=>+d.result===3).length;
+    const ball=arr.filter(d=>+d.call===1||+d.result===5).length;
     const ip=arr.filter(_isInPlay);
     const hits=arr.filter(_isHit).length;
     const hrs=arr.filter(d=>+d.result===4).length;
+    const doubles=arr.filter(d=>_isHit(d)&&+d._hitBase===2).length;
+    const triples=arr.filter(d=>_isHit(d)&&+d._hitBase===3).length;
+    const singles=hits-doubles-triples-hrs;
+    const outs=ip.filter(d=>!_isHit(d)).length;
     const ev=ip.map(d=>+d.ev).filter(v=>v>0);
     const evM=ev.length?ev.reduce((a,b)=>a+b,0)/ev.length:null;
+    const evMax=ev.length?Math.max(...ev):null;
     const la=ip.map(d=>+d.ldeg).filter(v=>!isNaN(v));
     const laM=la.length?la.reduce((a,b)=>a+b,0)/la.length:null;
     const hp=ip.map(d=>Math.abs(+d.hPos)).filter(v=>!isNaN(v));
     const hpM=hp.length?hp.reduce((a,b)=>a+b,0)/hp.length:null;
     const brlp=ip.filter(_isBarrelPlus).length;
+    const hhp=ip.filter(_isHHPlus).length;
+    // 타구 유형 (땅볼/라인/뜬공)
+    const gb=la.filter(v=>v<10).length, ld=la.filter(v=>v>=10&&v<25).length, fb=la.filter(v=>v>=25).length;
     const tbs=arr.filter(d=>_isHit(d)).reduce((s,d)=>s+(+d._hitBase||(+d.result===4?4:1)),0);
     const ab2=ip.length;
-    return {n:arr.length,sw,wh,ab:ab2,hits,hrs,
+    const contact=sw>0?(sw-wh)/sw*100:null; // 컨택률(스윙 중 맞힌 비율)
+    return {n:arr.length,sw,wh,looking,foul,ball,ab:ab2,hits,hrs,doubles,triples,singles,outs,
       avg:ab2?hits/ab2:null,slg:ab2?tbs/ab2:null,
-      swR:arr.length?sw/arr.length*100:0,whR:sw?wh/sw*100:0,
-      ev:evM,la:laM,hpos:hpM,brlp:ip.length?brlp/ip.length*100:null};
+      swR:arr.length?sw/arr.length*100:0,whR:sw?wh/sw*100:0,contact,
+      ev:evM,evMax,la:laM,hpos:hpM,brlp:ip.length?brlp/ip.length*100:null,hhp:ip.length?hhp/ip.length*100:null,
+      gb,ld,fb,gbR:ab2?gb/ab2*100:null,ldR:ab2?ld/ab2*100:null,fbR:ab2?fb/ab2*100:null};
   }
   const A=agg(cd);
   const byPitch={};
@@ -10255,29 +10268,52 @@ function showZoneDetailModal(col,row){
   const fmt3=v=>v!=null?v.toFixed(3).replace(/^0/,''):'-';
   const fmtP=v=>v!=null?v.toFixed(0)+'%':'-';
   const fmt1=v=>v!=null?v.toFixed(1):'-';
-  let html='<div style="max-height:80vh;overflow-y:auto">';
+  const fmt0=v=>v!=null?v.toFixed(0):'-';
+  let html='<div style="max-height:82vh;overflow-y:auto">';
   html+='<div style="font-size:16px;font-weight:700;margin-bottom:4px">🎯 존 상세 ['+colName+'\u00b7'+rowName+'] '+(inZone?'<span style="color:#f5a623;font-size:11px">인존</span>':'<span style="color:#5a7;font-size:11px">존밖</span>')+'</div>';
   html+='<div style="font-size:11px;color:var(--muted);margin-bottom:12px">'+(currentBatter||'')+' \u00b7 필터 적용됨 \u00b7 '+A.n+'구 / '+A.ab+'타수</div>';
-  html+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px">';
+  // 요약 카드
+  html+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">';
   const cards=[['타율',fmt3(A.avg),'#39ff8a'],['장타율',fmt3(A.slg),'#ffd700'],['헛스윙',fmtP(A.whR),'#ff5533'],
-    ['평균EV',fmt1(A.ev),'#ff8c44'],['평균LA',A.la!=null?A.la.toFixed(0)+'\u00b0':'-','#8af'],
-    ['|hPos|',A.hpos!=null?A.hpos.toFixed(2):'-','#c9f'],['배럴+%',fmtP(A.brlp),'#ff2020'],['홈런',A.hrs,'#fff']];
-  cards.forEach(function(x){html+='<div style="background:#141e2c;border-radius:6px;padding:8px;text-align:center"><div style="font-size:10px;color:var(--muted)">'+x[0]+'</div><div style="font-size:16px;font-weight:700;color:'+x[2]+';font-family:var(--mono)">'+x[1]+'</div></div>';});
+    ['컨택률',fmtP(A.contact),'#4fc3f7'],['평균EV',fmt1(A.ev),'#ff8c44'],['최고EV',fmt0(A.evMax),'#ff6622'],
+    ['평균LA',A.la!=null?A.la.toFixed(0)+'\u00b0':'-','#8af'],['|hPos|',A.hpos!=null?A.hpos.toFixed(2):'-','#c9f'],
+    ['배럴+%',fmtP(A.brlp),'#ff2020'],['HH+%',fmtP(A.hhp),'#ff5533'],['홈런',A.hrs,'#fff'],['스윙률',fmtP(A.swR),'#aaa']];
+  cards.forEach(function(x){html+='<div style="background:#141e2c;border-radius:6px;padding:7px;text-align:center"><div style="font-size:9.5px;color:var(--muted)">'+x[0]+'</div><div style="font-size:15px;font-weight:700;color:'+x[2]+';font-family:var(--mono)">'+x[1]+'</div></div>';});
   html+='</div>';
+  // 결과 분포 (한 줄 요약)
+  html+='<div style="background:#0e1826;border-radius:6px;padding:8px 10px;margin-bottom:12px;font-size:11px;display:flex;gap:14px;flex-wrap:wrap">';
+  html+='<span>안타 <b style="color:#39ff8a">'+A.hits+'</b> (1B '+A.singles+' / 2B '+A.doubles+' / 3B '+A.triples+' / HR '+A.hrs+')</span>';
+  html+='<span>인플레이아웃 <b>'+A.outs+'</b></span>';
+  html+='<span>헛스윙 <b style="color:#ff5533">'+A.wh+'</b></span>';
+  html+='<span>루킹 <b>'+A.looking+'</b></span>';
+  html+='<span>파울 <b>'+A.foul+'</b></span>';
+  html+='<span>볼 <b>'+A.ball+'</b></span>';
+  html+='</div>';
+  // 타구 유형
+  if(A.ab>0){
+    html+='<div style="background:#0e1826;border-radius:6px;padding:8px 10px;margin-bottom:14px;font-size:11px;display:flex;gap:16px;flex-wrap:wrap">';
+    html+='<span style="color:var(--muted)">타구유형:</span>';
+    html+='<span>땅볼 <b>'+A.gb+'</b> ('+fmtP(A.gbR)+')</span>';
+    html+='<span>라인드라이브 <b>'+A.ld+'</b> ('+fmtP(A.ldR)+')</span>';
+    html+='<span>뜬공 <b>'+A.fb+'</b> ('+fmtP(A.fbR)+')</span>';
+    html+='</div>';
+  }
+  // 구종별 상세 표
   html+='<div style="font-size:12px;font-weight:600;margin:8px 0 4px">구종별 대응</div>';
-  html+='<table class="data-table" style="font-size:11px"><thead><tr><th>구종</th><th>투구</th><th>타수</th><th>타율</th><th>헛스윙</th><th>EV</th><th>|hPos|</th></tr></thead><tbody>';
+  html+='<div class="tbl-wrap"><table class="data-table" style="font-size:11px"><thead><tr><th>구종</th><th>투구</th><th>타수</th><th>타율</th><th>장타</th><th>헛스윙</th><th>컨택</th><th>EV</th><th>LA</th><th>배럴+</th><th>|hPos|</th><th>HR</th></tr></thead><tbody>';
   pitchRows.forEach(function(r){
     const cl=(typeof GROUP_COLORS!=='undefined'&&GROUP_COLORS[r.g])||'#ccc';
-    html+='<tr><td style="color:'+cl+';font-weight:600">'+r.g+'</td><td>'+r.n+'</td><td>'+r.ab+'</td><td>'+fmt3(r.avg)+'</td><td>'+fmtP(r.whR)+'</td><td>'+(r.ev!=null?r.ev.toFixed(0):'-')+'</td><td>'+(r.hpos!=null?r.hpos.toFixed(2):'-')+'</td></tr>';
+    html+='<tr><td style="color:'+cl+';font-weight:600">'+r.g+'</td><td>'+r.n+'</td><td>'+r.ab+'</td><td>'+fmt3(r.avg)+'</td><td>'+fmt3(r.slg)+'</td><td>'+fmtP(r.whR)+'</td><td>'+fmtP(r.contact)+'</td><td>'+fmt0(r.ev)+'</td><td>'+(r.la!=null?r.la.toFixed(0)+'\u00b0':'-')+'</td><td>'+fmtP(r.brlp)+'</td><td>'+(r.hpos!=null?r.hpos.toFixed(2):'-')+'</td><td>'+r.hrs+'</td></tr>';
   });
-  html+='</tbody></table>';
+  html+='</tbody></table></div>';
+  // 구속대별 상세 표
   if(spdRows.length>1){
-    html+='<div style="font-size:12px;font-weight:600;margin:12px 0 4px">구속대별 대응 (5km)</div>';
-    html+='<table class="data-table" style="font-size:11px"><thead><tr><th>구속</th><th>투구</th><th>타수</th><th>타율</th><th>헛스윙</th><th>EV</th></tr></thead><tbody>';
+    html+='<div style="font-size:12px;font-weight:600;margin:14px 0 4px">구속대별 대응 (5km)</div>';
+    html+='<div class="tbl-wrap"><table class="data-table" style="font-size:11px"><thead><tr><th>구속</th><th>투구</th><th>타수</th><th>타율</th><th>장타</th><th>헛스윙</th><th>컨택</th><th>EV</th><th>LA</th><th>배럴+</th><th>HR</th></tr></thead><tbody>';
     spdRows.forEach(function(r){
-      html+='<tr><td style="font-weight:600">'+r.b+'~'+(r.b+5)+'</td><td>'+r.n+'</td><td>'+r.ab+'</td><td>'+fmt3(r.avg)+'</td><td>'+fmtP(r.whR)+'</td><td>'+(r.ev!=null?r.ev.toFixed(0):'-')+'</td></tr>';
+      html+='<tr><td style="font-weight:600">'+r.b+'~'+(r.b+5)+'</td><td>'+r.n+'</td><td>'+r.ab+'</td><td>'+fmt3(r.avg)+'</td><td>'+fmt3(r.slg)+'</td><td>'+fmtP(r.whR)+'</td><td>'+fmtP(r.contact)+'</td><td>'+fmt0(r.ev)+'</td><td>'+(r.la!=null?r.la.toFixed(0)+'\u00b0':'-')+'</td><td>'+fmtP(r.brlp)+'</td><td>'+r.hrs+'</td></tr>';
     });
-    html+='</tbody></table>';
+    html+='</tbody></table></div>';
   }
   html+='</div>';
   openModal(html);
