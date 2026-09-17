@@ -5082,9 +5082,28 @@ function renderPitcherZone(){
         <line x1="${(sx-r).toFixed(1)}" y1="${(sy+r).toFixed(1)}" x2="${(sx+r).toFixed(1)}" y2="${(sy-r).toFixed(1)}"/>
       </g>`;
     }
+    if(shape==='dtriangle'){
+      // 역삼각형 (아웃)
+      const p=`${sx.toFixed(1)},${(sy+r).toFixed(1)} ${(sx+r).toFixed(1)},${(sy-r*0.8).toFixed(1)} ${(sx-r).toFixed(1)},${(sy-r*0.8).toFixed(1)}`;
+      return `<polygon points="${p}" fill="${fill}" opacity="0.8" stroke="#000" stroke-width="0.4" class="zone-dot" data-gi="${gi}"/>`;
+    }
+    if(shape==='hbar'){
+      // 가로 막대 (볼)
+      return `<rect x="${(sx-r).toFixed(1)}" y="${(sy-r*0.45).toFixed(1)}" width="${(r*2).toFixed(1)}" height="${(r*0.9).toFixed(1)}" rx="1" fill="${fill}" opacity="0.75" stroke="#000" stroke-width="0.3" class="zone-dot" data-gi="${gi}"/>`;
+    }
+    if(shape==='ring'){
+      // 빈 원 (루킹S)
+      return `<circle cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="${r}" fill="none" stroke="${fill}" stroke-width="1.4" opacity="0.9" class="zone-dot" data-gi="${gi}"/>`;
+    }
+    if(shape==='plus'){
+      // + 모양 (사구)
+      return `<g class="zone-dot" data-gi="${gi}" stroke="${fill}" stroke-width="1.6" opacity="0.9">
+        <line x1="${(sx-r).toFixed(1)}" y1="${sy.toFixed(1)}" x2="${(sx+r).toFixed(1)}" y2="${sy.toFixed(1)}"/>
+        <line x1="${sx.toFixed(1)}" y1="${(sy-r).toFixed(1)}" x2="${sx.toFixed(1)}" y2="${(sy+r).toFixed(1)}"/>
+      </g>`;
+    }
     return '';
   };
-  // 사용된 구종 그룹 추적 (범례용)
   const usedGroups=new Set();
   const usedOutcomes=new Set();
   // V11.3: 결과 필터 (전역 상태)
@@ -5111,9 +5130,13 @@ function renderPitcherZone(){
     if(shape==='square') return `<svg width="11" height="11" style="vertical-align:middle"><rect x="2" y="2" width="7" height="7" fill="${col}"/></svg>`;
     if(shape==='cross') return `<svg width="11" height="11" style="vertical-align:middle"><line x1="2" y1="2" x2="9" y2="9" stroke="${col}" stroke-width="1.6"/><line x1="2" y1="9" x2="9" y2="2" stroke="${col}" stroke-width="1.6"/></svg>`;
     if(shape==='star') return `<svg width="12" height="12" style="vertical-align:middle"><polygon points="6,1 7.2,4.5 11,4.5 8,6.8 9.2,10.5 6,8.2 2.8,10.5 4,6.8 1,4.5 4.8,4.5" fill="${col}"/></svg>`;
+    if(shape==='dtriangle') return `<svg width="11" height="11" style="vertical-align:middle"><polygon points="5.5,9 9,3 2,3" fill="${col}"/></svg>`;
+    if(shape==='hbar') return `<svg width="11" height="11" style="vertical-align:middle"><rect x="2" y="4" width="7" height="3" rx="1" fill="${col}"/></svg>`;
+    if(shape==='ring') return `<svg width="11" height="11" style="vertical-align:middle"><circle cx="5.5" cy="5.5" r="3.3" fill="none" stroke="${col}" stroke-width="1.5"/></svg>`;
+    if(shape==='plus') return `<svg width="11" height="11" style="vertical-align:middle"><line x1="2" y1="5.5" x2="9" y2="5.5" stroke="${col}" stroke-width="1.6"/><line x1="5.5" y1="2" x2="5.5" y2="9" stroke="${col}" stroke-width="1.6"/></svg>`;
     return '';
   };
-  const _ocOrder=['hr','hit','out','whiff','called','foul','ball','hbp'];
+  const _ocOrder=['hr','hit','out','whiff','called','foul','ball','bb','hbp'];
   const shapeLeg=_ocOrder.filter(k=>usedOutcomes.has(k)).map(k=>{
     const m=_OUTCOME_META[k];
     return `<div class="legend-item" style="font-size:10px">${_shapeSvg(m.shape, _colorMode==='outcome'?m.color:'#888')} ${m.label}</div>`;
@@ -9089,15 +9112,15 @@ function _pitchOutcome(d){
   return 'ball';                                             // 존 밖 + 스윙 안함 = 볼
 }
 const _OUTCOME_META={
-  hr:    {label:'홈런',   color:'#ffd700', shape:'star'},
-  hit:   {label:'안타',   color:'#39ff8a', shape:'triangle'},
-  out:   {label:'아웃',   color:'#8090a0', shape:'circle'},
-  whiff: {label:'헛스윙', color:'#ff4560', shape:'square'},
-  called:{label:'루킹S',  color:'#4dd0e1', shape:'circle'},
-  foul:  {label:'파울',   color:'#b39ddb', shape:'diamond'},
-  ball:  {label:'볼',     color:'#546e7a', shape:'diamond'},
-  bb:    {label:'볼넷',   color:'#546e7a', shape:'diamond'},
-  hbp:   {label:'사구',   color:'#ff6b8a', shape:'cross'}
+  hr:    {label:'홈런',   color:'#ffd700', shape:'star'},      // ★ 별
+  hit:   {label:'안타',   color:'#39ff8a', shape:'triangle'},  // ▲ 위삼각형
+  out:   {label:'아웃',   color:'#8090a0', shape:'dtriangle'}, // ▽ 역삼각형
+  whiff: {label:'헛스윙', color:'#ff4560', shape:'square'},    // ■ 사각형
+  called:{label:'루킹S',  color:'#4dd0e1', shape:'ring'},      // ○ 빈 원
+  foul:  {label:'파울',   color:'#b39ddb', shape:'diamond'},   // ◆ 마름모
+  ball:  {label:'볼',     color:'#546e7a', shape:'hbar'},      // ▬ 가로막대
+  bb:    {label:'볼넷',   color:'#7986cb', shape:'circle'},    // ● 원
+  hbp:   {label:'사구',   color:'#ff6b8a', shape:'plus'}       // + 십자
 };
 function _isInZone(d){
   const zx=+d.zoneX, zy=+d.zoneY;
