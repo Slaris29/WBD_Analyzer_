@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <!-- V10.1: 외부 이미지(WBD 프로필) hotlinking 방지 우회 - Referer 헤더 차단 -->
 <meta name="referrer" content="no-referrer">
-<title>WBD Baseball Analyzer V11.5</title>
+<title>WBD Baseball Analyzer V11.6</title>
 <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -177,6 +177,9 @@ select{background:#060e1a;border:1px solid var(--border);color:var(--text);font-
 select:focus{border-color:var(--amber)}
 .filter-row{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
 .filter-label{font-size:11px;color:var(--muted);letter-spacing:.5px}
+/* 상대전적 모드 토글 */
+.h2h-mode-btn{font-family:var(--cond);font-weight:600;font-size:12px;padding:6px 12px;cursor:pointer;color:var(--muted);background:var(--card2);border:1px solid var(--border);border-radius:6px;transition:all .15s}
+.h2h-mode-btn.active{color:#000;background:var(--amber);border-color:var(--amber);font-weight:700}
 /* 구속 콤보박스 */
 .spd-combo{position:relative;display:inline-block;font-family:var(--mono)}
 .spd-combo-btn{display:inline-flex;align-items:center;gap:6px;background:var(--panel,#141e2c);border:1px solid var(--border,#2a3a4a);border-radius:6px;padding:5px 10px;cursor:pointer;color:var(--text,#e8eef4);font-size:13px;font-family:var(--mono);min-width:54px;justify-content:space-between;transition:border-color .15s}
@@ -558,7 +561,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
 <!-- ════ UPLOAD PAGE ════ -->
 <div id="upload-page">
   <div class="logo-big">WBD</div>
-  <div class="logo-sub">BASEBALL ANALYZER · V11.5</div>
+  <div class="logo-sub">BASEBALL ANALYZER · V11.6</div>
   <div id="server-library-box" style="width:100%;max-width:640px;margin-bottom:16px;background:var(--card);border:1px solid rgba(245,166,35,0.35);border-radius:12px;padding:20px 22px;display:none;box-shadow:0 0 32px rgba(245,166,35,0.05);text-align:left">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap">
       <div>
@@ -598,7 +601,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
   <!-- 모바일 전용 상단 바 (햄버거) -->
   <div id="mobile-topbar" style="display:none">
     <button id="hamburger-btn" onclick="toggleMobileMenu()" aria-label="메뉴">☰</button>
-    <div class="mobile-logo">WBD <span style="font-size:10px;color:var(--muted);margin-left:2px">V11.5</span></div>
+    <div class="mobile-logo">WBD <span style="font-size:10px;color:var(--muted);margin-left:2px">V11.6</span></div>
     <button class="mobile-icon-btn" onclick="openGlobalSearch()" title="검색">🔍</button>
     <button class="mobile-icon-btn" onclick="document.getElementById('add-file-input').click()" title="경기 추가" style="color:var(--amber)">+</button>
   </div>
@@ -616,7 +619,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
   <div id="mobile-menu-overlay" style="display:none" onclick="closeMobileMenu(event)">
     <div id="mobile-menu-panel" onclick="event.stopPropagation()">
       <div class="mobile-menu-header">
-        <div class="mobile-logo" style="font-size:16px;cursor:pointer" onclick="closeMobileMenu();openChangelogModal()" title="업데이트 내역 보기">WBD <span style="background:#ffd700;color:#000;font-size:11px;padding:1px 5px;border-radius:3px;font-weight:700;margin-left:2px">V11.5</span></div>
+        <div class="mobile-logo" style="font-size:16px;cursor:pointer" onclick="closeMobileMenu();openChangelogModal()" title="업데이트 내역 보기">WBD <span style="background:#ffd700;color:#000;font-size:11px;padding:1px 5px;border-radius:3px;font-weight:700;margin-left:2px">V11.6</span></div>
         <button class="mobile-icon-btn" onclick="closeMobileMenu()" style="font-size:20px">✕</button>
       </div>
       <div class="mobile-menu-section">
@@ -647,6 +650,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
         <div class="mobile-menu-label">도구</div>
         <button class="mobile-menu-btn" onclick="navMobile('compare')">⚖️ 선수 비교</button>
         <button class="mobile-menu-btn" onclick="navMobile('matchup')">🎮 매치업 시뮬</button>
+        <button class="mobile-menu-btn" onclick="navMobile('h2h')" style="color:#ffd700">🆚 상대전적</button>
         <button class="mobile-menu-btn" onclick="navMobile('highlights')">🎬 하이라이트</button>
       </div>
       <div class="mobile-menu-section">
@@ -655,7 +659,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
         <button class="mobile-menu-btn" onclick="closeMobileMenu();openPresetModal()">💾 프리셋</button>
         <button class="mobile-menu-btn" onclick="closeMobileMenu();openThemeModal()">🎨 테마</button>
         <button class="mobile-menu-btn" onclick="closeMobileMenu();openShortcutsModal()">⌨️ 단축키</button>
-        <button class="mobile-menu-btn" onclick="closeMobileMenu();openChangelogModal()" style="background:linear-gradient(90deg,rgba(204,68,255,.15),transparent);color:#cc44ff;font-weight:700">📋 업데이트 내역 (V11.5 NEW!)</button>
+        <button class="mobile-menu-btn" onclick="closeMobileMenu();openChangelogModal()" style="background:linear-gradient(90deg,rgba(204,68,255,.15),transparent);color:#cc44ff;font-weight:700">📋 업데이트 내역 (V11.6 NEW!)</button>
         <button class="mobile-menu-btn" onclick="closeMobileMenu();document.getElementById('add-file-input').click()" style="color:var(--amber)">+ 경기 추가</button>
         <button class="mobile-menu-btn" onclick="closeMobileMenu();openServerLibraryModal()" style="color:#88ccff">☁ 서버 경기 추가</button>
         <button class="mobile-menu-btn" onclick="closeMobileMenu();clearAllGames()" style="color:#ff4560">🗑️ 모든 경기 제거</button>
@@ -664,7 +668,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
   </div>
 
   <div id="topnav">
-    <div class="nav-logo">WBD <span style="font-size:11px;color:var(--muted);letter-spacing:1px;margin-left:4px">V11.5</span></div>
+    <div class="nav-logo">WBD <span style="font-size:11px;color:var(--muted);letter-spacing:1px;margin-left:4px">V11.6</span></div>
     <button class="nav-btn active" onclick="showPage('home')">🏠 홈</button>
     <button class="nav-btn" onclick="showPage('pitcher')">⚾ 투수</button>
     <button class="nav-btn" onclick="showPage('batter')">🏏 타자</button>
@@ -689,6 +693,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
       <div class="nav-dropdown-menu">
         <button onclick="showPage('compare')">⚖️ 선수 비교</button>
         <button onclick="showPage('matchup')">🎮 매치업</button>
+        <button onclick="showPage('h2h')" style="background:linear-gradient(90deg,rgba(255,215,0,.15),transparent);color:#ffd700;font-weight:700">🆚 상대전적 <span style="font-size:9px;background:#ffd700;color:#000;padding:1px 5px;border-radius:3px;margin-left:4px">NEW</span></button>
         <button onclick="showPage('pitchtype')">🎯 구종 분석</button>
         <button onclick="showPage('ballmap')" style="background:linear-gradient(90deg,rgba(255,153,51,.15),transparent);color:#ff9933;font-weight:700">🗺️ 타구 분석 <span style="font-size:9px;background:#ff9933;color:#000;padding:1px 5px;border-radius:3px;margin-left:4px">NEW</span></button>
         <button onclick="showPage('defense')" style="background:linear-gradient(90deg,rgba(57,255,138,.15),transparent);color:#39ff8a;font-weight:700">🛡️ 수비 분석 <span style="font-size:9px;background:#39ff8a;color:#000;padding:1px 5px;border-radius:3px;margin-left:4px">NEW</span></button>
@@ -1461,6 +1466,33 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
     </select>
   </div>
   <div id="matchup-content"></div>
+</div>
+
+<!-- ══ HEAD-TO-HEAD (상대전적) PAGE ══ -->
+<div class="page" id="page-h2h">
+  <div class="filter-row" style="margin-bottom:14px;flex-wrap:wrap;gap:8px">
+    <span class="filter-label">기준</span>
+    <div class="stab-row" style="display:inline-flex;gap:4px">
+      <button class="h2h-mode-btn active" data-mode="batter" onclick="setH2HMode('batter')">🏏 타자 기준</button>
+      <button class="h2h-mode-btn" data-mode="pitcher" onclick="setH2HMode('pitcher')">⚾ 투수 기준</button>
+    </div>
+    <span class="filter-label" id="h2h-sel-label">🏏 타자</span>
+    <select id="h2h-player" onchange="renderH2HPage()"></select>
+    <span class="filter-label">최소 타석</span>
+    <select id="h2h-minpa" onchange="renderH2HPage()">
+      <option value="1">1+</option>
+      <option value="3" selected>3+</option>
+      <option value="5">5+</option>
+      <option value="10">10+</option>
+    </select>
+    <span class="filter-label">손잡이</span>
+    <select id="h2h-hand" onchange="renderH2HPage()">
+      <option value="">전체</option>
+      <option value="R">우</option>
+      <option value="L">좌</option>
+    </select>
+  </div>
+  <div id="h2h-content"></div>
 </div>
 
 <!-- ══ SEASON INSIGHTS PAGE ══ -->
@@ -3533,7 +3565,7 @@ function showPage(name,_internal){
   const labels={home:'홈',pitcher:'투수',batter:'타자',matchup:'매치업',cards:'카드',leaderboard:'리더보드',team:'팀',compare:'비교',highlights:'하이라이트',awards:'어워드',insights:'인사이트',myteam:'내 팀'};
   document.querySelectorAll('.nav-btn').forEach(b=>{if(b.textContent.includes(labels[name]))b.classList.add('active');});
   // 현재 페이지 모바일 상단에 표시
-  const pageTitle=({home:'🏠 홈',pitcher:'⚾ 투수 분석',batter:'🏏 타자 분석',cards:'🃏 선수 카드',leaderboard:'🏅 리더보드',team:'🏆 팀 분석',compare:'⚖️ 선수 비교',highlights:'🎬 하이라이트',awards:'🏆 어워드',matchup:'🎮 매치업',insights:'📈 인사이트',myteam:'⚔️ 내 팀 빌더',pitchtype:'🎯 구종 분석',defense:'🛡️ 수비 분석',defender:'🛡️ 수비수 분석',ballmap:'🗺️ 타구 분석',scouting:'📋 상대 공략',scoutreport:'📊 선수 평가',gamereport:'📰 경기후 리포트',pfpmanager:'👤 프로필 사진 관리',records:'📚 기록실'})[name]||name;
+  const pageTitle=({home:'🏠 홈',pitcher:'⚾ 투수 분석',batter:'🏏 타자 분석',cards:'🃏 선수 카드',leaderboard:'🏅 리더보드',team:'🏆 팀 분석',compare:'⚖️ 선수 비교',highlights:'🎬 하이라이트',awards:'🏆 어워드',matchup:'🎮 매치업',h2h:'🆚 상대전적',insights:'📈 인사이트',myteam:'⚔️ 내 팀 빌더',pitchtype:'🎯 구종 분석',defense:'🛡️ 수비 분석',defender:'🛡️ 수비수 분석',ballmap:'🗺️ 타구 분석',scouting:'📋 상대 공략',scoutreport:'📊 선수 평가',gamereport:'📰 경기후 리포트',pfpmanager:'👤 프로필 사진 관리',records:'📚 기록실'})[name]||name;
   const mobileLogoEl=document.querySelector('#mobile-topbar .mobile-logo');
   if(mobileLogoEl)mobileLogoEl.textContent=pageTitle;
   // 모바일 하단 탭바 active 상태
@@ -3543,7 +3575,7 @@ function showPage(name,_internal){
   // 드롭다운 그룹 활성 표시
   const groupMap={
     leaderboard:'ranking',awards:'ranking',insights:'ranking',
-    compare:'tools',matchup:'tools',highlights:'tools',myteam:'tools',pitchtype:'tools',scouting:'tools',ballmap:'tools'
+    compare:'tools',matchup:'tools',h2h:'tools',highlights:'tools',myteam:'tools',pitchtype:'tools',scouting:'tools',ballmap:'tools'
   };
   document.querySelectorAll('.nav-dropdown').forEach(d=>{
     const grp=d.querySelector('[data-group]')?.dataset.group;
@@ -3571,6 +3603,7 @@ function showPage(name,_internal){
     else if(name==='highlights') renderHighlightsPage();
     else if(name==='awards') renderAwardsPage();
     else if(name==='matchup') renderMatchupPage();
+    else if(name==='h2h') renderH2HPage();
     else if(name==='insights') renderInsightsPage();
     else if(name==='myteam') renderMyTeamPage();
     else if(name==='pitchtype') renderPitchTypePage();
@@ -14213,6 +14246,315 @@ function renderMatchupPage(){
 }
 
 /* ══════════════════════════════════════
+   🆚 상대전적 (Head-to-Head) — V11.6
+   ├─ 타자 기준: 상대한 모든 투수별 성적 (또는 특정 투수)
+   ├─ 투수 기준: 상대한 모든 타자별 피성적 (또는 특정 타자)
+   ├─ 슬래시라인 (타율/출루/장타/OPS) + K/BB/HR/EV
+   ├─ 전 열 정렬 · 최소 타석 필터 · 손잡이 필터
+   └─ 행 클릭 → 투구별 상세 + 구종/구속/코스 스플릿 모달
+══════════════════════════════════════ */
+let _h2hMode='batter';  // 'batter' = 타자 기준, 'pitcher' = 투수 기준
+function setH2HMode(m){
+  _h2hMode=m;
+  document.querySelectorAll('.h2h-mode-btn').forEach(b=>b.classList.toggle('active',b.dataset.mode===m));
+  const lbl=document.getElementById('h2h-sel-label');
+  const handSel=document.getElementById('h2h-hand');
+  if(lbl) lbl.textContent = m==='batter' ? '🏏 타자' : '⚾ 투수';
+  // 손잡이 필터 라벨: 타자기준=상대 투수손, 투수기준=상대 타자손
+  if(handSel){
+    handSel.options[1].text = m==='batter' ? '우투' : '우타';
+    handSel.options[2].text = m==='batter' ? '좌투' : '좌타';
+  }
+  // 선택값 초기화 (모드 바뀌면 이름 목록이 바뀌므로)
+  const psel=document.getElementById('h2h-player');
+  if(psel) psel.value='';
+  renderH2HPage();
+}
+
+// 한 매치업(이미 필터된 투구 배열)의 슬래시라인 계산 — 기존 카드와 동일 정의
+function _h2hSlash(arr){
+  if(!arr||!arr.length) return null;
+  // 삽입 순서가 이미 경기·시간순 — 타석 종료 = (경기/이닝/half/타자) 조합이 바뀌는 지점
+  // _countPaEnd는 경기 경계를 안 보므로 H2H 전용으로 _gameId까지 포함해 판정
+  const paEnd=[];
+  for(let i=0;i<arr.length;i++){
+    const cur=arr[i], nx=arr[i+1]; const res=+cur.result;
+    if(!nx || (res>=4&&res<=6) || cur._gameId!==nx._gameId || cur.inn!==nx.inn || cur.half!==nx.half || cur.bName!==nx.bName){
+      paEnd.push(cur);
+    }
+  }
+  const PA=paEnd.length;
+  const BB=arr.filter(d=>+d.result===5).length;
+  const HBP=arr.filter(d=>+d.result===6).length;
+  const AB=paEnd.filter(d=>+d.result!==5&&+d.result!==6).length;
+  const hits=arr.filter(d=>_isHit(d)).length;
+  const hrs=arr.filter(d=>+d.result===4).length;
+  const h2B=arr.filter(d=>(+d._hitBase||0)===2).length;
+  const h3B=arr.filter(d=>(+d._hitBase||0)===3).length;
+  const h1B=Math.max(0,hits-hrs-h2B-h3B);
+  const tb=_totalBases(arr);
+  // 삼진: 2스트라이크에서 헛스윙(call=4)이나 루킹(call=0)으로 타석 종료
+  const K=paEnd.filter(d=>+d.strk===2&&(+d.call===0||+d.call===4)&&!_isHit(d)&&+d.result!==5&&+d.result!==6).length;
+  const inPlay=arr.filter(_isInPlay);
+  const evs=inPlay.filter(d=>+d.ev>0).map(d=>+d.ev);
+  const avgEV=evs.length?evs.reduce((a,b)=>a+b,0)/evs.length:0;
+  const maxEV=evs.length?Math.max(...evs):0;
+  const swings=arr.filter(_isSwing).length;
+  const whiffs=arr.filter(_isWhiff).length;
+  const ba=AB>0?hits/AB:0;
+  const obp=PA>0?(hits+BB+HBP)/PA:0;
+  const slg=AB>0?tb/AB:0;
+  return {PA,AB,hits,h1B,h2B,h3B,hrs,BB,HBP,K,tb,avgEV,maxEV,swings,whiffs,
+    ba,obp,slg,ops:obp+slg,
+    whiffPct:swings?whiffs/swings*100:0,
+    kPct:PA?K/PA*100:0, bbPct:PA?BB/PA*100:0,
+    pitches:arr.length};
+}
+
+function renderH2HPage(){
+  const el=document.getElementById('h2h-content');
+  const psel=document.getElementById('h2h-player');
+  if(!el||!psel) return;
+  const mode=_h2hMode;
+  const isBat = mode==='batter';
+
+  // 셀렉트 목록 채우기 (내 시점 선수 = 기준 선수)
+  const selfNames=((isBat?window._cache.batterNames:window._cache.pitcherNames)||[]).slice().sort((a,b)=>a.localeCompare(b));
+  const prev=psel.value;
+  psel.innerHTML='<option value="">— 전체 (상대전적 요약) —</option>'+selfNames.map(n=>`<option value="${_esc(n)}">${_esc(n)}</option>`).join('');
+  if(prev&&selfNames.includes(prev)) psel.value=prev;
+
+  const self=psel.value;
+  const minPA=parseInt(document.getElementById('h2h-minpa').value)||1;
+  const handF=(document.getElementById('h2h-hand').value)||'';
+
+  if(!self){ _renderH2HAll(el,isBat,minPA,handF); return; }
+  _renderH2HSingle(el,isBat,self,minPA,handF);
+}
+
+// HTML 이스케이프 (이름에 특수문자 대비)
+function _esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+// onclick 인라인 JS 문자열용 이스케이프 (작은따옴표 안에 넣을 값)
+function _jsStr(s){return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;').replace(/</g,'\\x3c');}
+
+// ── 특정 선수 하나: 상대한 모든 상대별 전적 표 ──
+function _renderH2HSingle(el,isBat,self,minPA,handF){
+  const fmt3 = v => (v==null||isNaN(v))?'-':('.'+(v*1000).toFixed(0).padStart(3,'0'));
+  const all = isBat ? getBatterDataByName(self) : getPitcherDataByName(self);
+  // 상대 손잡이 필터 (타자기준=상대투수 pHand / 투수기준=상대타자 bHand)
+  const handKey = isBat ? 'pHand' : 'bHand';
+  let base = handF ? all.filter(d=>String(d[handKey]).toUpperCase()===handF) : all;
+  // 상대 이름 키
+  const oppKey = isBat ? 'pName' : 'bName';
+  const groups={};
+  base.forEach(d=>{
+    const raw=d[oppKey]; if(raw==null||raw==='') return;
+    const opp=_canonPlayer(raw);  // 닉변 병합 (캐시 키와 일치시켜야 상세 조회 가능)
+    (groups[opp]=groups[opp]||[]).push(d);
+  });
+  const rows=[];
+  Object.entries(groups).forEach(([opp,arr])=>{
+    const s=_h2hSlash(arr); if(!s) return;
+    if(s.PA<minPA) return;
+    rows.push({opp,...s});
+  });
+  rows.sort((a,b)=>b.PA-a.PA);
+
+  const total=_h2hSlash(base);
+  const oppLabel = isBat ? '상대 투수' : '상대 타자';
+  const evLabel = isBat ? '평균EV' : '피평균EV';
+  const kLabel = isBat ? '삼진' : 'K';
+
+  let html='';
+  // 요약 헤더
+  html+=`<div class="card section" style="border-left:4px solid ${isBat?'#6bb5ff':'#ff6b6b'}">
+    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:10px">
+      <div style="font-size:22px;font-weight:800;color:${isBat?'#6bb5ff':'#ff6b6b'}">${isBat?'🏏':'⚾'} ${_esc(self)}</div>
+      <div style="font-size:12px;color:var(--muted)">${_playerTeam(self,isBat?'batter':'pitcher')||''}</div>
+      <div style="font-size:12px;color:var(--muted)">· 상대한 ${oppLabel} <b style="color:var(--text)">${rows.length}명</b> (${minPA}타석+${handF?` · ${handF==='R'?'우':'좌'}${isBat?'투':'타'}만`:''})</div>
+    </div>`;
+  if(total){
+    const cells=[
+      ['타석',total.PA],['타수',total.AB],['안타',total.hits],
+      ['타율',fmt3(total.ba)],['출루',fmt3(total.obp)],['장타',fmt3(total.slg)],
+      ['OPS',fmt3(total.ops)],['홈런',total.hrs],[kLabel,total.K],['볼넷',total.BB]
+    ];
+    html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(72px,1fr));gap:6px">';
+    cells.forEach(([l,v])=>{
+      html+=`<div style="background:var(--card2);border-radius:6px;padding:8px 6px;text-align:center">
+        <div style="font-size:10px;color:var(--muted)">${l}</div>
+        <div style="font-family:var(--mono);font-size:16px;font-weight:700">${v}</div></div>`;
+    });
+    html+='</div>';
+  }
+  html+='</div>';
+
+  if(!rows.length){
+    html+=`<div class="card section" style="padding:30px;text-align:center;color:var(--muted)">조건에 맞는 상대전적이 없습니다. (최소 타석/손잡이 필터를 낮춰보세요)</div>`;
+    el.innerHTML=html; return;
+  }
+
+  // 상대별 표
+  html+=`<div class="card section"><div class="card-title">📋 ${oppLabel}별 전적 <span style="font-size:10px;color:var(--muted);font-weight:400">(행 클릭 → 투구별 상세)</span></div>
+    <div class="tbl-wrap"><table class="data-table"><thead><tr>
+      <th>#</th>${_sortTh(oppLabel)}${_sortTh('타석')}${_sortTh('타수')}${_sortTh('안타')}${_sortTh('2B')}${_sortTh('3B')}${_sortTh('HR')}${_sortTh(kLabel)}${_sortTh('BB')}${_sortTh('타율')}${_sortTh('출루')}${_sortTh('장타')}${_sortTh('OPS')}${_sortTh('헛%')}${_sortTh(evLabel)}
+    </tr></thead><tbody>`;
+  rows.forEach((r,i)=>{
+    const baCol=r.ba>=0.400?'#39ff8a':r.ba>=0.300?'#a8e063':r.ba<=0.200?'#ff4560':'var(--text)';
+    const opsCol=r.ops>=1.000?'#39ff8a':r.ops>=0.800?'#a8e063':r.ops<=0.600?'#ff4560':'var(--text)';
+    html+=`<tr style="cursor:pointer" onclick="showH2HDetail('${isBat?'batter':'pitcher'}','${_jsStr(self)}','${_jsStr(r.opp)}','${handF}')">
+      <td data-rank>${i+1}</td>
+      <td style="font-weight:600">${_esc(r.opp)}</td>
+      <td style="font-family:var(--mono)">${r.PA}</td>
+      <td style="font-family:var(--mono)">${r.AB}</td>
+      <td style="font-family:var(--mono)">${r.hits}</td>
+      <td style="font-family:var(--mono)">${r.h2B}</td>
+      <td style="font-family:var(--mono)">${r.h3B}</td>
+      <td style="font-family:var(--mono);color:${r.hrs>0?'#ff4560':'var(--muted)'}">${r.hrs}</td>
+      <td style="font-family:var(--mono)">${r.K}</td>
+      <td style="font-family:var(--mono)">${r.BB}</td>
+      <td style="font-family:var(--mono);font-weight:700;color:${baCol}">${fmt3(r.ba)}</td>
+      <td style="font-family:var(--mono)">${fmt3(r.obp)}</td>
+      <td style="font-family:var(--mono)">${fmt3(r.slg)}</td>
+      <td style="font-family:var(--mono);font-weight:700;color:${opsCol}">${fmt3(r.ops)}</td>
+      <td style="font-family:var(--mono)">${r.whiffPct.toFixed(0)}%</td>
+      <td style="font-family:var(--mono)">${r.avgEV?r.avgEV.toFixed(1):'-'}</td>
+    </tr>`;
+  });
+  html+='</tbody></table></div></div>';
+  html+=`<div style="font-size:10px;color:var(--muted);text-align:center;padding:6px">※ 안타 정의는 기록실과 동일(낫아웃·야수선택 제외) · 삼진=2S 헛스윙/루킹으로 타석종료 · 활성 경기만 반영</div>`;
+  el.innerHTML=html;
+}
+
+// ── 전체: 모든 기준선수 요약 (선수 미선택 시) ──
+function _renderH2HAll(el,isBat,minPA,handF){
+  const fmt3 = v => (v==null||isNaN(v))?'-':('.'+(v*1000).toFixed(0).padStart(3,'0'));
+  const selfNames=((isBat?window._cache.batterNames:window._cache.pitcherNames)||[]).slice();
+  const handKey = isBat ? 'pHand' : 'bHand';
+  const oppKey = isBat ? 'pName' : 'bName';
+  const rows=[];
+  selfNames.forEach(self=>{
+    const all=isBat?getBatterDataByName(self):getPitcherDataByName(self);
+    const base=handF?all.filter(d=>String(d[handKey]).toUpperCase()===handF):all;
+    const s=_h2hSlash(base); if(!s||s.PA<minPA) return;
+    // 상대 수
+    const opps=new Set(); base.forEach(d=>{if(d[oppKey])opps.add(_canonPlayer(d[oppKey]));});
+    rows.push({self,oppN:opps.size,...s});
+  });
+  rows.sort((a,b)=>b.ops-a.ops);
+
+  const selfLabel=isBat?'타자':'투수';
+  const oppLabel=isBat?'상대투수수':'상대타자수';
+  const evLabel=isBat?'평균EV':'피평균EV';
+  const kLabel=isBat?'삼진':'K';
+
+  let html=`<div class="card section" style="padding:14px 16px">
+    <div style="font-size:15px;font-weight:700;margin-bottom:4px">🆚 상대전적 — 전체 ${selfLabel} 요약</div>
+    <div style="font-size:12px;color:var(--muted)">위에서 ${selfLabel}를 고르면 그 선수의 <b>상대별 세부 전적표</b>가 뜹니다. 아래는 전체 ${selfLabel}를 OPS 순으로 정렬한 표 (행 클릭 → 그 선수 선택).</div>
+  </div>`;
+  if(!rows.length){ el.innerHTML=html+`<div class="card section" style="padding:30px;text-align:center;color:var(--muted)">조건에 맞는 데이터가 없습니다.</div>`; return; }
+  html+=`<div class="card section"><div class="card-title">📋 전체 ${selfLabel} (${rows.length}명)</div>
+    <div class="tbl-wrap"><table class="data-table"><thead><tr>
+      <th>#</th>${_sortTh(selfLabel)}${_sortTh(oppLabel)}${_sortTh('타석')}${_sortTh('타수')}${_sortTh('안타')}${_sortTh('HR')}${_sortTh(kLabel)}${_sortTh('BB')}${_sortTh('타율')}${_sortTh('출루')}${_sortTh('장타')}${_sortTh('OPS')}${_sortTh(evLabel)}
+    </tr></thead><tbody>`;
+  rows.forEach((r,i)=>{
+    const baCol=r.ba>=0.400?'#39ff8a':r.ba>=0.300?'#a8e063':r.ba<=0.200?'#ff4560':'var(--text)';
+    const opsCol=r.ops>=1.000?'#39ff8a':r.ops>=0.800?'#a8e063':r.ops<=0.600?'#ff4560':'var(--text)';
+    html+=`<tr style="cursor:pointer" onclick="_h2hPick('${_jsStr(r.self)}')">
+      <td data-rank>${i+1}</td>
+      <td style="font-weight:600">${_esc(r.self)}</td>
+      <td style="font-family:var(--mono)">${r.oppN}</td>
+      <td style="font-family:var(--mono)">${r.PA}</td>
+      <td style="font-family:var(--mono)">${r.AB}</td>
+      <td style="font-family:var(--mono)">${r.hits}</td>
+      <td style="font-family:var(--mono);color:${r.hrs>0?'#ff4560':'var(--muted)'}">${r.hrs}</td>
+      <td style="font-family:var(--mono)">${r.K}</td>
+      <td style="font-family:var(--mono)">${r.BB}</td>
+      <td style="font-family:var(--mono);font-weight:700;color:${baCol}">${fmt3(r.ba)}</td>
+      <td style="font-family:var(--mono)">${fmt3(r.obp)}</td>
+      <td style="font-family:var(--mono)">${fmt3(r.slg)}</td>
+      <td style="font-family:var(--mono);font-weight:700;color:${opsCol}">${fmt3(r.ops)}</td>
+      <td style="font-family:var(--mono)">${r.avgEV?r.avgEV.toFixed(1):'-'}</td>
+    </tr>`;
+  });
+  html+='</tbody></table></div></div>';
+  html+=`<div style="font-size:10px;color:var(--muted);text-align:center;padding:6px">※ ${isBat?'투수':'타자'} 상대 통합 성적 · 안타 정의는 기록실과 동일 · 활성 경기만 반영</div>`;
+  el.innerHTML=html;
+}
+function _h2hPick(name){
+  const psel=document.getElementById('h2h-player');
+  if(psel){ psel.value=name; renderH2HPage(); const c=document.getElementById('h2h-content'); if(c)c.scrollIntoView({behavior:'smooth',block:'start'}); }
+}
+
+// ── 투구별 상세 모달 ──
+function showH2HDetail(mode,self,opp,handF){
+  const isBat = mode==='batter';
+  const all = isBat ? getBatterDataByName(self) : getPitcherDataByName(self);
+  const oppKey = isBat ? 'pName' : 'bName';
+  let arr = all.filter(d=>_canonPlayer(d[oppKey])===String(opp));
+  if(handF){ const hk=isBat?'pHand':'bHand'; arr=arr.filter(d=>String(d[hk]).toUpperCase()===handF); }
+  const fmt3 = v => (v==null||isNaN(v))?'-':('.'+(v*1000).toFixed(0).padStart(3,'0'));
+  const s=_h2hSlash(arr);
+  const pName = isBat?opp:self;   // 투수 이름
+  const bName = isBat?self:opp;   // 타자 이름
+
+  let html=`<div style="max-width:640px;margin:0 auto">
+    <div style="font-size:18px;font-weight:800;margin-bottom:2px">🆚 ${_esc(bName)} <span style="color:var(--muted);font-weight:400">vs</span> ${_esc(pName)}</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:12px">${isBat?'🏏 타자':'⚾ 투수'} 시점 · ${arr.length}투구${handF?` · ${handF==='R'?'우':'좌'}${isBat?'투':'타'}만`:''}</div>`;
+
+  if(s){
+    const cells=[['타석',s.PA],['타수',s.AB],['안타',s.hits],['홈런',s.hrs],
+      ['타율',fmt3(s.ba)],['출루',fmt3(s.obp)],['장타',fmt3(s.slg)],['OPS',fmt3(s.ops)],
+      ['삼진',s.K],['볼넷',s.BB],['헛스윙%',s.whiffPct.toFixed(0)+'%'],['평균EV',s.avgEV?s.avgEV.toFixed(1):'-']];
+    html+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:14px">';
+    cells.forEach(([l,v])=>{
+      html+=`<div style="background:var(--card2);border-radius:6px;padding:8px 4px;text-align:center">
+        <div style="font-size:9px;color:var(--muted)">${l}</div>
+        <div style="font-family:var(--mono);font-size:15px;font-weight:700">${v}</div></div>`;
+    });
+    html+='</div>';
+
+    // 구종별 스플릿
+    const byG={};
+    arr.forEach(d=>{const g=pitchGroup(d.pType,d);(byG[g]=byG[g]||[]).push(d);});
+    const grows=Object.entries(byG).map(([g,ga])=>{const gs=_h2hSlash(ga);return {g,gs,n:ga.length};}).filter(x=>x.gs).sort((a,b)=>b.n-a.n);
+    if(grows.length){
+      html+=`<div style="font-size:12px;font-weight:700;margin:10px 0 4px">구종별 대응</div>
+        <div class="tbl-wrap"><table class="data-table" style="font-size:11px"><thead><tr><th>구종</th><th>투구</th><th>타수</th><th>안타</th><th>HR</th><th>타율</th><th>장타</th><th>헛%</th><th>EV</th></tr></thead><tbody>`;
+      grows.forEach(({g,gs,n})=>{
+        html+=`<tr><td style="color:${GROUP_COLORS[g]||'#888'};font-weight:600">${g}</td>
+          <td style="font-family:var(--mono)">${n}</td><td style="font-family:var(--mono)">${gs.AB}</td>
+          <td style="font-family:var(--mono)">${gs.hits}</td><td style="font-family:var(--mono)">${gs.hrs}</td>
+          <td style="font-family:var(--mono);font-weight:700">${fmt3(gs.ba)}</td>
+          <td style="font-family:var(--mono)">${fmt3(gs.slg)}</td>
+          <td style="font-family:var(--mono)">${gs.whiffPct.toFixed(0)}%</td>
+          <td style="font-family:var(--mono)">${gs.avgEV?gs.avgEV.toFixed(1):'-'}</td></tr>`;
+      });
+      html+='</tbody></table></div>';
+    }
+  }
+
+  // 투구별 (최근순 = 삽입 역순, 최대 40)
+  const srt=arr.slice().reverse();
+  html+=`<div style="font-size:12px;font-weight:700;margin:12px 0 4px">투구 기록 <span style="font-size:10px;color:var(--muted);font-weight:400">(최근 ${Math.min(40,srt.length)}개)</span></div>
+    <div class="tbl-wrap" style="max-height:300px;overflow-y:auto"><table class="data-table" style="font-size:11px"><thead><tr><th>이닝</th><th>카운트</th><th>구종</th><th>구속</th><th>결과</th><th>EV</th></tr></thead><tbody>`;
+  srt.slice(0,40).forEach(d=>{
+    const pg=pitchGroup(d.pType,d);
+    const res=RESULT_NAMES[+d.result]||CALL_NAMES[+d.call]||'-';
+    const resCol = +d.result===4?'#ff4560':_isHit(d)?'#39ff8a':_isWhiff(d)?'#ff8800':'var(--text)';
+    html+=`<tr>
+      <td>${d.inn}${d.half===1?'초':'말'}</td>
+      <td style="font-family:var(--mono)">${d.ball||0}-${d.strk||0}</td>
+      <td style="color:${GROUP_COLORS[pg]||'#888'}">${(PITCH_NAMES&&PITCH_NAMES[d.pType])||d.pType}</td>
+      <td style="font-family:var(--mono)">${d.spdK||'-'}</td>
+      <td style="color:${resCol}">${res}</td>
+      <td style="font-family:var(--mono)">${+d.ev>0?d.ev:'-'}</td></tr>`;
+  });
+  html+='</tbody></table></div></div>';
+  openModal(html);
+}
+
+/* ══════════════════════════════════════
    V7.1 — UX 대개편
    ├─ 테마 시스템
    ├─ 즐겨찾기 (별 아이콘)
@@ -14294,6 +14636,19 @@ function openThemeModal(){
 //   - 버저닝: V9.x (소수점) → 누적되면 V10
 //   - title은 한 줄 핵심 요약, changes는 항목별 (icon + text)
 const CHANGELOG = [
+  {
+    version: 'V11.6',
+    date: '2026-09',
+    title: '🆚 상대전적(Head-to-Head) 페이지 신규',
+    badge: '#ffd700',
+    changes: [
+      {icon:'🆚', text:'⭐⭐⭐ <b>「상대전적」 페이지 신규 (도구 메뉴)</b> — 기존 매치업 페이지는 <b>승부 예측 시뮬</b>이 메인이라 실제 맞대결 기록은 안타 개수만 보조로 나왔고, <b>투수를 한 명씩 골라야</b>만 볼 수 있었음. → 제대로 된 상대전적 전용 뷰를 신규 추가. <b>기준 토글(🏏 타자 기준 / ⚾ 투수 기준)</b>로 양방향 모두 지원.'},
+      {icon:'📋', text:'⭐⭐ <b>선수 하나 선택 → 상대별 세부 전적표</b> — 예: 타자를 고르면 <b>상대한 모든 투수별 성적</b>이 표로 (반대로 투수를 고르면 상대한 모든 타자별 피성적). 각 행에 <b>타석·타수·안타·2B·3B·HR·삼진·볼넷 + 타율/출루/장타/OPS + 헛스윙%·EV</b>. 상단엔 그 선수의 <b>통합 상대전적 요약 카드</b>. 전 열 클릭 정렬, <b>최소 타석·손잡이(우/좌)</b> 필터.'},
+      {icon:'🖱️', text:'⭐⭐ <b>행 클릭 → 투구별 상세 모달</b> — 특정 매치업(타자 vs 투수) 행을 누르면 <b>슬래시라인 12지표 카드 + 구종별 대응 표 + 투구 기록(최근 40투구: 이닝·카운트·구종·구속·결과·EV)</b>이 팝업.'},
+      {icon:'📊', text:'⭐ <b>선수 미선택 시 전체 요약표</b> — 아무도 안 고르면 전체 타자(또는 투수)를 <b>OPS 순 정렬표</b>로 쭉 표시. 행을 누르면 그 선수의 세부 전적으로 이동. "전체를 쭉 보다가 궁금한 선수만 파고들기" 흐름.'},
+      {icon:'🎯', text:'정확도 — 안타 정의는 <b>기록실과 동일</b>(낫아웃 출루·야수선택 제외), 타석 종료 판정에 <b>경기 경계(_gameId)</b>까지 반영, SLG는 <b>_hitBase 추정 루타수</b> 기반(2·3루타 반영), 닉네임 변경 선수는 <b>_canonPlayer로 병합</b>해 한 행으로 집계.'},
+    ]
+  },
   {
     version: 'V11.5',
     date: '2026-09',
