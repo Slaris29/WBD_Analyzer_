@@ -792,6 +792,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
       <button class="stab" onclick="switchStab('pitcher',4)">E. 제구 정밀도</button>
       <button class="stab" onclick="switchStab('pitcher',5)">F. 경기별 성적</button>
       <button class="stab" onclick="switchStab('pitcher',6)">G. 🌟 잠재 구속</button>
+      <button class="stab" onclick="switchStab('pitcher',7)">H. 🆚 상대전적</button>
     </div>
     <!-- A -->
     <div class="spanel active" id="ps-0">
@@ -955,6 +956,10 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
     <div class="spanel" id="ps-6">
       <div id="p-potential-velocity"></div>
     </div>
+    <!-- H: 상대전적 -->
+    <div class="spanel" id="ps-7">
+      <div id="p-h2h"></div>
+    </div>
   </div>
 
   <!-- BATTER PAGE -->
@@ -978,6 +983,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
       <button class="stab" onclick="switchStab('batter',3)">D. 타격 로그</button>
       <button class="stab" onclick="switchStab('batter',4)">E. 존 분석</button>
       <button class="stab" onclick="switchStab('batter',5)">F. 경기별 성적</button>
+      <button class="stab" onclick="switchStab('batter',6)">G. 🆚 상대전적</button>
     </div>
     <!-- A -->
     <div class="spanel active" id="bs-0">
@@ -1196,6 +1202,10 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
         <div class="card-title">📅 경기별 성적</div>
         <div id="b-game-by-game"></div>
       </div>
+    </div>
+    <!-- G. 상대전적 -->
+    <div class="spanel" id="bs-6">
+      <div id="b-h2h"></div>
     </div>
   </div>
 
@@ -1475,18 +1485,21 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
     <div class="stab-row" style="display:inline-flex;gap:4px">
       <button class="h2h-mode-btn active" data-mode="batter" onclick="setH2HMode('batter')">🏏 타자 기준</button>
       <button class="h2h-mode-btn" data-mode="pitcher" onclick="setH2HMode('pitcher')">⚾ 투수 기준</button>
+      <button class="h2h-mode-btn" data-mode="duo" onclick="setH2HMode('duo')">🔍 1:1 상세</button>
     </div>
     <span class="filter-label" id="h2h-sel-label">🏏 타자</span>
     <select id="h2h-player" onchange="renderH2HPage()"></select>
-    <span class="filter-label">최소 타석</span>
-    <select id="h2h-minpa" onchange="renderH2HPage()">
+    <span class="filter-label" id="h2h-sel2-label" style="display:none">⚾ 투수</span>
+    <select id="h2h-player2" onchange="renderH2HPage()" style="display:none"></select>
+    <span class="filter-label h2h-list-only">최소 타석</span>
+    <select id="h2h-minpa" class="h2h-list-only" onchange="renderH2HPage()">
       <option value="1">1+</option>
       <option value="3" selected>3+</option>
       <option value="5">5+</option>
       <option value="10">10+</option>
     </select>
-    <span class="filter-label">손잡이</span>
-    <select id="h2h-hand" onchange="renderH2HPage()">
+    <span class="filter-label h2h-list-only">손잡이</span>
+    <select id="h2h-hand" class="h2h-list-only" onchange="renderH2HPage()">
       <option value="">전체</option>
       <option value="R">우</option>
       <option value="L">좌</option>
@@ -3662,6 +3675,7 @@ function renderPitcherSubTab(idx){
   else if(idx===4){renderPrecisionPitchToggles();renderPitcherPrecisionSummary();renderPitcherPrecisionPitchTable();renderPitcherPrecisionFilter();renderPitcherPrecisionMap();renderPitcherCountStrategy();renderPitcherSequenceTable();renderPitcherLRSplit();renderPitcherFatigue();}
   else if(idx===5){renderPitcherGameByGame();}
   else if(idx===6){renderPotentialVelocity();}
+  else if(idx===7){renderEmbeddedH2H('p-h2h','pitcher');}
 }
 
 function renderBatterSubTab(idx){
@@ -3671,6 +3685,7 @@ function renderBatterSubTab(idx){
   else if(idx===3){batterLogPage=0;renderBatterLog();}
   else if(idx===4){renderBatterZoneSummary();renderBatterZoneMap();renderBatterZonePitchFilter();renderBatterZonePitchTable();renderBatterCountCategory();}
   else if(idx===5){renderBatterGameByGame();}
+  else if(idx===6){renderEmbeddedH2H('b-h2h','batter');}
 }
 
 /* ══════════════════════════════════════
@@ -14257,10 +14272,17 @@ let _h2hMode='batter';  // 'batter' = 타자 기준, 'pitcher' = 투수 기준
 function setH2HMode(m){
   _h2hMode=m;
   document.querySelectorAll('.h2h-mode-btn').forEach(b=>b.classList.toggle('active',b.dataset.mode===m));
+  const isDuo = m==='duo';
   const lbl=document.getElementById('h2h-sel-label');
   const handSel=document.getElementById('h2h-hand');
-  if(lbl) lbl.textContent = m==='batter' ? '🏏 타자' : '⚾ 투수';
-  // 손잡이 필터 라벨: 타자기준=상대 투수손, 투수기준=상대 타자손
+  const sel2=document.getElementById('h2h-player2');
+  const lbl2=document.getElementById('h2h-sel2-label');
+  // 1:1 상세: 타자+투수 둘 다 선택 / 그 외: 기준선수 하나
+  if(lbl) lbl.textContent = isDuo ? '🏏 타자' : (m==='batter' ? '🏏 타자' : '⚾ 투수');
+  if(sel2) sel2.style.display = isDuo ? '' : 'none';
+  if(lbl2) lbl2.style.display = isDuo ? '' : 'none';
+  // list 전용 필터(최소타석·손잡이)는 duo에서 숨김
+  document.querySelectorAll('#page-h2h .h2h-list-only').forEach(e=>{ e.style.display = isDuo ? 'none' : ''; });
   if(handSel){
     handSel.options[1].text = m==='batter' ? '우투' : '우타';
     handSel.options[2].text = m==='batter' ? '좌투' : '좌타';
@@ -14268,6 +14290,7 @@ function setH2HMode(m){
   // 선택값 초기화 (모드 바뀌면 이름 목록이 바뀌므로)
   const psel=document.getElementById('h2h-player');
   if(psel) psel.value='';
+  if(sel2) sel2.value='';
   renderH2HPage();
 }
 
@@ -14316,8 +14339,24 @@ function renderH2HPage(){
   const psel=document.getElementById('h2h-player');
   if(!el||!psel) return;
   const mode=_h2hMode;
-  const isBat = mode==='batter';
 
+  // ── 1:1 상세 모드 ──
+  if(mode==='duo'){
+    const sel2=document.getElementById('h2h-player2');
+    const bNames=(window._cache.batterNames||[]).slice().sort((a,b)=>a.localeCompare(b));
+    const pNames=(window._cache.pitcherNames||[]).slice().sort((a,b)=>a.localeCompare(b));
+    const pb=psel.value, pp=sel2?sel2.value:'';
+    psel.innerHTML='<option value="">— 타자 선택 —</option>'+bNames.map(n=>`<option value="${_esc(n)}">${_esc(n)}</option>`).join('');
+    if(sel2) sel2.innerHTML='<option value="">— 투수 선택 —</option>'+pNames.map(n=>`<option value="${_esc(n)}">${_esc(n)}</option>`).join('');
+    if(pb&&bNames.includes(pb)) psel.value=pb;
+    if(sel2&&pp&&pNames.includes(pp)) sel2.value=pp;
+    const bat=psel.value, pit=sel2?sel2.value:'';
+    if(!bat||!pit){ el.innerHTML=`<div class="card section" style="padding:40px;text-align:center;color:var(--muted)">🏏 타자와 ⚾ 투수를 모두 선택하면 그 매치업의 상세 전적이 여기에 펼쳐집니다.</div>`; return; }
+    _renderH2HDuo(el, bat, pit);
+    return;
+  }
+
+  const isBat = mode==='batter';
   // 셀렉트 목록 채우기 (내 시점 선수 = 기준 선수)
   const selfNames=((isBat?window._cache.batterNames:window._cache.pitcherNames)||[]).slice().sort((a,b)=>a.localeCompare(b));
   const prev=psel.value;
@@ -14332,6 +14371,76 @@ function renderH2HPage(){
   _renderH2HSingle(el,isBat,self,minPA,handF);
 }
 
+// ── 1:1 상세: 타자 vs 투수 매치업 상세를 페이지에 인라인 렌더 (모달과 동일 정보, 더 크게) ──
+function _renderH2HDuo(el, bName, pName){
+  const fmt3 = v => (v==null||isNaN(v))?'-':(v>=1||v<=-1)?v.toFixed(3):(v<0?'-.':'.')+(Math.abs(v)*1000).toFixed(0).padStart(3,'0');
+  const all=getBatterDataByName(bName);
+  const arr=all.filter(d=>_canonPlayer(d.pName)===String(pName));
+  const bTeam=_playerTeam(bName,'batter')||'';
+  const pTeam=_playerTeam(pName,'pitcher')||'';
+  let html=`<div class="card section" style="border-left:4px solid #ffd700">
+    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+      <div style="text-align:center"><div style="font-size:20px;font-weight:800;color:#6bb5ff">🏏 ${_esc(bName)}</div><div style="font-size:11px;color:var(--muted)">${_esc(bTeam)}</div></div>
+      <div style="font-size:16px;color:var(--muted)">vs</div>
+      <div style="text-align:center"><div style="font-size:20px;font-weight:800;color:#ff6b6b">⚾ ${_esc(pName)}</div><div style="font-size:11px;color:var(--muted)">${_esc(pTeam)}</div></div>
+      <div style="flex:1"></div>
+      <div style="font-size:12px;color:var(--muted)">${arr.length}투구</div>
+    </div>
+  </div>`;
+  if(!arr.length){ el.innerHTML=html+`<div class="card section" style="padding:30px;text-align:center;color:var(--muted)">이 매치업의 실전 기록이 없습니다.</div>`; return; }
+  const s=_h2hSlash(arr);
+  if(s){
+    const cells=[['타석',s.PA],['타수',s.AB],['안타',s.hits],['1루타',s.h1B],['2루타',s.h2B],['3루타',s.h3B],['홈런',s.hrs],['삼진',s.K],
+      ['볼넷',s.BB],['타율',fmt3(s.ba)],['출루',fmt3(s.obp)],['장타',fmt3(s.slg)],['OPS',fmt3(s.ops)],['헛스윙%',s.whiffPct.toFixed(0)+'%'],['평균EV',s.avgEV?s.avgEV.toFixed(1):'-'],['최고EV',s.maxEV?s.maxEV.toFixed(0):'-']];
+    html+='<div class="card section"><div class="card-title">📊 종합 성적</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(80px,1fr));gap:8px">';
+    cells.forEach(([l,v])=>{ html+=`<div style="background:var(--card2);border-radius:6px;padding:10px 6px;text-align:center"><div style="font-size:10px;color:var(--muted)">${l}</div><div style="font-family:var(--mono);font-size:17px;font-weight:700">${v}</div></div>`; });
+    html+='</div></div>';
+  }
+  // 구종별 + 구속대별 스플릿 나란히
+  html+='<div class="grid2 section">';
+  // 구종별
+  const byG={}; arr.forEach(d=>{const g=pitchGroup(d.pType,d);(byG[g]=byG[g]||[]).push(d);});
+  const grows=Object.entries(byG).map(([g,ga])=>({g,gs:_h2hSlash(ga),n:ga.length})).filter(x=>x.gs).sort((a,b)=>b.n-a.n);
+  html+='<div class="card"><div class="card-title">구종별 대응</div>';
+  if(grows.length){
+    html+='<div class="tbl-wrap"><table class="data-table" style="font-size:11px"><thead><tr><th>구종</th><th>투구</th><th>타수</th><th>안타</th><th>HR</th><th>타율</th><th>장타</th><th>헛%</th><th>EV</th></tr></thead><tbody>';
+    grows.forEach(({g,gs,n})=>{ html+=`<tr><td style="color:${GROUP_COLORS[g]||'#888'};font-weight:600">${g}</td><td style="font-family:var(--mono)">${n}</td><td style="font-family:var(--mono)">${gs.AB}</td><td style="font-family:var(--mono)">${gs.hits}</td><td style="font-family:var(--mono)">${gs.hrs}</td><td style="font-family:var(--mono);font-weight:700">${fmt3(gs.ba)}</td><td style="font-family:var(--mono)">${fmt3(gs.slg)}</td><td style="font-family:var(--mono)">${gs.whiffPct.toFixed(0)}%</td><td style="font-family:var(--mono)">${gs.avgEV?gs.avgEV.toFixed(1):'-'}</td></tr>`; });
+    html+='</tbody></table></div>';
+  } else html+='<div style="padding:14px;color:var(--muted);font-size:12px">데이터 없음</div>';
+  html+='</div>';
+  // 구속대별 (5km)
+  const byS={}; arr.forEach(d=>{const sp=+d.spdK; if(!(sp>0))return; const b=Math.floor(sp/5)*5;(byS[b]=byS[b]||[]).push(d);});
+  const srows=Object.entries(byS).map(([b,sa])=>({b:+b,ss:_h2hSlash(sa),n:sa.length})).filter(x=>x.ss).sort((a,b)=>a.b-b.b);
+  html+='<div class="card"><div class="card-title">구속대별 대응 (5km)</div>';
+  if(srows.length){
+    html+='<div class="tbl-wrap"><table class="data-table" style="font-size:11px"><thead><tr><th>구속</th><th>투구</th><th>타수</th><th>안타</th><th>HR</th><th>타율</th><th>장타</th><th>헛%</th><th>EV</th></tr></thead><tbody>';
+    srows.forEach(({b,ss,n})=>{ html+=`<tr><td style="font-family:var(--mono);font-weight:600">${b}~${b+5}</td><td style="font-family:var(--mono)">${n}</td><td style="font-family:var(--mono)">${ss.AB}</td><td style="font-family:var(--mono)">${ss.hits}</td><td style="font-family:var(--mono)">${ss.hrs}</td><td style="font-family:var(--mono);font-weight:700">${fmt3(ss.ba)}</td><td style="font-family:var(--mono)">${fmt3(ss.slg)}</td><td style="font-family:var(--mono)">${ss.whiffPct.toFixed(0)}%</td><td style="font-family:var(--mono)">${ss.avgEV?ss.avgEV.toFixed(1):'-'}</td></tr>`; });
+    html+='</tbody></table></div>';
+  } else html+='<div style="padding:14px;color:var(--muted);font-size:12px">데이터 없음</div>';
+  html+='</div></div>';
+  // 카운트별 스플릿
+  const byC={}; arr.forEach(d=>{const c=`${+d.ball||0}-${+d.strk||0}`;(byC[c]=byC[c]||[]).push(d);});
+  const corder=['0-0','0-1','0-2','1-0','1-1','1-2','2-0','2-1','2-2','3-0','3-1','3-2'];
+  const crows=corder.filter(c=>byC[c]).map(c=>({c,cs:_h2hSlash(byC[c]),n:byC[c].length})).filter(x=>x.cs);
+  if(crows.length){
+    html+='<div class="card section"><div class="card-title">카운트별 대응</div><div class="tbl-wrap"><table class="data-table" style="font-size:11px"><thead><tr><th>카운트</th><th>투구</th><th>타수</th><th>안타</th><th>타율</th><th>장타</th><th>헛%</th><th>EV</th></tr></thead><tbody>';
+    crows.forEach(({c,cs,n})=>{ html+=`<tr><td style="font-family:var(--mono);font-weight:600">${c}</td><td style="font-family:var(--mono)">${n}</td><td style="font-family:var(--mono)">${cs.AB}</td><td style="font-family:var(--mono)">${cs.hits}</td><td style="font-family:var(--mono);font-weight:700">${fmt3(cs.ba)}</td><td style="font-family:var(--mono)">${fmt3(cs.slg)}</td><td style="font-family:var(--mono)">${cs.whiffPct.toFixed(0)}%</td><td style="font-family:var(--mono)">${cs.avgEV?cs.avgEV.toFixed(1):'-'}</td></tr>`; });
+    html+='</tbody></table></div></div>';
+  }
+  // 투구 기록 전체
+  const srt=arr.slice().reverse();
+  html+=`<div class="card section"><div class="card-title">투구 기록 <span style="font-size:10px;color:var(--muted);font-weight:400">(최근순 · ${srt.length}개)</span></div><div class="tbl-wrap" style="max-height:420px;overflow-y:auto"><table class="data-table" style="font-size:11px"><thead><tr><th>이닝</th><th>카운트</th><th>구종</th><th>구속</th><th>결과</th><th>EV</th><th>LA</th></tr></thead><tbody>`;
+  srt.forEach(d=>{
+    const pg=pitchGroup(d.pType,d);
+    const res=RESULT_NAMES[+d.result]||CALL_NAMES[+d.call]||'-';
+    const resCol=+d.result===4?'#ff4560':_isHit(d)?'#39ff8a':_isWhiff(d)?'#ff8800':'var(--text)';
+    html+=`<tr><td>${d.inn}${d.half===1?'초':'말'}</td><td style="font-family:var(--mono)">${d.ball||0}-${d.strk||0}</td><td style="color:${GROUP_COLORS[pg]||'#888'}">${(PITCH_NAMES&&PITCH_NAMES[d.pType])||d.pType}</td><td style="font-family:var(--mono)">${d.spdK||'-'}</td><td style="color:${resCol}">${res}</td><td style="font-family:var(--mono)">${+d.ev>0?d.ev:'-'}</td><td style="font-family:var(--mono)">${+d.ev>0&&d.ldeg!=null?(+d.ldeg).toFixed(0)+'°':'-'}</td></tr>`;
+  });
+  html+='</tbody></table></div></div>';
+  html+=`<div style="font-size:10px;color:var(--muted);text-align:center;padding:6px">※ 타자 시점 · 안타 정의는 기록실과 동일 · 활성 경기만 반영</div>`;
+  el.innerHTML=html;
+}
+
 // HTML 이스케이프 (이름에 특수문자 대비)
 function _esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 // onclick 인라인 JS 문자열용 이스케이프 (작은따옴표 안에 넣을 값)
@@ -14339,7 +14448,7 @@ function _jsStr(s){return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").re
 
 // ── 특정 선수 하나: 상대한 모든 상대별 전적 표 ──
 function _renderH2HSingle(el,isBat,self,minPA,handF){
-  const fmt3 = v => (v==null||isNaN(v))?'-':('.'+(v*1000).toFixed(0).padStart(3,'0'));
+  const fmt3 = v => (v==null||isNaN(v))?'-':(v>=1||v<=-1)?v.toFixed(3):(v<0?'-.':'.')+(Math.abs(v)*1000).toFixed(0).padStart(3,'0');
   const all = isBat ? getBatterDataByName(self) : getPitcherDataByName(self);
   // 상대 손잡이 필터 (타자기준=상대투수 pHand / 투수기준=상대타자 bHand)
   const handKey = isBat ? 'pHand' : 'bHand';
@@ -14428,7 +14537,7 @@ function _renderH2HSingle(el,isBat,self,minPA,handF){
 
 // ── 전체: 모든 기준선수 요약 (선수 미선택 시) ──
 function _renderH2HAll(el,isBat,minPA,handF){
-  const fmt3 = v => (v==null||isNaN(v))?'-':('.'+(v*1000).toFixed(0).padStart(3,'0'));
+  const fmt3 = v => (v==null||isNaN(v))?'-':(v>=1||v<=-1)?v.toFixed(3):(v<0?'-.':'.')+(Math.abs(v)*1000).toFixed(0).padStart(3,'0');
   const selfNames=((isBat?window._cache.batterNames:window._cache.pitcherNames)||[]).slice();
   const handKey = isBat ? 'pHand' : 'bHand';
   const oppKey = isBat ? 'pName' : 'bName';
@@ -14486,6 +14595,41 @@ function _h2hPick(name){
   if(psel){ psel.value=name; renderH2HPage(); const c=document.getElementById('h2h-content'); if(c)c.scrollIntoView({behavior:'smooth',block:'start'}); }
 }
 
+// ── 투수/타자 분석 페이지 탭에 임베드하는 상대전적 (현재 선택 선수 기준) ──
+const _embH2HState={}; // {containerId:{minPA,handF}}
+function renderEmbeddedH2H(containerId, mode){
+  const box=document.getElementById(containerId); if(!box) return;
+  const isBat = mode==='batter';
+  const self = isBat ? currentBatter : currentPitcher;
+  const st=_embH2HState[containerId]||(_embH2HState[containerId]={minPA:1,handF:''});
+  if(!self){ box.innerHTML=`<div class="card section" style="padding:30px;text-align:center;color:var(--muted)">${isBat?'타자':'투수'}를 선택하세요</div>`; return; }
+  // 필터 바 + 결과 컨테이너 (한 번만 구성, 이후엔 결과만 갱신)
+  const handOpts = isBat
+    ? '<option value="">전체 투수</option><option value="R">우투 상대</option><option value="L">좌투 상대</option>'
+    : '<option value="">전체 타자</option><option value="R">우타 상대</option><option value="L">좌타 상대</option>';
+  box.innerHTML=`<div class="filter-row" style="margin-bottom:12px;flex-wrap:wrap;gap:8px">
+      <span class="filter-label">최소 타석</span>
+      <select id="${containerId}-minpa" onchange="_embH2HUpd('${containerId}','${mode}')">
+        <option value="1">1+</option><option value="3">3+</option><option value="5">5+</option><option value="10">10+</option>
+      </select>
+      <span class="filter-label">손잡이</span>
+      <select id="${containerId}-hand" onchange="_embH2HUpd('${containerId}','${mode}')">${handOpts}</select>
+      <span style="font-size:11px;color:var(--muted)">· 현재 선택: <b style="color:var(--text)">${_esc(self)}</b></span>
+    </div>
+    <div id="${containerId}-body"></div>`;
+  const mp=document.getElementById(containerId+'-minpa'); if(mp) mp.value=String(st.minPA);
+  const hs=document.getElementById(containerId+'-hand'); if(hs) hs.value=st.handF;
+  _renderH2HSingle(document.getElementById(containerId+'-body'), isBat, self, st.minPA, st.handF);
+}
+function _embH2HUpd(containerId, mode){
+  const st=_embH2HState[containerId]||(_embH2HState[containerId]={minPA:1,handF:''});
+  const mp=document.getElementById(containerId+'-minpa'); const hs=document.getElementById(containerId+'-hand');
+  st.minPA=parseInt(mp&&mp.value)||1; st.handF=(hs&&hs.value)||'';
+  const isBat=mode==='batter';
+  const self=isBat?currentBatter:currentPitcher;
+  _renderH2HSingle(document.getElementById(containerId+'-body'), isBat, self, st.minPA, st.handF);
+}
+
 // ── 투구별 상세 모달 ──
 function showH2HDetail(mode,self,opp,handF){
   const isBat = mode==='batter';
@@ -14493,7 +14637,7 @@ function showH2HDetail(mode,self,opp,handF){
   const oppKey = isBat ? 'pName' : 'bName';
   let arr = all.filter(d=>_canonPlayer(d[oppKey])===String(opp));
   if(handF){ const hk=isBat?'pHand':'bHand'; arr=arr.filter(d=>String(d[hk]).toUpperCase()===handF); }
-  const fmt3 = v => (v==null||isNaN(v))?'-':('.'+(v*1000).toFixed(0).padStart(3,'0'));
+  const fmt3 = v => (v==null||isNaN(v))?'-':(v>=1||v<=-1)?v.toFixed(3):(v<0?'-.':'.')+(Math.abs(v)*1000).toFixed(0).padStart(3,'0');
   const s=_h2hSlash(arr);
   const pName = isBat?opp:self;   // 투수 이름
   const bName = isBat?self:opp;   // 타자 이름
@@ -14647,6 +14791,9 @@ const CHANGELOG = [
       {icon:'🖱️', text:'⭐⭐ <b>행 클릭 → 투구별 상세 모달</b> — 특정 매치업(타자 vs 투수) 행을 누르면 <b>슬래시라인 12지표 카드 + 구종별 대응 표 + 투구 기록(최근 40투구: 이닝·카운트·구종·구속·결과·EV)</b>이 팝업.'},
       {icon:'📊', text:'⭐ <b>선수 미선택 시 전체 요약표</b> — 아무도 안 고르면 전체 타자(또는 투수)를 <b>OPS 순 정렬표</b>로 쭉 표시. 행을 누르면 그 선수의 세부 전적으로 이동. "전체를 쭉 보다가 궁금한 선수만 파고들기" 흐름.'},
       {icon:'🎯', text:'정확도 — 안타 정의는 <b>기록실과 동일</b>(낫아웃 출루·야수선택 제외), 타석 종료 판정에 <b>경기 경계(_gameId)</b>까지 반영, SLG는 <b>_hitBase 추정 루타수</b> 기반(2·3루타 반영), 닉네임 변경 선수는 <b>_canonPlayer로 병합</b>해 한 행으로 집계.'},
+      {icon:'🗂️', text:'⭐⭐ <b>투수·타자 분석 페이지에 「상대전적」 탭 추가</b> — 투수 분석 <b>H. 🆚 상대전적</b>, 타자 분석 <b>G. 🆚 상대전적</b>. 현재 선택한 선수 기준으로 상대별 전적표가 바로 뜨고, 탭 안에서 <b>최소 타석·손잡이 필터</b> 조절 가능. 페이지를 옮기지 않고 그 선수 보던 흐름에서 바로 확인.'},
+      {icon:'🔍', text:'⭐⭐ <b>상대전적 페이지에 「1:1 상세」 모드 추가</b> — 타자 <b>+</b> 투수를 둘 다 직접 선택하면 그 매치업의 상세가 모달이 아니라 <b>페이지에 쫙 펼쳐짐</b>: 종합 성적 16지표 + <b>구종별·구속대별(5km)·카운트별 대응 표</b> + 전체 투구 기록(이닝·카운트·구종·구속·결과·EV·LA).'},
+      {icon:'ℹ️', text:'참고 — 개별 매치업은 표본(타석)이 적을 때가 많아 <b>타율·출루·장타가 모두 같은 값(예: 1타수 대비 안타 1개 → .333)</b>으로 보일 수 있음. 계산 오류가 아니라 표본이 작아 그런 것이며, 옆의 <b>타수·안타 개수</b>를 함께 보면 됨(최소 타석 필터로 표본 늘리기 권장).'},
     ]
   },
   {
@@ -17771,7 +17918,7 @@ function _scoutLeagueAvgs(){
 // ─── 자연어 조언 생성기 v3 (raw 데이터 기반, 깊이 있는 분석) ───
 function _scoutGeneratePitcherReport(data){
   if(!data) return {sections:[]};
-  const fmt3 = v => (v==null||isNaN(v))?'-':('.'+(v*1000).toFixed(0).padStart(3,'0'));
+  const fmt3 = v => (v==null||isNaN(v))?'-':(v>=1||v<=-1)?v.toFixed(3):(v<0?'-.':'.')+(Math.abs(v)*1000).toFixed(0).padStart(3,'0');
   const sections = [];
   const lg = _scoutLeagueAvgs();
   
@@ -18862,7 +19009,7 @@ function _scoutGeneratePitcherReport(data){
 
 function _scoutGenerateBatterReport(data){
   if(!data) return {sections:[]};
-  const fmt3 = v => (v==null||isNaN(v))?'-':('.'+(v*1000).toFixed(0).padStart(3,'0'));
+  const fmt3 = v => (v==null||isNaN(v))?'-':(v>=1||v<=-1)?v.toFixed(3):(v<0?'-.':'.')+(Math.abs(v)*1000).toFixed(0).padStart(3,'0');
   const sections = [];
   const lg = _scoutLeagueAvgs();
   
@@ -19374,7 +19521,7 @@ function _scoutGenerateBatterReport(data){
 // 타자 공략 + vsR = 우투 상대 공략
 
 function _scoutGenerateSplitReport(data, mode, split){
-  const fmt3 = v => (v==null||isNaN(v))?'-':('.'+(v*1000).toFixed(0).padStart(3,'0'));
+  const fmt3 = v => (v==null||isNaN(v))?'-':(v>=1||v<=-1)?v.toFixed(3):(v<0?'-.':'.')+(Math.abs(v)*1000).toFixed(0).padStart(3,'0');
   const lg = _scoutLeagueAvgs();
   
   // 스플릿 대상 필터
@@ -19635,7 +19782,7 @@ function _scoutGenerateSplitReport(data, mode, split){
 }
 
 function _scoutRenderSplitContent(data, splitReport, mode, split){
-  const fmt3 = v => (v==null||isNaN(v))?'-':('.'+(v*1000).toFixed(0).padStart(3,'0'));
+  const fmt3 = v => (v==null||isNaN(v))?'-':(v>=1||v<=-1)?v.toFixed(3):(v<0?'-.':'.')+(Math.abs(v)*1000).toFixed(0).padStart(3,'0');
   
   if(!splitReport){
     return `<div class="card section" style="padding:30px;text-align:center;color:var(--muted);border:1px dashed var(--border)">
@@ -19916,7 +20063,7 @@ function _scoutRenderSplitContent(data, splitReport, mode, split){
 
 // ─── TOP 3 우선순위 자동 선정 (전력분석실 헤더용) ───
 function _scoutPickTop3Priorities(data, report, mode){
-  const fmt3 = v => (v==null||isNaN(v))?'-':('.'+(v*1000).toFixed(0).padStart(3,'0'));
+  const fmt3 = v => (v==null||isNaN(v))?'-':(v>=1||v<=-1)?v.toFixed(3):(v<0?'-.':'.')+(Math.abs(v)*1000).toFixed(0).padStart(3,'0');
   const candidates = [];
   
   // 카테고리 정의
@@ -22419,7 +22566,7 @@ function _renderScoutReportPitchGrades(data, report){
 function _generateScoutReportPitcher(data){
   const c = data.card;
   const lg = _scoutLeagueAvgs();
-  const fmt3 = v => (v==null||isNaN(v))?'-':('.'+(v*1000).toFixed(0).padStart(3,'0'));
+  const fmt3 = v => (v==null||isNaN(v))?'-':(v>=1||v<=-1)?v.toFixed(3):(v<0?'-.':'.')+(Math.abs(v)*1000).toFixed(0).padStart(3,'0');
   
   // ─ 20-80 스케일 변환 헬퍼 (z-score 기반) ─
   // 백분위 기반: 평균 50, 표편 약 10
@@ -23297,7 +23444,7 @@ function _generateScoutReportPitcher(data){
 function _generateScoutReportBatter(data){
   const c = data.card;
   const lg = _scoutLeagueAvgs();
-  const fmt3 = v => (v==null||isNaN(v))?'-':('.'+(v*1000).toFixed(0).padStart(3,'0'));
+  const fmt3 = v => (v==null||isNaN(v))?'-':(v>=1||v<=-1)?v.toFixed(3):(v<0?'-.':'.')+(Math.abs(v)*1000).toFixed(0).padStart(3,'0');
   
   const pctileTo80 = (myValue, lgValues, higherBetter=true) => {
     if(!lgValues || lgValues.length < 5) return 50;
@@ -23914,7 +24061,7 @@ function renderGameReportPage(){
   if(!out) return;
   const state = window._gameReportState;
   const games = GAMES || [];
-  const fmt3 = v => (v==null||isNaN(v))?'-':('.'+(v*1000).toFixed(0).padStart(3,'0'));
+  const fmt3 = v => (v==null||isNaN(v))?'-':(v>=1||v<=-1)?v.toFixed(3):(v<0?'-.':'.')+(Math.abs(v)*1000).toFixed(0).padStart(3,'0');
   
   // 첫 진입 시 자동으로 첫 게임 선택
   if(!state.gameId && games.length){
@@ -24278,7 +24425,7 @@ function renderGameReportPage(){
 
 // 경기 리포트 생성
 function _generateGameReport(game){
-  const fmt3 = v => (v==null||isNaN(v))?'-':('.'+(v*1000).toFixed(0).padStart(3,'0'));
+  const fmt3 = v => (v==null||isNaN(v))?'-':(v>=1||v<=-1)?v.toFixed(3):(v<0?'-.':'.')+(Math.abs(v)*1000).toFixed(0).padStart(3,'0');
   const pitches = game.pitches || [];
   const info = _parseGameName(game.name || '');
   const teamA_name = info.teamA || 'A팀';
@@ -25640,7 +25787,7 @@ function _computeAllTeamStats(){
 
 // 팀 진단서 생성
 function _generateTeamScoutReport(teamName){
-  const fmt3 = v => (v==null||isNaN(v))?'-':('.'+(v*1000).toFixed(0).padStart(3,'0'));
+  const fmt3 = v => (v==null||isNaN(v))?'-':(v>=1||v<=-1)?v.toFixed(3):(v<0?'-.':'.')+(Math.abs(v)*1000).toFixed(0).padStart(3,'0');
   
   // 팀 소속 선수
   const batterNames = (window._cache.batterNames || []).filter(n => _playerTeam(n, 'batter') === teamName);
