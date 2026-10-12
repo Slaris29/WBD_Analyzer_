@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <!-- V10.1: 외부 이미지(WBD 프로필) hotlinking 방지 우회 - Referer 헤더 차단 -->
 <meta name="referrer" content="no-referrer">
-<title>WBD Baseball Analyzer V11.6</title>
+<title>WBD Baseball Analyzer V12.0</title>
 <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -561,7 +561,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
 <!-- ════ UPLOAD PAGE ════ -->
 <div id="upload-page">
   <div class="logo-big">WBD</div>
-  <div class="logo-sub">BASEBALL ANALYZER · V11.6</div>
+  <div class="logo-sub">BASEBALL ANALYZER · V12.0</div>
   <div id="server-library-box" style="width:100%;max-width:640px;margin-bottom:16px;background:var(--card);border:1px solid rgba(245,166,35,0.35);border-radius:12px;padding:20px 22px;display:none;box-shadow:0 0 32px rgba(245,166,35,0.05);text-align:left">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap">
       <div>
@@ -601,7 +601,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
   <!-- 모바일 전용 상단 바 (햄버거) -->
   <div id="mobile-topbar" style="display:none">
     <button id="hamburger-btn" onclick="toggleMobileMenu()" aria-label="메뉴">☰</button>
-    <div class="mobile-logo">WBD <span style="font-size:10px;color:var(--muted);margin-left:2px">V11.6</span></div>
+    <div class="mobile-logo">WBD <span style="font-size:10px;color:var(--muted);margin-left:2px">V12.0</span></div>
     <button class="mobile-icon-btn" onclick="openGlobalSearch()" title="검색">🔍</button>
     <button class="mobile-icon-btn" onclick="document.getElementById('add-file-input').click()" title="경기 추가" style="color:var(--amber)">+</button>
   </div>
@@ -619,7 +619,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
   <div id="mobile-menu-overlay" style="display:none" onclick="closeMobileMenu(event)">
     <div id="mobile-menu-panel" onclick="event.stopPropagation()">
       <div class="mobile-menu-header">
-        <div class="mobile-logo" style="font-size:16px;cursor:pointer" onclick="closeMobileMenu();openChangelogModal()" title="업데이트 내역 보기">WBD <span style="background:#ffd700;color:#000;font-size:11px;padding:1px 5px;border-radius:3px;font-weight:700;margin-left:2px">V11.6</span></div>
+        <div class="mobile-logo" style="font-size:16px;cursor:pointer" onclick="closeMobileMenu();openChangelogModal()" title="업데이트 내역 보기">WBD <span style="background:#ffd700;color:#000;font-size:11px;padding:1px 5px;border-radius:3px;font-weight:700;margin-left:2px">V12.0</span></div>
         <button class="mobile-icon-btn" onclick="closeMobileMenu()" style="font-size:20px">✕</button>
       </div>
       <div class="mobile-menu-section">
@@ -651,6 +651,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
         <button class="mobile-menu-btn" onclick="navMobile('compare')">⚖️ 선수 비교</button>
         <button class="mobile-menu-btn" onclick="navMobile('matchup')">🎮 매치업 시뮬</button>
         <button class="mobile-menu-btn" onclick="navMobile('h2h')" style="color:#ffd700">🆚 상대전적</button>
+        <button class="mobile-menu-btn" onclick="navMobile('rv')" style="color:#39ff8a">📊 Run Value</button>
         <button class="mobile-menu-btn" onclick="navMobile('highlights')">🎬 하이라이트</button>
       </div>
       <div class="mobile-menu-section">
@@ -659,7 +660,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
         <button class="mobile-menu-btn" onclick="closeMobileMenu();openPresetModal()">💾 프리셋</button>
         <button class="mobile-menu-btn" onclick="closeMobileMenu();openThemeModal()">🎨 테마</button>
         <button class="mobile-menu-btn" onclick="closeMobileMenu();openShortcutsModal()">⌨️ 단축키</button>
-        <button class="mobile-menu-btn" onclick="closeMobileMenu();openChangelogModal()" style="background:linear-gradient(90deg,rgba(204,68,255,.15),transparent);color:#cc44ff;font-weight:700">📋 업데이트 내역 (V11.6 NEW!)</button>
+        <button class="mobile-menu-btn" onclick="closeMobileMenu();openChangelogModal()" style="background:linear-gradient(90deg,rgba(204,68,255,.15),transparent);color:#cc44ff;font-weight:700">📋 업데이트 내역 (V12.0 NEW!)</button>
         <button class="mobile-menu-btn" onclick="closeMobileMenu();document.getElementById('add-file-input').click()" style="color:var(--amber)">+ 경기 추가</button>
         <button class="mobile-menu-btn" onclick="closeMobileMenu();openServerLibraryModal()" style="color:#88ccff">☁ 서버 경기 추가</button>
         <button class="mobile-menu-btn" onclick="closeMobileMenu();clearAllGames()" style="color:#ff4560">🗑️ 모든 경기 제거</button>
@@ -668,7 +669,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
   </div>
 
   <div id="topnav">
-    <div class="nav-logo">WBD <span style="font-size:11px;color:var(--muted);letter-spacing:1px;margin-left:4px">V11.6</span></div>
+    <div class="nav-logo">WBD <span style="font-size:11px;color:var(--muted);letter-spacing:1px;margin-left:4px">V12.0</span></div>
     <button class="nav-btn active" onclick="showPage('home')">🏠 홈</button>
     <button class="nav-btn" onclick="showPage('pitcher')">⚾ 투수</button>
     <button class="nav-btn" onclick="showPage('batter')">🏏 타자</button>
@@ -694,6 +695,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
         <button onclick="showPage('compare')">⚖️ 선수 비교</button>
         <button onclick="showPage('matchup')">🎮 매치업</button>
         <button onclick="showPage('h2h')" style="background:linear-gradient(90deg,rgba(255,215,0,.15),transparent);color:#ffd700;font-weight:700">🆚 상대전적 <span style="font-size:9px;background:#ffd700;color:#000;padding:1px 5px;border-radius:3px;margin-left:4px">NEW</span></button>
+        <button onclick="showPage('rv')" style="background:linear-gradient(90deg,rgba(57,255,138,.15),transparent);color:#39ff8a;font-weight:700">📊 Run Value <span style="font-size:9px;background:#39ff8a;color:#000;padding:1px 5px;border-radius:3px;margin-left:4px">V12</span></button>
         <button onclick="showPage('pitchtype')">🎯 구종 분석</button>
         <button onclick="showPage('ballmap')" style="background:linear-gradient(90deg,rgba(255,153,51,.15),transparent);color:#ff9933;font-weight:700">🗺️ 타구 분석 <span style="font-size:9px;background:#ff9933;color:#000;padding:1px 5px;border-radius:3px;margin-left:4px">NEW</span></button>
         <button onclick="showPage('defense')" style="background:linear-gradient(90deg,rgba(57,255,138,.15),transparent);color:#39ff8a;font-weight:700">🛡️ 수비 분석 <span style="font-size:9px;background:#39ff8a;color:#000;padding:1px 5px;border-radius:3px;margin-left:4px">NEW</span></button>
@@ -857,6 +859,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
           <option value="L">좌타 상대</option>
         </select>
       </div>
+      <div id="p-rv-card"></div>
       <div class="card section"><div class="card-title">주자 상황별 구종 분포</div><div id="p-runner-donuts"></div></div>
       <div class="card section"><div class="card-title">이닝별 평균 구속 변화</div><div id="p-inn-velocity"></div></div>
       <div class="grid2 section">
@@ -1099,6 +1102,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
           <option value="L">좌투 상대</option>
         </select>
       </div>
+      <div id="b-rv-card"></div>
       <div class="grid2 section">
         <div class="card">
           <div class="card-title">카운트별 성적</div>
@@ -1506,6 +1510,11 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
     </select>
   </div>
   <div id="h2h-content"></div>
+</div>
+
+<!-- ══ RUN VALUE (RE24) PAGE ══ -->
+<div class="page" id="page-rv">
+  <div id="rv-content"></div>
 </div>
 
 <!-- ══ SEASON INSIGHTS PAGE ══ -->
@@ -3578,7 +3587,7 @@ function showPage(name,_internal){
   const labels={home:'홈',pitcher:'투수',batter:'타자',matchup:'매치업',cards:'카드',leaderboard:'리더보드',team:'팀',compare:'비교',highlights:'하이라이트',awards:'어워드',insights:'인사이트',myteam:'내 팀'};
   document.querySelectorAll('.nav-btn').forEach(b=>{if(b.textContent.includes(labels[name]))b.classList.add('active');});
   // 현재 페이지 모바일 상단에 표시
-  const pageTitle=({home:'🏠 홈',pitcher:'⚾ 투수 분석',batter:'🏏 타자 분석',cards:'🃏 선수 카드',leaderboard:'🏅 리더보드',team:'🏆 팀 분석',compare:'⚖️ 선수 비교',highlights:'🎬 하이라이트',awards:'🏆 어워드',matchup:'🎮 매치업',h2h:'🆚 상대전적',insights:'📈 인사이트',myteam:'⚔️ 내 팀 빌더',pitchtype:'🎯 구종 분석',defense:'🛡️ 수비 분석',defender:'🛡️ 수비수 분석',ballmap:'🗺️ 타구 분석',scouting:'📋 상대 공략',scoutreport:'📊 선수 평가',gamereport:'📰 경기후 리포트',pfpmanager:'👤 프로필 사진 관리',records:'📚 기록실'})[name]||name;
+  const pageTitle=({home:'🏠 홈',pitcher:'⚾ 투수 분석',batter:'🏏 타자 분석',cards:'🃏 선수 카드',leaderboard:'🏅 리더보드',team:'🏆 팀 분석',compare:'⚖️ 선수 비교',highlights:'🎬 하이라이트',awards:'🏆 어워드',matchup:'🎮 매치업',h2h:'🆚 상대전적',rv:'📊 Run Value',insights:'📈 인사이트',myteam:'⚔️ 내 팀 빌더',pitchtype:'🎯 구종 분석',defense:'🛡️ 수비 분석',defender:'🛡️ 수비수 분석',ballmap:'🗺️ 타구 분석',scouting:'📋 상대 공략',scoutreport:'📊 선수 평가',gamereport:'📰 경기후 리포트',pfpmanager:'👤 프로필 사진 관리',records:'📚 기록실'})[name]||name;
   const mobileLogoEl=document.querySelector('#mobile-topbar .mobile-logo');
   if(mobileLogoEl)mobileLogoEl.textContent=pageTitle;
   // 모바일 하단 탭바 active 상태
@@ -3588,7 +3597,7 @@ function showPage(name,_internal){
   // 드롭다운 그룹 활성 표시
   const groupMap={
     leaderboard:'ranking',awards:'ranking',insights:'ranking',
-    compare:'tools',matchup:'tools',h2h:'tools',highlights:'tools',myteam:'tools',pitchtype:'tools',scouting:'tools',ballmap:'tools'
+    compare:'tools',matchup:'tools',h2h:'tools',rv:'tools',highlights:'tools',myteam:'tools',pitchtype:'tools',scouting:'tools',ballmap:'tools'
   };
   document.querySelectorAll('.nav-dropdown').forEach(d=>{
     const grp=d.querySelector('[data-group]')?.dataset.group;
@@ -3617,6 +3626,7 @@ function showPage(name,_internal){
     else if(name==='awards') renderAwardsPage();
     else if(name==='matchup') renderMatchupPage();
     else if(name==='h2h') renderH2HPage();
+    else if(name==='rv') renderRunValuePage();
     else if(name==='insights') renderInsightsPage();
     else if(name==='myteam') renderMyTeamPage();
     else if(name==='pitchtype') renderPitchTypePage();
@@ -3670,7 +3680,7 @@ function switchStab(type,idx){
 function renderPitcherSubTab(idx){
   if(idx===0){/* rendered by renderPitcherPage */}
   else if(idx===1){renderPitcherZone();renderZone9Bad();renderZone9Good();renderCountGrid();}
-  else if(idx===2){renderRunnerDonuts();renderInnVelocity();renderLRDonuts();renderResultPitch();}
+  else if(idx===2){renderPitcherRVCard();renderRunnerDonuts();renderInnVelocity();renderLRDonuts();renderResultPitch();}
   else if(idx===3){pitcherLogPage=0;renderPitcherLog();}
   else if(idx===4){renderPrecisionPitchToggles();renderPitcherPrecisionSummary();renderPitcherPrecisionPitchTable();renderPitcherPrecisionFilter();renderPitcherPrecisionMap();renderPitcherCountStrategy();renderPitcherSequenceTable();renderPitcherLRSplit();renderPitcherFatigue();}
   else if(idx===5){renderPitcherGameByGame();}
@@ -3681,7 +3691,7 @@ function renderPitcherSubTab(idx){
 function renderBatterSubTab(idx){
   if(idx===0){renderBatterSpray();renderBarrel();renderBBQuality();renderLdegHist();renderSdegFan();}
   else if(idx===1){renderSwingRadar();renderHpos();renderSpdBand();renderBatterFilterAnalysis();renderBatterPitchTable();renderTiming();}
-  else if(idx===2){renderCountTable();renderRunnerTable();renderHeightStats();renderResultPie();}
+  else if(idx===2){renderBatterRVCard();renderCountTable();renderRunnerTable();renderHeightStats();renderResultPie();}
   else if(idx===3){batterLogPage=0;renderBatterLog();}
   else if(idx===4){renderBatterZoneSummary();renderBatterZoneMap();renderBatterZonePitchFilter();renderBatterZonePitchTable();renderBatterCountCategory();}
   else if(idx===5){renderBatterGameByGame();}
@@ -14780,6 +14790,20 @@ function openThemeModal(){
 //   - 버저닝: V9.x (소수점) → 누적되면 V10
 //   - title은 한 줄 핵심 요약, changes는 항목별 (icon + text)
 const CHANGELOG = [
+  {
+    version: 'V12.0',
+    date: '2026-10',
+    title: '📊 Run Value (RE24) — 상황 득점가치 분석 체계 신규',
+    badge: '#39ff8a',
+    changes: [
+      {icon:'📊', text:'⭐⭐⭐ <b>「Run Value」 페이지 신규 (도구 메뉴)</b> — 분석기 전체가 비율스탯(타율·OPS·ERA)뿐이라 <b>"상황별 실제 득점 기여"</b>를 볼 수 없던 공백을 메움. 현대 야구 분석의 근본 틀인 <b>득점 기대값(Run Expectancy)</b>을 이 리그 데이터로 직접 학습해 모든 플레이를 점수화.'},
+      {icon:'🔢', text:'⭐⭐⭐ <b>RE24 매트릭스</b> — 24개 루상·아웃 상황별 "이닝 끝까지 기대 득점"을 리그 전 타석으로 학습한 히트맵. 이 게임만의 득점 환경이 드러남(예: 무사 만루 ≈ 2.1점, 2사 주자없음 ≈ 0.08점). 아웃·주자 수에 따라 단조 증가하는 것으로 모델 타당성 확인.'},
+      {icon:'🏏', text:'⭐⭐⭐ <b>타자/투수 Run Value 랭킹</b> — RV = RE(끝)−RE(시작)+득점. 타율이 못 보는 <b>진루타·상황 타격</b>까지 가치 반영. 검증: 상황 득점가치만으로 돌렸는데 <b>MVP·사이영 수상자가 저절로 상위</b>에 나옴(모델이 실제로 작동한다는 증거). 전 열 정렬·팀/최소표본 필터, RV/100·득점창출·손실 분해.'},
+      {icon:'🎯', text:'⭐⭐ <b>종료 카운트별 Run Value</b> — 타석이 어떤 카운트에서 끝났을 때 평균 가치가 어떤지. 2스트라이크(투수 유리)는 음수, 3볼(타자 유리)은 양수로 — 카운트 전략의 정량 근거.'},
+      {icon:'📋', text:'⭐⭐ <b>타자·투수 분석 C탭에 개인 RV 요약 카드</b> — 시즌 RV·RV/100·리그 순위 + <b>레버리지 가중 클러치 RV</b>(승부처 중요도를 가중한 WPA식 기여도). 그 선수 보던 흐름에서 바로 확인.'},
+      {icon:'🔬', text:'정확도 — 타석 단위 집계, 이닝 종료 시 RE=0 처리, half 규칙(1=teamA 공격)과 경기별 득점 누적으로 "이닝 끝까지 추가 득점"을 정확히 계산. 닉변 선수 _canonPlayer 병합. 활성 경기 + 캐시 세대로 메모이즈.'},
+    ]
+  },
   {
     version: 'V11.6',
     date: '2026-09',
@@ -30125,6 +30149,249 @@ function renderRivalries(){
 
   return html;
 }
+
+/* ══════════════════════════════════════════════════════════════
+   📊 RUN VALUE 엔진 (RE24 기반) — V12.0
+   ├─ _buildRE24()      : 24개 루상·아웃 상태별 득점 기대값 (리그 학습)
+   ├─ _computeRunValues(): 타자/투수/카운트별 Run Value 집계
+   └─ 활성 경기 + 캐시 세대로 메모이즈
+   원리: RV(플레이) = RE(끝상태) - RE(시작상태) + 득점.  이닝 종료 시 RE=0.
+       타석 기준 집계. 투수 RV = -타자 RV. 카운트 RV는 투구 단위.
+══════════════════════════════════════════════════════════════ */
+function _bScore(p){ return +p.half===1 ? (+p.scoreA||0) : (+p.scoreB||0); }
+function _baseOutState(p){ return [p.b1?1:0, p.b2?1:0, p.b3?1:0, +p.out||0]; }
+function _stateKey(b1,b2,b3,out){ return b1+''+b2+''+b3+'|'+out; }
+// 한 게임의 half-inning 순서/그룹 (삽입순 보존)
+function _gameHalves(ps){
+  const order=[]; const hp={};
+  for(const p of ps){ const k=p.inn+'_'+p.half; if(!order.length||order[order.length-1]!==k)order.push(k); (hp[k]=hp[k]||[]).push(p); }
+  return {order,hp};
+}
+let _rvCache={gen:-1,key:'',data:null};
+function _rvKey(){ const gen=window._cache?window._cache.generation:-1; return gen+'::'+[...activeGameIds].sort().join(','); }
+function getRunValueData(){
+  const key=_rvKey();
+  if(_rvCache.key===key && _rvCache.data) return _rvCache.data;
+  const RE_sum={},RE_cnt={};
+  const games=GAMES.filter(g=>activeGameIds.has(g.id));
+  // ── 1차: RE24 매트릭스 학습 ──
+  const halvesByGame=[];
+  for(const g of games){
+    const ps=g.pitches; if(!ps||!ps.length)continue;
+    let finalA=0,finalB=0; for(const p of ps){ if(+p.scoreA>finalA)finalA=+p.scoreA; if(+p.scoreB>finalB)finalB=+p.scoreB; }
+    const {order,hp}=_gameHalves(ps);
+    halvesByGame.push({g,order,hp,finalA,finalB});
+    order.forEach((hk,idx)=>{
+      const arr=hp[hk]; const half=+arr[0].half;
+      let endBat=null;
+      for(let j=idx+1;j<order.length;j++){ if(+hp[order[j]][0].half===half){ endBat=_bScore(hp[order[j]][0]); break; } }
+      if(endBat==null) endBat = half===1?finalA:finalB;
+      let prevB='\u0000';
+      for(const p of arr){
+        if(prevB===p.bName) continue; prevB=p.bName;
+        const [b1,b2,b3,out]=_baseOutState(p); if(out>=3)continue;
+        const rr=Math.max(0,endBat-_bScore(p)); const k=_stateKey(b1,b2,b3,out);
+        RE_sum[k]=(RE_sum[k]||0)+rr; RE_cnt[k]=(RE_cnt[k]||0)+1;
+      }
+    });
+  }
+  const RE={},REn={};
+  for(const k in RE_cnt){ RE[k]=RE_sum[k]/RE_cnt[k]; REn[k]=RE_cnt[k]; }
+  const REget=(b1,b2,b3,out)=> out>=3?0:(RE[_stateKey(b1,b2,b3,out)]||0);
+  // ── 2차: Run Value 집계 ──
+  const bat={},pit={},cnt={}; // cnt: 카운트별 (투구 단위 접근 대신 PA RV를 시작카운트에 귀속)
+  const addB=(n,rv)=>{ if(!n)return; (bat[n]=bat[n]||{rv:0,pa:0,pos:0,neg:0})&&(bat[n].rv+=rv,bat[n].pa++, rv>0?bat[n].pos+=rv:bat[n].neg+=rv); };
+  const addP=(n,rv)=>{ if(!n)return; (pit[n]=pit[n]||{rv:0,bf:0})&&(pit[n].rv+= -rv, pit[n].bf++); };
+  for(const {order,hp,finalA,finalB} of halvesByGame){
+    order.forEach((hk,idx)=>{
+      const arr=hp[hk]; const half=+arr[0].half;
+      let endBat=null;
+      for(let j=idx+1;j<order.length;j++){ if(+hp[order[j]][0].half===half){ endBat=_bScore(hp[order[j]][0]); break; } }
+      if(endBat==null) endBat=half===1?finalA:finalB;
+      // PA 분할
+      const pas=[]; let cur=null,prevB='\u0000';
+      for(const p of arr){ const bn=p.bName; if(cur==null||prevB!==bn){ cur={b:_canonPlayer(bn),p:_canonPlayer(p.pName),first:p,pitches:[p]}; pas.push(cur); prevB=bn; } else cur.pitches.push(p); }
+      for(let i=0;i<pas.length;i++){
+        const pa=pas[i]; const f=pa.first;
+        const [b1,b2,b3,out]=_baseOutState(f); if(out>=3)continue;
+        let s1,runs;
+        if(i+1<pas.length){ const nf=pas[i+1].first; s1=_baseOutState(nf); runs=Math.max(0,_bScore(nf)-_bScore(f)); }
+        else { s1=[0,0,0,3]; runs=Math.max(0,endBat-_bScore(f)); }
+        const rv=REget(s1[0],s1[1],s1[2],s1[3])-REget(b1,b2,b3,out)+runs;
+        addB(pa.b,rv); addP(pa.p,rv);
+        // 카운트별: 시작 카운트(대개 0-0) 대신, 각 투구가 만든 "카운트 전이 가치"는 별도 — 여기선 결과를 2S/3B 등 '마지막 카운트'에 귀속
+        const last=pa.pitches[pa.pitches.length-1]; const ck=(+last.ball||0)+'-'+(+last.strk||0);
+        (cnt[ck]=cnt[ck]||{rv:0,n:0}).rv+=rv; cnt[ck].n++;
+      }
+    });
+  }
+  const data={RE,REn,REget,bat,pit,cnt,
+    totalPA:Object.values(bat).reduce((a,v)=>a+v.pa,0),
+    games:games.length};
+  _rvCache={gen:window._cache?window._cache.generation:-1,key,data};
+  return data;
+}
+
+// ─── 📊 Run Value 페이지 ───
+function renderRunValuePage(){
+  const el=document.getElementById('rv-content'); if(!el)return;
+  if(!GAMES.filter(g=>activeGameIds.has(g.id)).length){ el.innerHTML='<div class="card section" style="padding:40px;text-align:center;color:var(--muted)">데이터가 없어요</div>'; return; }
+  setTimeout(()=>{
+    try{ _renderRunValueInner(el); }
+    catch(e){ console.error('RV page error',e); el.innerHTML=`<div class="card section" style="padding:30px;text-align:center;color:#ff4560">Run Value 오류: ${e.message}</div>`; }
+  },20);
+}
+function _renderRunValueInner(el){
+  const D=getRunValueData();
+  const fmt3 = v => (v==null||isNaN(v))?'-':(v>=1||v<=-1)?v.toFixed(3):(v<0?'-.':'.')+(Math.abs(v)*1000).toFixed(0).padStart(3,'0');
+  const sgn=v=>(v>0?'+':'')+v.toFixed(1);
+  const minPA=parseInt((document.getElementById('rv-minpa')||{}).value)||20;
+  const minBF=parseInt((document.getElementById('rv-minbf')||{}).value)||40;
+  const teamF=(document.getElementById('rv-team')||{}).value||'';
+
+  let html='';
+  // ── 설명 배너 ──
+  html+=`<div class="card section" style="background:linear-gradient(135deg,#0a1828,#160a1a);border:1px solid var(--amber);padding:16px">
+    <div style="font-size:11px;color:var(--amber);letter-spacing:3px;margin-bottom:4px">RUN VALUE · RE24</div>
+    <div style="font-size:13px;line-height:1.7;color:var(--text)">모든 플레이를 <b>득점 기대값(RE) 변화 + 실제 득점</b>으로 환산한 지표. 타율·OPS가 못 보는 <b>상황별 득점 기여</b>를 점수로 나타냄. 이 리그 ${D.games}경기 · ${D.totalPA}타석으로 직접 학습. <span style="color:var(--muted)">RV &gt; 0 = 득점 환경을 유리하게 만듦.</span></div>
+  </div>`;
+
+  // ── RE24 히트맵 ──
+  html+='<div class="card section"><div class="card-title">🔢 RE24 매트릭스 <span style="font-size:10px;color:var(--muted);font-weight:400">— 각 상황에서 이닝 끝까지 기대 득점</span></div>';
+  const baseRows=[['---',0,0,0],['1--',1,0,0],['-2-',0,1,0],['--3',0,0,1],['12-',1,1,0],['1-3',1,0,1],['-23',0,1,1],['만루',1,1,1]];
+  const vals=[]; baseRows.forEach(([,b1,b2,b3])=>[0,1,2].forEach(o=>{const v=D.REget(b1,b2,b3,o);if(v>0)vals.push(v);}));
+  const vmax=Math.max(...vals,0.1);
+  const heat=v=>{ if(v<=0)return 'var(--card2)'; const t=Math.min(1,v/vmax); const r=Math.round(20+t*200),g=Math.round(40+t*120),b2=Math.round(90-t*60); return `rgba(${r},${g},${b2},0.85)`; };
+  html+='<div style="overflow-x:auto"><table class="data-table" style="text-align:center"><thead><tr><th>주자\\아웃</th><th>0사</th><th>1사</th><th>2사</th></tr></thead><tbody>';
+  baseRows.forEach(([lbl,b1,b2,b3])=>{
+    html+=`<tr><td style="font-family:var(--mono);font-weight:700">${lbl}</td>`;
+    [0,1,2].forEach(o=>{ const v=D.REget(b1,b2,b3,o); const n=D.REn[_stateKey(b1,b2,b3,o)]||0;
+      html+=`<td style="background:${heat(v)};font-family:var(--mono);font-weight:700;color:#fff" title="${n}회 표본">${v>0?v.toFixed(3):'-'}</td>`; });
+    html+='</tr>';
+  });
+  html+='</tbody></table></div><div style="font-size:10px;color:var(--muted);padding:6px">※ 셀 색이 진할수록 기대 득점이 높음 · 괄호는 표본 수(hover)</div></div>';
+
+  // ── 팀 필터 + 최소 표본 ──
+  const teams=[...new Set(Object.keys(D.bat).map(n=>_playerTeam(n,'batter')).filter(Boolean))].sort();
+  html+=`<div class="filter-row" style="margin:4px 0 12px;flex-wrap:wrap;gap:8px">
+    <span class="filter-label">팀</span><select id="rv-team" onchange="renderRunValuePage()"><option value="">전체</option>${teams.map(t=>`<option value="${t}"${t===teamF?' selected':''}>${t}</option>`).join('')}</select>
+    <span class="filter-label">최소 타석</span><select id="rv-minpa" onchange="renderRunValuePage()">${[10,20,30,40].map(v=>`<option value="${v}"${v===minPA?' selected':''}>${v}+</option>`).join('')}</select>
+    <span class="filter-label">최소 상대타자</span><select id="rv-minbf" onchange="renderRunValuePage()">${[20,40,60,80].map(v=>`<option value="${v}"${v===minBF?' selected':''}>${v}+</option>`).join('')}</select>
+  </div>`;
+
+  // ── 타자 RV 랭킹 ──
+  let brows=Object.entries(D.bat).map(([n,v])=>({n,...v,team:_playerTeam(n,'batter'),per:v.pa?v.rv/v.pa*100:0})).filter(r=>r.pa>=minPA);
+  if(teamF) brows=brows.filter(r=>r.team===teamF);
+  brows.sort((a,b)=>b.rv-a.rv);
+  html+=`<div class="card section"><div class="card-title">🏏 타자 Run Value <span style="font-size:10px;color:var(--muted);font-weight:400">(${brows.length}명 · ${minPA}타석+)</span></div>
+    <div class="tbl-wrap"><table class="data-table"><thead><tr><th>#</th>${_sortTh('타자')}${_sortTh('팀')}${_sortTh('타석')}${_sortTh('RV')}${_sortTh('RV/100')}${_sortTh('창출')}${_sortTh('손실')}</tr></thead><tbody>`;
+  brows.forEach((r,i)=>{ const c=r.rv>=8?'#39ff8a':r.rv>=3?'#a8e063':r.rv<=-3?'#ff4560':'var(--text)';
+    html+=`<tr><td data-rank>${i+1}</td><td style="font-weight:600">${_esc(r.n)}</td><td>${r.team||'-'}</td><td style="font-family:var(--mono)">${r.pa}</td><td style="font-family:var(--mono);font-weight:700;color:${c}">${sgn(r.rv)}</td><td style="font-family:var(--mono)">${sgn(r.per)}</td><td style="font-family:var(--mono);color:#39ff8a">+${r.pos.toFixed(1)}</td><td style="font-family:var(--mono);color:#ff4560">${r.neg.toFixed(1)}</td></tr>`; });
+  html+='</tbody></table></div></div>';
+
+  // ── 투수 RV 랭킹 ──
+  let prows=Object.entries(D.pit).map(([n,v])=>({n,...v,team:_playerTeam(n,'pitcher'),per:v.bf?v.rv/v.bf*100:0})).filter(r=>r.bf>=minBF);
+  if(teamF) prows=prows.filter(r=>r.team===teamF);
+  prows.sort((a,b)=>b.rv-a.rv);
+  html+=`<div class="card section"><div class="card-title">⚾ 투수 Run Value <span style="font-size:10px;color:var(--muted);font-weight:400">(${prows.length}명 · 상대타자 ${minBF}+ · 높을수록 실점 억제)</span></div>
+    <div class="tbl-wrap"><table class="data-table"><thead><tr><th>#</th>${_sortTh('투수')}${_sortTh('팀')}${_sortTh('상대타자')}${_sortTh('RV')}${_sortTh('RV/100')}</tr></thead><tbody>`;
+  prows.forEach((r,i)=>{ const c=r.rv>=6?'#39ff8a':r.rv>=2?'#a8e063':r.rv<=-3?'#ff4560':'var(--text)';
+    html+=`<tr><td data-rank>${i+1}</td><td style="font-weight:600">${_esc(r.n)}</td><td>${r.team||'-'}</td><td style="font-family:var(--mono)">${r.bf}</td><td style="font-family:var(--mono);font-weight:700;color:${c}">${sgn(r.rv)}</td><td style="font-family:var(--mono)">${sgn(r.per)}</td></tr>`; });
+  html+='</tbody></table></div></div>';
+
+  // ── 카운트별 RV ──
+  const corder=['0-0','0-1','0-2','1-0','1-1','1-2','2-0','2-1','2-2','3-0','3-1','3-2'];
+  const crows=corder.filter(c=>D.cnt[c]).map(c=>({c,...D.cnt[c],avg:D.cnt[c].n?D.cnt[c].rv/D.cnt[c].n:0}));
+  html+=`<div class="card section"><div class="card-title">🎯 종료 카운트별 평균 Run Value <span style="font-size:10px;color:var(--muted);font-weight:400">— 타석이 이 카운트에서 끝났을 때 타자 쪽 평균 가치</span></div>
+    <div class="tbl-wrap"><table class="data-table" style="text-align:center"><thead><tr><th>카운트</th><th>타석수</th><th>평균 RV</th><th>합계 RV</th></tr></thead><tbody>`;
+  crows.forEach(r=>{ const c=r.avg>=0.05?'#39ff8a':r.avg<=-0.05?'#ff4560':'var(--text)';
+    html+=`<tr><td style="font-family:var(--mono);font-weight:700">${r.c}</td><td style="font-family:var(--mono)">${r.n}</td><td style="font-family:var(--mono);font-weight:700;color:${c}">${r.avg>=0?'+':''}${r.avg.toFixed(3)}</td><td style="font-family:var(--mono)">${sgn(r.rv)}</td></tr>`; });
+  html+='</tbody></table></div><div style="font-size:10px;color:var(--muted);padding:6px">※ 투수 유리 카운트(2스트라이크)는 음수, 타자 유리 카운트(3볼)는 양수가 정상</div></div>';
+
+  html+=`<div style="font-size:10px;color:var(--muted);text-align:center;padding:8px">※ RV = RE(끝상태)−RE(시작상태)+득점 · 타석 기준 · 투수 RV = −타자 RV · 활성 경기만 반영</div>`;
+  el.innerHTML=html;
+}
+
+// ─── 개인 분석 탭용 RV 요약 카드 ───
+function _playerRVRank(D, name, isBat){
+  const map=isBat?D.bat:D.pit;
+  const minKey=isBat?'pa':'bf';
+  const me=map[name]; if(!me) return null;
+  const qualified=Object.entries(map).filter(([,v])=>v[minKey]>=(isBat?20:40)).sort((a,b)=>b[1].rv-a[1].rv);
+  const idx=qualified.findIndex(([n])=>n===name);
+  return {me, rank: idx>=0?idx+1:null, total:qualified.length};
+}
+function renderBatterRVCard(){ _renderPlayerRVCard('b-rv-card', currentBatter, true); }
+function renderPitcherRVCard(){ _renderPlayerRVCard('p-rv-card', currentPitcher, false); }
+function _renderPlayerRVCard(containerId, name, isBat){
+  const box=document.getElementById(containerId); if(!box)return;
+  if(!name){ box.innerHTML=''; return; }
+  const D=getRunValueData();
+  const info=_playerRVRank(D,name,isBat);
+  const sgn=v=>(v>0?'+':'')+v.toFixed(1);
+  if(!info){ box.innerHTML=`<div class="card section" style="padding:14px;color:var(--muted);font-size:12px">Run Value 데이터 없음</div>`; return; }
+  const me=info.me;
+  const n = isBat?me.pa:me.bf;
+  const per = n? me.rv/n*100 : 0;
+  const rvCol=me.rv>=5?'#39ff8a':me.rv>=0?'#a8e063':'#ff4560';
+  // 레버리지 가중 클러치: 이 선수 PA 중 '중요 상황' RV (RE 시작값이 높은 상황) 합산
+  const lev=_playerLeverageRV(D,name,isBat);
+  let cells=[
+    ['시즌 RV', sgn(me.rv), rvCol],
+    ['RV/100'+(isBat?'PA':'BF'), sgn(per), rvCol],
+    ['리그 순위', info.rank?`${info.rank}위 / ${info.total}`:'-', 'var(--text)'],
+  ];
+  if(isBat){ cells.push(['득점 창출','+'+me.pos.toFixed(1),'#39ff8a'],['득점 손실',me.neg.toFixed(1),'#ff4560']); }
+  if(lev){ cells.push(['클러치 RV', sgn(lev.clutchRV), lev.clutchRV>=0?'#39ff8a':'#ff4560']); }
+  box.innerHTML=`<div class="card section" style="border-left:4px solid #39ff8a">
+    <div class="card-title">📊 Run Value (RE24) <span style="font-size:10px;color:var(--muted);font-weight:400">— 상황 득점 기여 · ${isBat?'타석':'상대타자'} ${n}</span></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px">
+      ${cells.map(([l,v,c])=>`<div style="background:var(--card2);border-radius:6px;padding:10px 6px;text-align:center"><div style="font-size:10px;color:var(--muted)">${l}</div><div style="font-family:var(--mono);font-size:17px;font-weight:700;color:${c}">${v}</div></div>`).join('')}
+    </div>
+    ${lev?`<div style="font-size:11px;color:var(--muted);margin-top:8px">클러치 RV = 레버리지(상황 중요도) 가중 RV 합 · 승부처에서의 기여를 강조</div>`:''}
+  </div>`;
+}
+// 레버리지 가중 RV: 각 PA의 시작 RE가 리그 평균보다 높을수록(=중요 상황) 가중
+function _playerLeverageRV(D,name,isBat){
+  // 재계산: PA별 RV와 시작상태 레버리지. getRunValueData는 합계만 주므로 간이 재집계.
+  const key=_rvKey()+'::lev::'+name+'::'+(isBat?'b':'p');
+  if(_levCache.key===key) return _levCache.val;
+  const games=GAMES.filter(g=>activeGameIds.has(g.id));
+  const avgRE=0.45; // 리그 평균 RE(무사주자없음 근처) 기준 레버리지 중심
+  let clutchRV=0, plays=0;
+  for(const g of games){
+    const ps=g.pitches; if(!ps||!ps.length)continue;
+    let finalA=0,finalB=0; for(const p of ps){ if(+p.scoreA>finalA)finalA=+p.scoreA; if(+p.scoreB>finalB)finalB=+p.scoreB; }
+    const {order,hp}=_gameHalves(ps);
+    order.forEach((hk,idx)=>{
+      const arr=hp[hk]; const half=+arr[0].half;
+      let endBat=null; for(let j=idx+1;j<order.length;j++){ if(+hp[order[j]][0].half===half){ endBat=_bScore(hp[order[j]][0]); break; } }
+      if(endBat==null) endBat=half===1?finalA:finalB;
+      const pas=[]; let cur=null,prevB='\u0000';
+      for(const p of arr){ const bn=p.bName; if(cur==null||prevB!==bn){ cur={b:_canonPlayer(bn),p:_canonPlayer(p.pName),first:p}; pas.push(cur); prevB=bn; } }
+      for(let i=0;i<pas.length;i++){
+        const pa=pas[i]; const who=isBat?pa.b:pa.p; if(who!==name)continue;
+        const f=pa.first; const [b1,b2,b3,out]=_baseOutState(f); if(out>=3)continue;
+        let s1,runs;
+        if(i+1<pas.length){ const nf=pas[i+1].first; s1=_baseOutState(nf); runs=Math.max(0,_bScore(nf)-_bScore(f)); }
+        else { s1=[0,0,0,3]; runs=Math.max(0,endBat-_bScore(f)); }
+        const startRE=D.REget(b1,b2,b3,out);
+        let rv=D.REget(s1[0],s1[1],s1[2],s1[3])-startRE+runs;
+        if(!isBat) rv=-rv;
+        // 접전(7회+ ±2) 또는 득점권이면 레버리지 ↑
+        const diff=Math.abs((+f.scoreA||0)-(+f.scoreB||0));
+        const lateClose=(+f.inn>=7&&diff<=2)?1.5:1;
+        const risp=(b2||b3)?1.4:1;
+        const lev=lateClose*risp*(startRE/avgRE);
+        clutchRV+=rv*lev; plays++;
+      }
+    });
+  }
+  const val=plays?{clutchRV,plays}:null;
+  _levCache={key,val};
+  return val;
+}
+let _levCache={key:'',val:null};
 
 // ─── 🎯 클러치 분석 ───
 function renderClutch(){
