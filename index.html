@@ -766,7 +766,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
       <span id="games-bar-arrow" style="font-size:10px;color:var(--muted);margin-left:auto;transition:transform .2s">▼</span>
     </div>
     <div id="games-panel" style="display:none;padding:8px 28px 12px;border-top:1px solid var(--border)">
-      <div id="round-filter-bar" style="display:none;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:10px"></div>
       <div id="games-list" style="display:flex;gap:8px;flex-wrap:wrap"></div>
     </div>
   </div>
@@ -792,6 +791,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
           <option value="date-desc">최신순</option>
           <option value="date-asc">오래된순</option>
         </select>
+        <span class="filter-label" id="dash-round-label" style="display:none">라운드</span>
+        <span id="round-filter-bar" style="display:none;align-items:center;gap:5px"></span>
         <input type="text" id="dash-search" placeholder="팀명 검색..." oninput="renderGameDashboard()" style="background:#060e1a;border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:3px;font-size:12px;font-family:var(--cond);min-width:140px">
         <button class="btn-secondary" onclick="dashActivateAll(true)" style="font-size:11px;padding:6px 12px">✓ 전체 선택</button>
         <button class="btn-secondary" onclick="dashActivateAll(false)" style="font-size:11px;padding:6px 12px">✗ 전체 해제</button>
@@ -2921,13 +2922,14 @@ function setRoundFilter(r){
 }
 function _renderRoundFilterBar(){
   const bar=document.getElementById('round-filter-bar'); if(!bar)return;
+  const lbl=document.getElementById('dash-round-label');
   const R=computeRounds();
-  if(!R.valid){ bar.style.display='none'; return; }
+  if(!R.valid){ bar.style.display='none'; if(lbl)lbl.style.display='none'; return; }
   const maxR=Math.max(...Object.values(R.maxRound));
-  let btns=`<span style="font-size:11px;color:var(--muted);margin-right:4px">라운드:</span>`;
-  btns+=`<button class="rf-btn${window._roundFilter==null?' active':''}" onclick="setRoundFilter(null)">전체</button>`;
+  let btns=`<button class="rf-btn${window._roundFilter==null?' active':''}" onclick="setRoundFilter(null)">전체</button>`;
   for(let r=1;r<=maxR;r++) btns+=`<button class="rf-btn${window._roundFilter===r?' active':''}" onclick="setRoundFilter(${r})">${r}R</button>`;
-  bar.innerHTML=btns; bar.style.display='flex';
+  bar.innerHTML=btns; bar.style.display='inline-flex';
+  if(lbl)lbl.style.display='inline';
 }
 
 function renderActiveContent(){
@@ -14974,7 +14976,7 @@ const CHANGELOG = [
     badge: '#39ff8a',
     changes: [
       {icon:'📋', text:'⭐⭐⭐ <b>선수 평가 리포트 전면 개편 — 탭 분할 + 백분위 바</b> — 한 페이지에 다 쏟아내던 걸 <b>4개 탭(종합·세부 지표·강약점·비교/추이)</b>으로 재구성. <b>「세부 지표」 탭에 스탯티즈식 백분위 바</b> 신설 — 타율/OPS/wRC+/EV/배럴% 등 11개(타자)·ERA/FIP/WHIP/K9 등(투수)를 <b>리그 대비 상위 몇 %인지 색상 막대</b>로. 여기에 <b>xOut 운 분석</b>(실제 vs 기대)과 <b>Run Value</b>도 함께 표시. 종합 탭은 핵심(등급·요약·추천)만 남겨 간결하게.'},
-      {icon:'🔄', text:'⭐⭐ <b>라운드 자동 판별 + 라운드 필터</b> — 풀리그 구조(각 팀과 N번씩 맞붙음)를 <b>업로드 방식 변경 없이 자동 감지</b>. 매치업이 그룹(시즌) 내 몇 번째 대결인지로 라운드 부여(26 Summer=2R, FW=3R 등 자동), 꼬리(포스트시즌 등)는 경기수 기준으로 자동 제외. 게임 바에 <b>「라운드: 전체/1R/2R…」 필터</b> 신설 — 특정 라운드만 켜서 전체 분석에 적용 가능. <b>선수평가 「비교·추이」 탭</b>에 라운드별 타율·홈런·삼진%·EV 변화 표(이전 라운드 대비 색상).'},
+      {icon:'🔄', text:'⭐⭐ <b>라운드 자동 판별 + 라운드 필터</b> — 풀리그 구조(각 팀과 N번씩 맞붙음)를 <b>업로드 방식 변경 없이 자동 감지</b>. 매치업이 그룹(시즌) 내 몇 번째 대결인지로 라운드 부여(26 Summer=2R, FW=3R 등 자동), 꼬리(포스트시즌 등)는 경기수 기준으로 자동 제외. <b>경기 대시보드 필터 행에 「라운드: 전체/1R/2R…」 필터</b> 신설 — 특정 라운드만 켜서 전체 분석에 적용 가능. <b>선수평가 「비교·추이」 탭</b>에 라운드별 타율·홈런·삼진%·EV 변화 표(이전 라운드 대비 색상).'},
       {icon:'📊', text:'⭐⭐ <b>백분위 바를 투수·타자 개인 분석에도</b> — 선수평가 전용이던 스탯티즈식 백분위 바를 <b>투수/타자 분석 C탭</b>에도 추가. 선수 보던 흐름에서 바로 "리그 대비 상위 몇 %"를 RV·xOut 카드와 함께 확인. 선수평가와 동일 계산(공용 함수).'},
       {icon:'📤', text:'⭐⭐ <b>분석 데이터 내보내기에 Run Value·xOut 추가</b> — export 번들에 <code>runValue</code>(RE24 매트릭스 + 선수별 RV)와 <code>xOut</code>(선수별 실제 vs 기대 성적·운) 섹션 신규. schemaVersion 18, appVersion 표기도 V12.0으로 정정.'},
       {icon:'🗂️', text:'⭐⭐⭐ <b>메뉴 구조 전면 재편</b> — 기능이 \"도구\" 한 통에 13개씩 쌓여 찾기 힘들던 걸 성격별로 정리. <b>허브 페이지</b> 3곳 신설(상단 탭으로 전환): <b>📊 심화 분석</b>(Run Value·기대성적/운·구종 분석), <b>🛡️ 수비</b>(팀 수비·수비수 단독·타구 분석), <b>📋 스카우팅</b>(상대 공략·선수 평가). 드롭다운도 <b>⚔️ 전략</b>(비교·매치업·상대전적·팀빌더)·<b>🏅 랭킹</b>·<b>📰 경기</b>로 재분류. 모바일 메뉴도 동일 구조로.'},
@@ -31392,6 +31394,7 @@ function exportAnalyticsBundle(opts){
       v18_changes:[
         '🆕 runValue — RE24 기반 Run Value. RE(루상·아웃 상태별 기대득점 24칸) + batters/pitchers 선수별 RV 합·RV/100. 활성 경기 기준.',
         '🆕 xOut — 기대 성적. 인플레이 타구(홈런 제외, BABIP 성격)의 리그 기대 아웃확률로 batters/pitchers별 ba vs xba, luck(실제−기대 안타) 산출. 수비 xOut 모델 재사용.',
+        '🆕 rounds — 풀리그 라운드 자동 판별(roundOf: 경기ID→라운드, maxRound: 그룹별 최대). 포스트시즌·꼬리 라운드 미부여.',
       ],
       v17_changes:[
         '🆕 teamDefense.teams[i].infieldPass — 팀 내야 통과율',
@@ -32016,6 +32019,11 @@ function exportAnalyticsBundle(opts){
       const bat={}; Object.entries(D.bat||{}).forEach(([n,v])=>{ if(v.pa>=10) bat[n]={rv:+v.rv.toFixed(2),pa:v.pa,per100:+(v.rv/v.pa*100).toFixed(2)}; });
       const pit={}; Object.entries(D.pit||{}).forEach(([n,v])=>{ if(v.bf>=20) pit[n]={rv:+v.rv.toFixed(2),bf:v.bf,per100:+(v.rv/v.bf*100).toFixed(2)}; });
       return { note:'RE24 기반 Run Value. RE=루상·아웃(b1b2b3|out) 상태별 기대득점. bat/pit=선수별 RV 합(타석/상대타자 기준). 활성 경기 기준.', RE, batters:bat, pitchers:pit };
+    }catch(e){ return null; } })(),
+    rounds:(()=>{ try{
+      if(typeof computeRounds!=='function') return null;
+      const R=computeRounds(); if(!R.valid) return null;
+      return { note:'풀리그 라운드 자동 판별(매치업 N번째 대결=NR). roundOf=경기ID별 라운드, maxRound=그룹별 최대 라운드. 포스트시즌·꼬리 라운드는 미부여.', roundOf:R.roundOf, maxRound:R.maxRound };
     }catch(e){ return null; } })(),
     xOut:(()=>{ try{
       if(typeof getXOutData!=='function') return null;
@@ -34448,6 +34456,7 @@ function _populateDashTeamFilter(){
 function renderGameDashboard(){
   _populateDashMetaFilters();
   _populateDashTeamFilter();
+  if(typeof _renderRoundFilterBar==='function') _renderRoundFilterBar();
   const grid=document.getElementById('dashboard-grid');
   if(!grid)return;
   const catFilter=(document.getElementById('dash-category-filter')||{}).value||'';
