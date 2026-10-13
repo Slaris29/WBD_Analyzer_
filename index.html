@@ -4152,6 +4152,11 @@ function _buildGameLog(pitches, inningFilter){
     if(safe===1) return {emoji:'⚾', text:'안타', color:'#39ff8a'};
     if(safe===2) return {emoji:'😵', text:'실책 출루', color:'#cc88ff'};
     if(+paEndP.strk===2 && (c===0||c===4)) return {emoji:'❌', text:'삼진', color:'#ff4560'};
+    // 타구 아웃: 실제 발사각으로 땅볼/라인/뜬공 구분
+    const bt=(typeof _battedType==='function')?_battedType(paEndP):null;
+    if(bt==='땅볼') return {emoji:'⬇️', text:'땅볼아웃', color:'#999'};
+    if(bt==='뜬공') return {emoji:'🪂', text:'플라이아웃', color:'#999'};
+    if(bt==='라인') return {emoji:'➡️', text:'라인아웃', color:'#999'};
     if(r===1) return {emoji:'🪂', text:'플라이아웃', color:'#999'};
     if(r===2) return {emoji:'⬇️', text:'땅볼아웃', color:'#999'};
     return {emoji:'•', text:'아웃', color:'#999'};
@@ -5755,6 +5760,39 @@ function renderResultPitch(){
   document.getElementById('p-result-pitch').innerHTML=html;
 }
 
+// ─── 최종 결과 뱃지 (한눈에: 안타/아웃/삼진/볼넷 등) ───
+// 타구 종류(땅볼/뜬공/라인)와 안타·아웃을 합쳐서 명확히 표시
+function _finalOutcomeBadge(d){
+  const r=+d.result;
+  // 비타구 결과 우선
+  if(r===4) return '<span class="badge badge-hr">홈런</span>';
+  if(r===5) return '<span class="badge badge-walk">볼넷</span>';
+  if(r===6) return '<span class="badge badge-hbp">사구</span>';
+  if(r===3) return '<span class="badge" style="background:rgba(204,68,255,0.18);color:#cc44ff">파울</span>';
+  // 삼진 (2스트라이크에서 타석 종료 — 헛스윙/루킹)
+  if(+d.strk===2 && !_isHit(d) && (+d.call===4 || +d.call===0) && r!==1 && r!==2){
+    // 타석이 이 투구로 끝났을 때만 삼진 (연속 파울 아님)
+    if(+d.call===4) return '<span class="badge badge-out" style="background:rgba(255,69,96,0.22);color:#ff4560">삼진(헛)</span>';
+    if(+d.call===0) return '<span class="badge badge-out" style="background:rgba(255,136,68,0.22);color:#ff8844">삼진(루킹)</span>';
+  }
+  // 인플레이 타구: 안타 vs 아웃 + 타구종류 (실제 발사각 기준)
+  const isInPlay=+d.ev>0 && r!==3;
+  if(isInPlay){
+    const bType = _battedType(d) || '타구';
+    if(_isHit(d)){
+      const base=+d._hitBase||0;
+      const bl = base===2?'2루타' : base===3?'3루타' : '안타';
+      return `<span class="badge badge-hit">${bl}<span style="opacity:.6;font-size:9px">(${bType})</span></span>`;
+    }
+    return `<span class="badge badge-out">아웃<span style="opacity:.6;font-size:9px">(${bType})</span></span>`;
+  }
+  // 그 외 (스윙 안 하고 진행중 등)
+  if(+d.call===1) return '<span class="badge badge-ball">볼</span>';
+  if(+d.call===0) return '<span class="badge badge-strike">스트라이크</span>';
+  if(+d.call===4) return '<span class="badge badge-swing">헛스윙</span>';
+  return '<span class="badge badge-out" style="opacity:.5">-</span>';
+}
+
 /* ─── PITCHER LOG ─── */
 function renderPitcherLog(){
   const innSel=document.getElementById('pl-inn-sel').value;
@@ -5793,7 +5831,7 @@ function renderPitcherLog(){
   let html=`<thead><tr><th>#</th><th>이닝</th><th>타자</th><th>구종</th><th>구속</th><th>코스</th><th>B-S-O</th><th>판정</th><th>스윙</th><th title="타자 배트 접촉 위치 (0.5=중심)">피배트중심</th><th>결과</th><th>EV</th><th>발사각</th><th>피타구질</th><th title="리그 기대 아웃확률 · 🍀피안타인데 잡혔어야 💀잘맞았는데 아웃">xOut</th></tr></thead><tbody>`;
   slice.forEach((d,i)=>{
     const gi=_gIndexOf(d);
-    html+=`<tr onclick="showPitchModal(${gi})"><td style="color:var(--muted)">${d.id||''}</td><td>${d.inn}이닝${d.half===0?'말':'초'}</td><td>${d.bName||'-'}</td><td style="color:${GROUP_COLORS[pitchGroup(d.pType,d)]}">${PITCH_NAMES[d.pType]||d.pType}</td><td style="font-family:var(--mono)">${d.spdK||'-'}</td><td style="font-size:10px">${_pl_zone(d)}</td><td style="font-family:var(--mono)">${d.ball}-${d.strk}-${d.out}</td><td>${callBadge(d.call)}</td><td>${_pl_swing(d)}</td><td>${_pl_hpos(d)}</td><td>${resBadge(d.result)}</td><td style="font-family:var(--mono)">${d.ev>0?d.ev:'-'}</td><td style="font-family:var(--mono)">${d.ldeg!=null&&d.ev>0?d.ldeg+'°':'-'}</td><td>${_pl_bbq(d)}</td><td>${_xoutBadge(d)}</td></tr>`;
+    html+=`<tr onclick="showPitchModal(${gi})"><td style="color:var(--muted)">${d.id||''}</td><td>${d.inn}이닝${d.half===0?'말':'초'}</td><td>${d.bName||'-'}</td><td style="color:${GROUP_COLORS[pitchGroup(d.pType,d)]}">${PITCH_NAMES[d.pType]||d.pType}</td><td style="font-family:var(--mono)">${d.spdK||'-'}</td><td style="font-size:10px">${_pl_zone(d)}</td><td style="font-family:var(--mono)">${d.ball}-${d.strk}-${d.out}</td><td>${callBadge(d.call)}</td><td>${_pl_swing(d)}</td><td>${_pl_hpos(d)}</td><td>${_finalOutcomeBadge(d)}</td><td style="font-family:var(--mono)">${d.ev>0?d.ev:'-'}</td><td style="font-family:var(--mono)">${d.ldeg!=null&&d.ev>0?d.ldeg+'°':'-'}</td><td>${_pl_bbq(d)}</td><td>${_xoutBadge(d)}</td></tr>`;
   });
   html+='</tbody>';
   document.getElementById('pitcher-log-table').innerHTML=html;
@@ -7080,7 +7118,7 @@ function renderBatterLog(){
   slice.forEach(d=>{
     const gi=_gIndexOf(d);
     const _zc = d.zoneX!=null ? (_isInZone(d)?'<span style="color:#f5a623">존안</span>':'<span style="color:var(--muted)">존밖</span>') : '-';
-    html+=`<tr onclick="showPitchModal(${gi})"><td style="color:var(--muted)">${d.id||''}</td><td>${d.inn}이닝${d.half===0?'말':'초'}</td><td>${d.pName||'-'}</td><td style="color:${GROUP_COLORS[pitchGroup(d.pType,d)]}">${PITCH_NAMES[d.pType]||d.pType}</td><td style="font-family:var(--mono)">${d.spdK||'-'}</td><td style="font-size:10px">${_zc}</td><td>${cb(d.call)}</td><td>${sb(d)}</td><td>${hposBadge(d)}</td><td style="font-family:var(--mono);color:var(--muted)">${d.batSpd>0?d.batSpd:'-'}</td><td>${rb(d.result)}</td><td style="font-family:var(--mono)">${d.ev>0?d.ev:'-'}</td><td style="font-family:var(--mono)">${d.ldeg!=null&&d.ev>0?d.ldeg+'°':'-'}</td><td>${bbqBadge(d)}</td><td>${_xoutBadge(d)}</td></tr>`;
+    html+=`<tr onclick="showPitchModal(${gi})"><td style="color:var(--muted)">${d.id||''}</td><td>${d.inn}이닝${d.half===0?'말':'초'}</td><td>${d.pName||'-'}</td><td style="color:${GROUP_COLORS[pitchGroup(d.pType,d)]}">${PITCH_NAMES[d.pType]||d.pType}</td><td style="font-family:var(--mono)">${d.spdK||'-'}</td><td style="font-size:10px">${_zc}</td><td>${cb(d.call)}</td><td>${sb(d)}</td><td>${hposBadge(d)}</td><td style="font-family:var(--mono);color:var(--muted)">${d.batSpd>0?d.batSpd:'-'}</td><td>${_finalOutcomeBadge(d)}</td><td style="font-family:var(--mono)">${d.ev>0?d.ev:'-'}</td><td style="font-family:var(--mono)">${d.ldeg!=null&&d.ev>0?d.ldeg+'°':'-'}</td><td>${bbqBadge(d)}</td><td>${_xoutBadge(d)}</td></tr>`;
   });
   html+='</tbody>';
   document.getElementById('batter-log-table').innerHTML=html;
@@ -7156,6 +7194,75 @@ function showPitchModal(gi){
 
   const oc=_pitchOutcome(d), ocMeta=_OUTCOME_META[oc]||{};
   const bbq=(_isInPlay(d)&&!_isBunt(d))?_BBQ_META[_bbQuality(d)]:null;
+  // ── xOut (기대 아웃확률) + 행운/불운 판정 ──
+  let xoutBlock='';
+  if(typeof _pitchXOut==='function'){
+    const xo=_pitchXOut(d);
+    if(xo!=null){
+      const pct=Math.round(xo*100);
+      const isOut=_isInPlay(d)&&!_isHit(d);
+      const isHR=+d.result===4;
+      let verdict='', vcol='var(--text)';
+      if(isHR){ verdict='홈런 (아웃 불가)'; vcol='#ff4560'; }
+      else if(!isOut && xo>=0.7){ verdict='🍀 행운의 안타 (원래 잡혔어야)'; vcol='#39ff8a'; }
+      else if(isOut && xo<=0.35){ verdict='💀 불운한 아웃 (잘 친 타구)'; vcol='#ff4560'; }
+      else if(!isOut){ verdict='안타 (타구질상 적정)'; vcol='var(--text)'; }
+      else { verdict='아웃 (타구질상 적정)'; vcol='var(--text)'; }
+      const barCol = xo>=0.7?'#39ff8a':xo>=0.4?'#f5a623':'#ff4560';
+      xoutBlock=`<div style="margin-top:12px;background:var(--card2);border-radius:6px;padding:10px 12px">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:5px">🎯 기대 아웃확률 (xOut) — 같은 EV·발사각 타구의 리그 아웃율</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="flex:1;background:#152238;height:16px;border-radius:8px;overflow:hidden;position:relative">
+            <div style="position:absolute;left:0;top:0;height:100%;width:${pct}%;background:${barCol};border-radius:8px"></div>
+            <div style="position:absolute;left:8px;top:0;height:100%;display:flex;align-items:center;font-family:var(--mono);font-size:11px;font-weight:700;color:#fff;mix-blend-mode:difference">${pct}% 아웃</div>
+          </div>
+        </div>
+        <div style="font-size:12px;font-weight:700;color:${vcol};margin-top:6px;text-align:center">${verdict}</div>
+      </div>`;
+    }
+  }
+  // 배럴/하드히트 태그
+  let qualTags='';
+  if(_isInPlay(d)&&+d.ev>0){
+    const t=[];
+    if(+d.ev>=105&&+d.ldeg>=8&&+d.ldeg<=32) t.push('<span style="background:#ff456022;color:#ff4560;padding:1px 7px;border-radius:10px;font-size:10px">배럴</span>');
+    if(+d.ev>=110) t.push('<span style="background:#ff8c4422;color:#ff8c44;padding:1px 7px;border-radius:10px;font-size:10px">하드히트</span>');
+    if(t.length) qualTags=`<div style="margin-top:4px;display:flex;gap:5px">${t.join('')}</div>`;
+  }
+  // ── Run Value (이 타석의 득점 기대값 변화) ──
+  let rvBlock='';
+  try{
+    if(typeof getRunValueData==='function'){
+      const D=getRunValueData();
+      const b1=d.b1?1:0,b2=d.b2?1:0,b3=d.b3?1:0,ou=+d.out||0;
+      if(ou<3){
+        const reNow=D.REget(b1,b2,b3,ou);
+        rvBlock=`<div style="margin-top:8px;background:var(--card2);border-radius:6px;padding:8px 12px;font-size:11px">
+          <span style="color:var(--muted)">현재 상황 득점 기대값(RE):</span> <b style="font-family:var(--mono);color:#ffd700">${reNow.toFixed(2)}점</b>
+          <span style="color:var(--muted);font-size:10px"> · ${b1||b2||b3?['1루','2루','3루'].filter((_,i)=>[b1,b2,b3][i]).join('·')+' 주자':'주자 없음'} ${ou}아웃</span></div>`;
+      }
+    }
+  }catch(e){}
+  // ── 같은 상황(카운트·구종) 리그 평균 비교 ──
+  let leagueBlock='';
+  try{
+    const cnt=(+d.ball||0)+'-'+(+d.strk||0);
+    const pg=pitchGroup(d.pType,d);
+    const peers=G.filter(x=>((+x.ball||0)+'-'+(+x.strk||0))===cnt && pitchGroup(x.pType,x)===pg);
+    if(peers.length>=20){
+      const sw=peers.filter(_isSwing).length;
+      const wh=peers.filter(_isWhiff).length;
+      const ip=peers.filter(_isInPlay);
+      const hits=peers.filter(_isHit).length;
+      const ab=peers.filter(x=>{const r=+x.result;return +x['1BSafe']===1||r===4||r===1||r===2||(+x.strk===2&&(+x.call===0||+x.call===4));}).length;
+      const avgEV=ip.filter(x=>+x.ev>0).length? ip.filter(x=>+x.ev>0).reduce((s,x)=>s+(+x.ev),0)/ip.filter(x=>+x.ev>0).length : 0;
+      leagueBlock=`<div style="margin-top:8px;background:var(--card2);border-radius:6px;padding:8px 12px;font-size:11px;line-height:1.7">
+        <div style="color:var(--muted);margin-bottom:3px">📊 같은 상황 리그 평균 <span style="font-size:9px">(${cnt} 카운트 · ${pg} · ${peers.length}구)</span></div>
+        <span style="color:var(--muted)">헛스윙률</span> <b style="font-family:var(--mono)">${sw?(wh/sw*100).toFixed(0):'-'}%</b> ·
+        <span style="color:var(--muted)">피안타율</span> <b style="font-family:var(--mono)">${ab?('.'+(hits/ab*1000).toFixed(0).padStart(3,'0')):'-'}</b> ·
+        <span style="color:var(--muted)">평균EV</span> <b style="font-family:var(--mono)">${avgEV?avgEV.toFixed(1):'-'}</b></div>`;
+    }
+  }catch(e){}
   const html=`<h3 style="color:var(--amber);font-family:var(--cond);margin-bottom:16px;font-size:16px">투구 #${d.id||''} 상세</h3>
   <div class="grid2" style="gap:16px">
   <div>${zoneSVG}<div style="font-size:9px;color:var(--muted);text-align:center;margin-top:4px">⭕ 목표 &nbsp;●&nbsp; 실제 (색=결과)</div>${sprayMini}</div>
@@ -7175,9 +7282,13 @@ function showPitchModal(gi){
     ${d.ldeg!=null&&d.ev>0?`<div><span style="color:var(--muted)">발사각:</span> ${d.ldeg}°</div>`:''}
     ${d.sdeg!=null&&d.ev>0?`<div><span style="color:var(--muted)">타구방향:</span> ${d.sdeg}° <span style="font-size:10px;color:${_SIDE_COLOR[_fieldSide(d)]||'var(--muted)'}">${_SIDE_DESC[_fieldSide(d)]||'-'}</span></div>`:''}
     ${bbq?`<div><span style="color:var(--muted)">타구질:</span> <span style="color:${bbq.color}">${bbq.label}</span></div>`:''}
+    ${qualTags}
     ${hposBar}
   </div>
-  </div>`;
+  </div>
+  ${xoutBlock}
+  ${rvBlock}
+  ${leagueBlock}`;
   openModal(html);
 }
 
@@ -9143,6 +9254,17 @@ function _isK(d){ return +d.strk===2 && (+d.call===0 || +d.call===4); }
 //   기존엔 1BSafe=1이면 무조건 안타로 세어, 이 함수를 쓰는 21개 화면이
 //   기록실/헤더보다 안타를 많게 표시했음(실측 Slaris 2R: 7 vs 6).
 function _isHit(d){ return (+d.ev>0 && _isHitPlay(d)) || +d.result===4; }
+// 타구 유형 — 게임의 result 코드(땅에 닿기만 하면 땅볼) 대신 실제 발사각(ldeg)으로 판정.
+// 펜스 직격 2루타가 '땅볼'로 잡히던 문제 해결. 반환: '땅볼'|'라인'|'뜬공'|null(비타구)
+function _battedType(d){
+  if(!(+d.ev>0) || +d.result===3) return null;   // 타구 아님/파울
+  const la=+d.ldeg;
+  if(isNaN(la)) return (+d.result===1?'뜬공':+d.result===2?'땅볼':null); // ldeg 없으면 코드 폴백
+  if(la<10) return '땅볼';
+  if(la<25) return '라인';
+  return '뜬공';
+}
+function _battedTypeShort(d){ const t=_battedType(d); return t==='땅볼'?'땅':t==='라인'?'라인':t==='뜬공'?'뜬':''; }
 function _pct(n,d){ return d>0 ? (n/d*100).toFixed(1)+'%' : '-'; }
 
 // ═══════════════════════════════════════════════════════════
@@ -14975,6 +15097,10 @@ const CHANGELOG = [
     title: '📊 심화 분석 체계(Run Value·xOut) + 🗂️ 네비게이션 전면 재편',
     badge: '#39ff8a',
     changes: [
+      {icon:'🎯', text:'⭐⭐ <b>타구 유형을 실제 발사각으로 판정 (땅볼 오분류 수정)</b> — 게임의 result 코드는 <b>땅에 닿기만 하면 \"GroundBall\"</b>이라, 펜스 직격 라인드라이브 2루타도 땅볼로 잡혔음. 실측: result=땅볼 1,041개 중 <b>351개(34%)가 실제론 라인/뜬공</b>. → 발사각(ldeg) 기준 공용 판정 <code>_battedType</code>(땅볼&lt;10°·라인10~24°·뜬공25°+) 신규. 로그 결과 뱃지·경기 플래너 아웃 표기에 적용(예: \"2루타(라인)\"). 타구질 비율·히스토그램은 원래 발사각 기준이라 그대로.'},
+      {icon:'✅', text:'⭐⭐ <b>로그 「결과」 컬럼 — 최종 결과 한눈에</b> — 기존엔 "땅볼/뜬공/파울"만 떠서 <b>그게 안타인지 아웃인지 모달을 열어야</b> 알 수 있었음. 이제 <b>안타(땅볼)·2루타(라인)·아웃(뜬공)·삼진(헛/루킹)·볼넷·사구·홈런</b>처럼 최종 결과 + 타구종류를 색으로 구분해 바로 표시(안타=초록). 타자·투수 로그 공통.'},
+      {icon:'🔎', text:'⭐ <b>투구 상세 모달에 Run Value·리그 평균 비교 추가</b> — 현재 상황의 <b>득점 기대값(RE)</b>과, 같은 <b>카운트·구종의 리그 평균</b>(헛스윙률·피안타율·평균EV)을 함께 표시해 "이 상황이 어떤 상황인지" 맥락 제공.'},
+      {icon:'🎯', text:'⭐⭐ <b>투구 상세 모달에 xOut(기대 아웃확률) 추가</b> — 타구 로그에서 투구를 클릭하면 뜨는 상세 창에, 그 타구의 <b>리그 기대 아웃확률 막대 + 판정</b>(🍀 행운의 안타 / 💀 불운한 아웃 / 타구질상 적정 / 홈런)을 표시. 배럴·하드히트 태그도 함께. 로그 컬럼뿐 아니라 상세 창에서도 "이 타구가 운이었나"를 바로 확인.'},
       {icon:'🧬', text:'⭐⭐⭐ <b>플레이 스타일 자동 분류 + 자연어 프로파일</b> — 선수평가 종합 탭 최상단에 신설. <b>실측 데이터 기반</b>(능력치가 아니라 체이스%·초구스윙·ISO·배럴·삼진율 / 투수는 실제 직구 구속·구종 믹스 엔트로피·변화구 헛스윙 유도·볼넷·초구스트라이크)으로 리그 백분위를 내어 유형 판정. 예: "💥 적극적 슬러거", "🎯 선구안 좋은 거포", "🔥 구속 앞세운 파워 피처(제구 불안)", "🎛️ 제구·변화구 기교파". 태그 + 실측 수치를 인용한 서술 문장 자동 생성. (타고 리그라 절대값은 변별 안 돼 전부 리그 상대 비교)'},
       {icon:'📋', text:'⭐⭐⭐ <b>선수 평가 리포트 2차 대폭 강화 — 내용·분석 밀도 확대</b> — 탭을 <b>5개(종합·세부 지표·🗺️존·구종·강약점·비교/추이)</b>로 확장. <b>종합</b>: 5툴 레이더 차트 + <b>서술형 심층 인사이트</b>(RV 득점기여·xOut 운·라운드별 성장/하락·좌우 편차를 문장으로 자동 생성). <b>세부 지표</b>: 백분위 바 + <b>상황별 스플릿 표</b>(vs좌/우·유리/불리 카운트별 타율·HR·헛%·EV). <b>존·구종(신규)</b>: <b>9존 타율 히트맵</b> + 구종그룹별 대응 표. <b>비교/추이</b>: 라운드 추이 + <b>상대전적 하이라이트</b>(강한/약한 상대 top5). 실제 스카우팅 리포트 수준의 정보량으로.'},
       {icon:'📋', text:'⭐⭐ <b>(1차) 선수 평가 탭 분할 + 백분위 바 도입</b> — 한 페이지에 다 쏟아내던 걸 <b>4개 탭(종합·세부 지표·강약점·비교/추이)</b>으로 재구성. <b>「세부 지표」 탭에 스탯티즈식 백분위 바</b> 신설 — 타율/OPS/wRC+/EV/배럴% 등 11개(타자)·ERA/FIP/WHIP/K9 등(투수)를 <b>리그 대비 상위 몇 %인지 색상 막대</b>로. 여기에 <b>xOut 운 분석</b>(실제 vs 기대)과 <b>Run Value</b>도 함께 표시. 종합 탭은 핵심(등급·요약·추천)만 남겨 간결하게.'},
