@@ -10470,6 +10470,98 @@ function renderBatterZoneSummary(){
   el.innerHTML=html+'</div>';
 }
 
+// ═══ 공용 5×5 존 집계/렌더 (타자분석·선수평가 공유 — 중복 금지) ═══
+// zoneX/zoneY(-2..+2) → 0..4 셀. 투수 시점 격자(col0=좌, row0=상단). 안타/AB는 기록실 정의.
+function _zone5x5CellOf(zx,zy){
+  let c=Math.floor((zx+2)/0.8), r=Math.floor((2-(zy||0))/0.8);
+  return [Math.max(0,Math.min(4,c)), Math.max(0,Math.min(4,r))];
+}
+// arr의 각 투구를 5×5 셀로 집계 → {'c,r':{...}} (renderBatterZoneMap과 동일 필드)
+function _zone5x5Cells(arr){
+  const cells={};
+  arr.forEach(d=>{
+    if(d.zoneX==null) return;
+    const [c,r]=_zone5x5CellOf(+d.zoneX,+d.zoneY);
+    const k=c+','+r;
+    if(!cells[k])cells[k]={pitches:0,ab:0,swings:0,whiffs:0,batted:0,hits:0,hrs:0,evSum:0,evCnt:0,tbs:0,laSum:0,laCnt:0,hhN:0,hhpN:0,brlN:0,brlpN:0,pa:0,ob:0};
+    const z=cells[k], res=+d.result;
+    z.pitches++;
+    if(_isSwing(d))z.swings++;
+    if(_isWhiff(d))z.whiffs++;
+    if(_isInPlay(d)){
+      z.batted++;z.evSum+=+d.ev;z.evCnt++;
+      const _la=+d.ldeg; if(d.ldeg!=null&&!isNaN(_la)){z.laSum+=_la;z.laCnt++;}
+      if(+d.ev>=110)z.hhN++;
+      if(_isHHPlus(d))z.hhpN++;
+      if(+d.ev>=105&&_la>=8&&_la<=32)z.brlN++;
+      if(_isBarrelPlus(d))z.brlpN++;
+    }
+    if(res===5||res===6){z.pa++;z.ob++;}
+    if(_isHit(d))z.hits++;
+    if(res===4)z.hrs++;
+    if(_isABPitch(d)){ z.ab++; z.pa++; if(_isHit(d)) z.ob++; }
+    if(_isHit(d)){ z.tbs += (+d._hitBase || (res===4?4:1)); }
+  });
+  return cells;
+}
+// 집계 cells + metric → 반응형 SVG 문자열. opts:{interactive, cellPx}
+// interactive=true면 .zone-cell <g>에 data-c/data-r 부여(툴팁·클릭 연결은 호출측에서).
+function _zone5x5SVG(cells, metric, opts){
+  opts=opts||{};
+  const cellVals=[];
+  Object.values(cells).forEach(c=>{
+    if(metric==='whiff'){ if(c.swings>=2)cellVals.push(c.whiffs/c.swings); }
+    else if(metric==='ev'){ if(c.batted>=2)cellVals.push(c.evSum/c.evCnt); }
+    else if(metric==='la'){ if(c.laCnt>=2)cellVals.push(c.laSum/c.laCnt); }
+    else if(metric==='hh'){ if(c.batted>=2)cellVals.push(c.hhN/c.batted); }
+    else if(metric==='hhp'){ if(c.batted>=2)cellVals.push(c.hhpN/c.batted); }
+    else if(metric==='brl'){ if(c.batted>=2)cellVals.push(c.brlN/c.batted); }
+    else if(metric==='brlp'){ if(c.batted>=2)cellVals.push(c.brlpN/c.batted); }
+    else if(metric==='ops'){ if(c.ab>=2)cellVals.push((c.pa>0?c.ob/c.pa:0)+(c.tbs/c.ab)); }
+    else if(c.ab>=2){ if(metric==='avg')cellVals.push(c.hits/c.ab); else if(metric==='slg')cellVals.push(c.tbs/c.ab); }
+  });
+  const minV=Math.min(...cellVals,0), maxV=Math.max(...cellVals,1);
+  const S=opts.cellPx||56, W=S*5+2, H=S*5+2;
+  let items='';
+  for(let r=0;r<5;r++)for(let c=0;c<5;c++){
+    const cell=cells[c+','+r], x=c*S+1, y=r*S+1;
+    const isInZone=(c>=1&&c<=3&&r>=1&&r<=3);
+    const inZoneBorder=isInZone?'#f5a623':'#2a4060';
+    let fill='#0a1828', text='', sub='';
+    const hasData = metric==='whiff' ? (cell&&cell.swings>=1) :
+      (metric==='ev'||metric==='hh'||metric==='hhp'||metric==='brl'||metric==='brlp') ? (cell&&cell.batted>=1) :
+      metric==='la' ? (cell&&cell.laCnt>=1) : (cell&&cell.ab>=1);
+    if(hasData){
+      let v=0;
+      if(metric==='avg'){v=cell.hits/cell.ab;text=v.toFixed(3).replace(/^0/,'');}
+      else if(metric==='slg'){v=cell.tbs/cell.ab;text=v.toFixed(3).replace(/^0/,'');}
+      else if(metric==='ev'){v=cell.evSum/cell.evCnt;text=v.toFixed(0);}
+      else if(metric==='whiff'){v=cell.whiffs/cell.swings;text=(v*100).toFixed(0)+'%';}
+      else if(metric==='la'){v=cell.laSum/cell.laCnt;text=v.toFixed(0)+'°';}
+      else if(metric==='hh'){v=cell.hhN/cell.batted;text=(v*100).toFixed(0)+'%';}
+      else if(metric==='hhp'){v=cell.hhpN/cell.batted;text=(v*100).toFixed(0)+'%';}
+      else if(metric==='brl'){v=cell.brlN/cell.batted;text=(v*100).toFixed(0)+'%';}
+      else if(metric==='brlp'){v=cell.brlpN/cell.batted;text=(v*100).toFixed(0)+'%';}
+      else if(metric==='ops'){v=(cell.pa>0?cell.ob/cell.pa:0)+(cell.tbs/cell.ab);text=v.toFixed(3).replace(/^0/,'');}
+      if(['la','hh','hhp','brl','brlp','ops'].includes(metric)){
+        const norm=Math.max(0,Math.min(1,(v-minV)/Math.max(0.001,maxV-minV)));
+        fill=_hotColdPalette(metric==='la'?Math.max(0,Math.min(1,(v+20)/60)):norm);
+      } else { fill=_hotColdPalette(_absHotScore(metric,v)); }
+      sub = metric==='whiff' ? cell.swings+'스윙' : metric==='ev' ? cell.batted+'타구' : cell.ab+'타수';
+    } else if(cell){ sub=cell.pitches+'구'; }
+    const txtCol=_textForBg(fill);
+    const subCol=txtCol==='#222'?'rgba(0,0,0,0.55)':'rgba(255,255,255,0.6)';
+    const fs=(S*0.23).toFixed(0), sfs=(S*0.145).toFixed(0);
+    items+=opts.interactive?`<g class="zone-cell" data-c="${c}" data-r="${r}">`:'';
+    items+=`<rect x="${x}" y="${y}" width="${S-2}" height="${S-2}" fill="${fill}" stroke="${inZoneBorder}" stroke-width="${isInZone?1.5:0.8}" rx="2"/>`;
+    if(text)items+=`<text x="${x+S/2}" y="${y+S/2+2}" fill="${txtCol}" font-size="${fs}" font-weight="700" text-anchor="middle" font-family="var(--mono)">${text}</text>`;
+    if(sub)items+=`<text x="${x+S/2}" y="${y+S-6}" fill="${subCol}" font-size="${sfs}" text-anchor="middle">${sub}</text>`;
+    items+=opts.interactive?'</g>':'';
+  }
+  // 반응형: viewBox만 고정, 폭은 컨테이너에 맞춤(max-width로 과대 방지)
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:${opts.maxW||W}px;height:auto;display:block;margin:0 auto">${items}</svg>`;
+}
+
 // ───── 타자 E-2: 5×5 핫/콜드 존 맵 ─────
 function renderBatterZoneMap(){
   const el=document.getElementById('b-zone-map');
@@ -10480,121 +10572,9 @@ function renderBatterZoneMap(){
   let all=getBatterDataFiltered().filter(d=>d.spdK>0 && d.zoneX!=null);
   all=all.filter(d=>_passMapPitchFilter('b',d));
   all=_passZoneSpdFilter(all);
-  const cells={}; // key: "col,row" → {pitches, swings, whiffs, batted[], hits, hrs, evSum, evCnt}
-  const getCell=(zx,zy)=>{
-    let col=Math.floor((zx+2)/0.8); // -2..+2 → 0..4
-    let row=Math.floor((2-zy)/0.8);
-    col=Math.max(0,Math.min(4,col));
-    row=Math.max(0,Math.min(4,row));
-    return [col,row];
-  };
-  all.forEach(d=>{
-    const [c,r]=getCell(+d.zoneX,+d.zoneY||0);
-    const k=c+','+r;
-    if(!cells[k])cells[k]={pitches:0,ab:0,swings:0,whiffs:0,batted:0,hits:0,hrs:0,evSum:0,evCnt:0,tbs:0,laSum:0,laCnt:0,hhN:0,hhpN:0,brlN:0,brlpN:0,pa:0,ob:0};
-    cells[k].pitches++;
-    const res=+d.result;
-    if(_isSwing(d))cells[k].swings++;
-    if(_isWhiff(d))cells[k].whiffs++;
-    if(_isInPlay(d)){
-      cells[k].batted++;cells[k].evSum+=+d.ev;cells[k].evCnt++;
-      const _la=+d.ldeg; if(d.ldeg!=null&&!isNaN(_la)){cells[k].laSum+=_la;cells[k].laCnt++;}
-      if(+d.ev>=110)cells[k].hhN++;
-      if(_isHHPlus(d))cells[k].hhpN++;
-      if(+d.ev>=105&&_la>=8&&_la<=32)cells[k].brlN++;
-      if(_isBarrelPlus(d))cells[k].brlpN++;
-    }
-    // OPS용: 타석 종료 이벤트 + 출루
-    if(res===5||res===6){cells[k].pa++;cells[k].ob++;}
-    if(_isHit(d))cells[k].hits++;
-    if(res===4)cells[k].hrs++;
-    // AB: 표준 (인플레이 + K)
-    if(+d['1BSafe']===1 || res===4 || res===1 || res===2 ||
-       (+d.strk===2 && (+d.call===0 || +d.call===4))){
-      cells[k].ab++;
-      cells[k].pa++;
-      if(+d['1BSafe']===1 || res===4) cells[k].ob++;
-    }
-    // V11.2 fix: 추정 베이스(_hitBase) 기반 정확한 총루타 — 2·3루타를 1루타로 계산하던 옛날 버그 수정
-    if(+d['1BSafe']===1 || res===4){ cells[k].tbs += (+d._hitBase || (res===4?4:1)); }
-  });
-  // 최대/최소 범위 잡기 (metric별로 적절한 기준)
-  const cellVals=[];
-  Object.values(cells).forEach(c=>{
-    if(metric==='whiff'){
-      if(c.swings>=2)cellVals.push(c.whiffs/c.swings);
-    } else if(metric==='ev'){
-      if(c.batted>=2)cellVals.push(c.evSum/c.evCnt);
-    } else if(metric==='la'){
-      if(c.laCnt>=2)cellVals.push(c.laSum/c.laCnt);
-    } else if(metric==='hh'){
-      if(c.batted>=2)cellVals.push(c.hhN/c.batted);
-    } else if(metric==='hhp'){
-      if(c.batted>=2)cellVals.push(c.hhpN/c.batted);
-    } else if(metric==='brl'){
-      if(c.batted>=2)cellVals.push(c.brlN/c.batted);
-    } else if(metric==='brlp'){
-      if(c.batted>=2)cellVals.push(c.brlpN/c.batted);
-    } else if(metric==='ops'){
-      if(c.ab>=2)cellVals.push((c.pa>0?c.ob/c.pa:0)+(c.tbs/c.ab));
-    } else if(c.ab>=2){
-      // BA / SLG는 표준 식 (분모 = AB)
-      if(metric==='avg')cellVals.push(c.hits/c.ab);
-      else if(metric==='slg')cellVals.push(c.tbs/c.ab);
-    }
-  });
-  const minV=Math.min(...cellVals,0), maxV=Math.max(...cellVals,1);
-  // SVG 렌더
-  const S=56; // 셀 크기
-  const W=S*5+2, H=S*5+2;
-  let items='';
-  for(let r=0;r<5;r++){
-    for(let c=0;c<5;c++){
-      const cell=cells[c+','+r];
-      const x=c*S+1, y=r*S+1;
-      const isInZone=(c>=1&&c<=3&&r>=1&&r<=3);
-      const inZoneBorder=isInZone?'#f5a623':'#2a4060';
-      let fill='#0a1828', text='', sub='';
-      // whiff는 스윙 기준, ev는 타구 기준, BA/SLG는 AB 기준
-      const hasData = metric==='whiff' ? (cell&&cell.swings>=1) :
-                       (metric==='ev'||metric==='hh'||metric==='hhp'||metric==='brl'||metric==='brlp') ? (cell&&cell.batted>=1) :
-                       metric==='la' ? (cell&&cell.laCnt>=1) :
-                       (cell&&cell.ab>=1);
-      if(hasData){
-        let v=0;
-        if(metric==='avg'){v=cell.hits/cell.ab;text=v.toFixed(3).replace(/^0/,'');}
-        else if(metric==='slg'){v=cell.tbs/cell.ab;text=v.toFixed(3).replace(/^0/,'');}
-        else if(metric==='ev'){v=cell.evSum/cell.evCnt;text=v.toFixed(0);}
-        else if(metric==='whiff'){v=cell.whiffs/cell.swings;text=(v*100).toFixed(0)+'%';}
-        else if(metric==='la'){v=cell.laSum/cell.laCnt;text=v.toFixed(0)+'°';}
-        else if(metric==='hh'){v=cell.hhN/cell.batted;text=(v*100).toFixed(0)+'%';}
-        else if(metric==='hhp'){v=cell.hhpN/cell.batted;text=(v*100).toFixed(0)+'%';}
-        else if(metric==='brl'){v=cell.brlN/cell.batted;text=(v*100).toFixed(0)+'%';}
-        else if(metric==='brlp'){v=cell.brlpN/cell.batted;text=(v*100).toFixed(0)+'%';}
-        else if(metric==='ops'){v=(cell.pa>0?cell.ob/cell.pa:0)+(cell.tbs/cell.ab);text=v.toFixed(3).replace(/^0/,'');}
-        // 절대 기준 팔레트 사용 (신규 지표는 상대 정규화)
-        if(['la','hh','hhp','brl','brlp','ops'].includes(metric)){
-          const norm=Math.max(0,Math.min(1,(v-minV)/Math.max(0.001,maxV-minV)));
-          fill=_hotColdPalette(metric==='la'?Math.max(0,Math.min(1,(v+20)/60)):norm);
-        } else {
-          fill=_hotColdPalette(_absHotScore(metric,v));
-        }
-        sub = metric==='whiff' ? cell.swings+'스윙' :
-              metric==='ev' ? cell.batted+'타구' :
-              cell.ab+'타수';
-      } else if(cell){
-        sub=cell.pitches+'구';
-      }
-      items+=`<g class="zone-cell" data-c="${c}" data-r="${r}">`;
-      items+=`<rect x="${x}" y="${y}" width="${S-2}" height="${S-2}" fill="${fill}" stroke="${inZoneBorder}" stroke-width="${isInZone?1.5:0.8}" rx="2"/>`;
-      const txtCol=_textForBg(fill);
-      const subCol=_textForBg(fill)==='#222'?'rgba(0,0,0,0.55)':'rgba(255,255,255,0.6)';
-      if(text)items+=`<text x="${x+S/2}" y="${y+S/2+2}" fill="${txtCol}" font-size="13" font-weight="700" text-anchor="middle" font-family="Share Tech Mono">${text}</text>`;
-      if(sub)items+=`<text x="${x+S/2}" y="${y+S-6}" fill="${subCol}" font-size="8" text-anchor="middle">${sub}</text>`;
-      items+=`</g>`;
-    }
-  }
-  el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">${items}</svg>
+  // 공용 집계·렌더 사용 (중복 제거)
+  const cells=_zone5x5Cells(all);
+  el.innerHTML=`${_zone5x5SVG(cells, metric, {interactive:true, cellPx:56})}
     <div style="margin-top:10px;font-size:10px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap">
       <span>🟧 가운데 3×3 = 인존(스트라이크존)</span>
       <span>🔴 핫존 ↔ 🔵 콜드존</span>
@@ -15126,7 +15106,8 @@ const CHANGELOG = [
     title: '📊 심화 분석 체계(Run Value·xOut) + 🗂️ 네비게이션 전면 재편',
     badge: '#39ff8a',
     changes: [
-      {icon:'🧹', text:'⭐⭐⭐ <b>안타 정의 전면 통일 (타율 ~3% 과대 버그 일괄 수정)</b> — 선수평가는 이미 <code>_isHit</code>(낫아웃·야수선택 제외)로 고쳤지만, <b>선수카드·팀통계·랭킹·매치업·WAR 입력 등 앱 전체 34곳</b>이 아직 인라인 <code>1BSafe===1||홈런</code>(낫아웃·야수선택 포함)을 써서 타율/피안타율이 <b>기록실보다 리그 기준 ~3%p 부풀려져</b> 있었음(안타 1,512개 중 45개가 낫아웃·야수선택, 투수 75명 중 17명 영향). → 전부 <code>_isHit</code>로 교체해 <b>앱 어디서나 타율이 기록실과 100% 일치</b>. <br><span style="color:var(--muted);font-size:11px">※ 정리: 선수평가 투수/타자 9존 집계가 거의 같은 코드로 중복돼 있던 걸 공용 <code>_scoutZoneStats</code>로 합치고(투수 존 피안타율도 같은 버그라 함께 교정), 3×3 존 히트맵 렌더러 2개가 제각각이던 걸 공용 SVG 헬퍼 기반 <code>_scoutZoneChartSVG</code> 하나로 단일화 — 타자분석 맵과 같은 스타일·저표본 점선 규약. 투수 존 탭도 이제 피안타율 히트맵이 뜸(기존 공백).</span>'},
+      {icon:'🧹', text:'⭐⭐⭐ <b>안타 정의 전면 통일 (타율 ~3% 과대 버그 일괄 수정)</b> — 선수평가는 이미 <code>_isHit</code>(낫아웃·야수선택 제외)로 고쳤지만, <b>선수카드·팀통계·랭킹·매치업·WAR 입력 등 앱 전체 34곳</b>이 아직 인라인 <code>1BSafe===1||홈런</code>(낫아웃·야수선택 포함)을 써서 타율/피안타율이 <b>기록실보다 리그 기준 ~3%p 부풀려져</b> 있었음(안타 1,512개 중 45개가 낫아웃·야수선택, 투수 75명 중 17명 영향). → 전부 <code>_isHit</code>로 교체해 <b>앱 어디서나 타율이 기록실과 100% 일치</b>. <br><span style="color:var(--muted);font-size:11px">※ 정리: 선수평가 투수/타자 9존 집계가 거의 같은 코드로 중복돼 있던 걸 공용 <code>_scoutZoneStats</code>로 합치고(투수 존 피안타율도 같은 버그라 함께 교정).</span>'},
+      {icon:'🗺️', text:'⭐⭐⭐ <b>선수평가 존 히트맵을 타자분석의 5×5 맵으로 교체</b> — 선수평가는 빈약한 <b>3×3</b> 히트맵(렌더러도 2개 제각각)을 쓰고 있었는데, 타자분석엔 훨씬 좋은 <b>5×5 핫/콜드 존 맵</b>(스트라이크존 바깥 1칸 포함, 지표 선택, 핫↔콜드 팔레트, 표본수 표시)이 이미 있었음. → <b>그 5×5를 그대로 가져옴</b>. 집계·렌더를 공용 함수(<code>_zone5x5Cells</code>/<code>_zone5x5SVG</code>)로 뽑아 <b>타자분석과 선수평가가 같은 코드를 공유</b>(중복 제거). 선수평가 「세부 지표」·「존·구종」 두 탭 모두 5×5로, <b>타율/장타율/OPS/헛스윙%/EV/하드히트%/배럴%/발사각</b> 지표 전환 가능. 화면에 꽉 차 안 보이던 문제도 반응형(컨테이너 맞춤)으로 해결. <b>투수 존 탭도 5×5 피안타율 히트맵</b>이 뜸(기존 공백).'},
       {icon:'📈', text:'⭐⭐ <b>라운드별 추이 — 세부지표 확대 + 투수 이닝 정식집계 사용</b> — 「비교·추이」 탭의 라운드 표가 <b>타율/피안타율만</b> 보여 빈약했음. 이제 <b>타자=타율·출루율·장타율·OPS·홈런·삼진%·평균EV</b>, <b>투수=이닝·ERA·WHIP·피안타율·K/9·피홈런·피평균EV</b>로 확장. 투수 이닝·ERA·WHIP는 <b>새 추정식을 만들지 않고</b> 앱의 정식 집계 함수(<code>_getCachedPitcherStats</code>, 아웃카운트 추적 = <code>_getPitcherSeason</code>과 동일 파이프라인)를 라운드별로 합산 → 기록실·시즌 성적과 <b>완전 일치</b>. 각 지표에 ▲/▼좋음 방향 표시.'},
       {icon:'🩹', text:'⭐⭐ <b>투수 「시즌 내 추이」 방향 반대 버그 수정</b> — 종합평가 서술에서 투수의 <b>피안타율이 올라갔는데 "후반 상승 — 성장형"</b>(초록)으로 좋게 표시되던 오류. 투수는 피안타율 상승=나쁨이므로 방향을 반대로(타자/투수 구분), 라벨도 "피안타율 1R→2R (후반 피안타 증가/감소)"로 명확히.'},
       {icon:'🔧', text:'⭐⭐⭐ <b>선수평가 타율 불일치 수정</b> — 선수평가의 <b>스플릿 표·존 히트맵 타율</b>이 안타를 <code>1BSafe</code> 원본으로 세서 <b>낫아웃 출루·야수선택까지 안타로 집계</b>, 타율이 부풀려졌음(예: 실제 .395인데 스플릿 합산 .455). → 기록실과 <b>동일한 정의(_isHit·_isABPitch)로 통일</b>, 이제 거의 일치(잔차는 좌우 스플릿이 투수 손잡이 결측 투구를 제외하는 데서 오는 미세차). <b>xOut "인플레이타율"</b>은 일반 타율과 다른 BABIP 지표임을 라벨로 명시. <b>라운드 추이</b> 각 지표에 ▲/▼좋음 방향 표시 추가.'},
@@ -20680,30 +20661,12 @@ function _scoutPickTop3Priorities(data, report, mode){
 }
 
 // ─── 존 차트 SVG (9분할 컬러맵) ───
-// 선수평가 전용 3×3 존 (타)율 히트맵 — 공용 SVG 헬퍼(sEl/makeSVG)로 렌더, 존 테두리 색은 타자분석 맵과 동일 규약.
-// mode: 'pitcher'(피안타율, 높을수록 빨강=투수에게 나쁨) | 'batter'(타율, 높을수록 빨강=타자에게 좋음) — 색 스케일은 동일, 의미만 반대.
-function _scoutZoneChartSVG(zoneStats, mode){
-  const S=78, pad=1, W=S*3+pad*2, H=S*3+pad*2;
-  const MINAB=3;                                   // 표본 3타수+에서만 수치 표시
-  let items=sEl('rect',{x:0.5,y:0.5,width:W-1,height:W-1,fill:'none',stroke:'#2a4060','stroke-width':'1'});
-  zoneStats.forEach((z,i)=>{
-    const r=Math.floor(i/3), c=i%3, x=c*S+pad, y=r*S+pad;
-    const ba=z.ab>0?z.hits/z.ab:0;
-    const enough=z.ab>=MINAB;
-    // WBD 타고 환경: .000~.700 스케일로 정규화(평균 .33~.37)
-    const t=enough?Math.min(1,ba/0.7):0;
-    const fill=enough?`rgb(${Math.round(30+t*200)},${Math.round(80-t*60)},${Math.round(160-t*140)})`:'#132234';
-    const rectAttr={x,y,width:S-1,height:S-1,fill,stroke:'#1b2d44','stroke-width':'0.8',rx:'2'};
-    if(z.ab>0&&!enough) rectAttr['stroke-dasharray']='3,2';   // 저표본 = 점선(타자맵 lowN 규약)
-    items+=sEl('rect',rectAttr);
-    if(enough){
-      items+=`<text x="${x+S/2}" y="${y+S/2-2}" fill="#fff" font-size="16" font-weight="800" text-anchor="middle" font-family="var(--mono)" style="paint-order:stroke;stroke:rgba(0,0,0,0.55);stroke-width:2.5">${(ba<1?'.':'')+(ba*1000).toFixed(0).padStart(3,'0')}</text>`;
-      items+=`<text x="${x+S/2}" y="${y+S/2+14}" fill="rgba(255,255,255,0.78)" font-size="10" text-anchor="middle">${z.hits}/${z.ab}</text>`;
-    } else if(z.n>0){
-      items+=`<text x="${x+S/2}" y="${y+S/2+4}" fill="var(--muted)" font-size="11" text-anchor="middle">${z.n}구</text>`;
-    }
-  });
-  return makeSVG(W,H,items,'style="max-width:260px;margin:0 auto"');
+// 선수평가 존 히트맵 — 타자분석의 공용 5×5(_zone5x5Cells/_zone5x5SVG)를 그대로 사용.
+// name: 선수명, mode: 'batter'|'pitcher'(투수=피안타 관점이지만 avg=hits/AB로 동일 집계), metric: 기본 avg.
+function _scoutZone5x5(name, mode, metric, opts){
+  const arr=(mode==='pitcher')?getPitcherDataByName(name):getBatterDataByName(name);
+  const cells=_zone5x5Cells(arr.filter(d=>d.zoneX!=null));
+  return _zone5x5SVG(cells, metric||'avg', opts||{});
 }
 
 // ─── 메인 렌더링 ───
@@ -22533,11 +22496,11 @@ function renderScoutingPage(){
   // ─── 데이터 백업 (히트맵 + 좌우 split) ───
   html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
     <div class="card section">
-      <div class="card-title">🎯 ${state.mode==='pitcher'?'피안타':'타격'} 히트맵</div>
-      ${_scoutZoneChartSVG(data.zoneStats, state.mode)}
+      <div class="card-title">🎯 ${state.mode==='pitcher'?'피안타':'타격'} 히트맵 <span style="font-size:10px;color:var(--muted);font-weight:400">5×5 · ${state.mode==='pitcher'?'피안타율':'타율'}</span></div>
+      ${_scoutZone5x5(state.target, state.mode, 'avg', {maxW:300})}
       <div style="font-size:10px;color:var(--muted);margin-top:8px;line-height:1.5">
-        타자 시점 9분할 (좌우 기준은 우타 기준). 빨간색일수록 ${state.mode==='pitcher'?'피안타율 높음 (조심)':'타율 높음 (강점)'}.<br>
-        5구 미만은 표본 부족.
+        투수 시점 5×5 (가운데 3×3 = 스트라이크존). 빨간색일수록 ${state.mode==='pitcher'?'피안타율 높음 (조심)':'타율 높음 (강점)'}, 파란색=콜드존.<br>
+        숫자 아래는 타수. 상세·다른 지표는 「존·구종」 탭에서.
       </div>
     </div>
 
@@ -23148,17 +23111,34 @@ function _scoutGroupTable(data, mode){
   return `<div class="card section" style="border-left:3px solid #cc44ff"><div class="card-title" style="color:#cc44ff;font-size:13px;margin-bottom:12px">🎿 구종그룹별 ${isBat?'대응':'구사·피성적'}</div>
     <div class="tbl-wrap"><table class="data-table" style="font-size:11px;text-align:center"><thead><tr><th>구종</th><th>${isBat?'상대':'구사'}</th><th>${isBat?'타율':'피안타율'}</th><th>HR</th><th>헛%</th><th>EV</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
 }
-// 존 탭 히트맵 — 공용 _scoutZoneChartSVG 재사용(렌더러 단일화). 타자=타율, 투수=피안타율.
+// 존 탭 히트맵 — 타자분석과 동일한 공용 5×5 맵(지표 선택 + 핫/콜드 팔레트). 타자=타율 기본, 투수=피안타율 관점.
+const _SCOUT_ZONE_METRICS=[['avg','타율/피안타율'],['slg','장타율'],['ops','OPS'],['whiff','헛스윙%'],['ev','평균 EV'],['hh','하드히트%'],['brl','배럴%'],['la','평균 발사각']];
 function _scoutZoneHeatmap(data, mode){
-  if(!data.zoneStats) return '';
+  const name=data.target||data.name;
   const isBat=mode==='batter';
   const col=isBat?'#39ff8a':'#ff8c44';
-  const title=isBat?'🗺️ 존별 타율 (투수 시점 3×3)':'🗺️ 존별 피안타율 (투수 시점 3×3)';
-  const note=isBat?'위=높은코스, 색 진할수록 고타율 · 표본 3타수+ 표시'
-                  :'위=높은코스, 색 진할수록 피안타율 높음(투수에게 불리) · 표본 3타수+ 표시 · 점선=저표본';
-  return `<div class="card section" style="border-left:3px solid ${col}"><div class="card-title" style="color:${col};font-size:13px;margin-bottom:10px">${title}</div>
-    ${_scoutZoneChartSVG(data.zoneStats, mode)}
-    <div style="font-size:9px;color:var(--muted);text-align:center;margin-top:6px">${note}</div></div>`;
+  const metric=(window._scoutZoneState&&window._scoutZoneState.metric)||'avg';
+  // 지표 셀렉터
+  const sel=`<select onchange="_scoutZoneSetMetric(this.value)" style="background:var(--card2);border:1px solid var(--border);color:var(--text);padding:5px 10px;border-radius:5px;font-size:12px">
+    ${_SCOUT_ZONE_METRICS.map(([v,l])=>`<option value="${v}" ${v===metric?'selected':''}>${l}</option>`).join('')}</select>`;
+  const metricNote=metric==='avg'?(isBat?'빨강=고타율(강점)':'빨강=피안타율 높음(조심)')
+    :metric==='whiff'?'빨강=헛스윙 많음':metric==='ev'?'빨강=강한 타구':'빨강=높음';
+  return `<div class="card section" style="border-left:3px solid ${col}">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+      <div class="card-title" style="color:${col};font-size:13px;margin:0">🗺️ 존별 히트맵 <span style="font-size:10px;color:var(--muted);font-weight:400">투수 시점 5×5</span></div>
+      ${sel}
+    </div>
+    <div id="scout-zone-map">${_scoutZone5x5(name, mode, metric, {interactive:false, cellPx:58, maxW:330})}</div>
+    <div style="font-size:9px;color:var(--muted);text-align:center;margin-top:8px;line-height:1.5">
+      가운데 주황 테두리 3×3 = 스트라이크존 · ${metricNote} ↔ 파랑 · 숫자 아래는 표본수
+    </div></div>`;
+}
+function _scoutZoneSetMetric(m){
+  window._scoutZoneState=window._scoutZoneState||{};
+  window._scoutZoneState.metric=m;
+  const st=window._scoutReportState;
+  const el=document.getElementById('scout-zone-map');
+  if(el && st){ el.innerHTML=_scoutZone5x5(st.target, st.mode, m, {interactive:false, cellPx:58, maxW:330}); }
 }
 // 5툴 레이더 (grades 기반 SVG)
 function _scoutRadar(report){
