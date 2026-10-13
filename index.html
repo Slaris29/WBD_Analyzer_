@@ -2853,10 +2853,25 @@ function removeGame(gid){
 ══════════════════════════════════════ */
 let _roundCache={gKey:'',data:null};
 function _gameDateKey(name){
-  // 2026_06_26_AT_vs_IQ... → 20260626, 매치업쌍, 팀
-  const m=String(name||'').match(/(\d{4})[_-]?(\d{2})[_-]?(\d{2})[_-]+([A-Za-z0-9]+)[_-]+vs[_-]+([A-Za-z0-9]+)/i);
-  if(!m) return null;
-  return {date:+(m[1]+m[2]+m[3]), t1:m[4].toUpperCase(), t2:m[5].toUpperCase(), pair:[m[4].toUpperCase(),m[5].toUpperCase()].sort().join('|')};
+  // 다양한 파일명 포맷 지원:
+  //  · 2026_06_26_AT_vs_IQ                                  (짧은 팀명)
+  //  · league_2025_11_14_ishikawa_fighting_folks_vs_hoshizora_milkyways_pXPZ9  (긴 팀명 + 접두사/해시)
+  const s=String(name||'').replace(/\.(csv|txt)$/i,'');
+  // 날짜 추출 (문자열 어디든 YYYY_MM_DD)
+  const dm=s.match(/(\d{4})[_-](\d{2})[_-](\d{2})/);
+  if(!dm) return null;
+  const date=+(dm[1]+dm[2]+dm[3]);
+  // 날짜 이후 부분에서 _vs_ 기준으로 팀 양쪽 추출
+  const after=s.slice(dm.index+dm[0].length).replace(/^[_-]+/,'');
+  const vm=after.split(/[_-]vs[_-]/i);
+  if(vm.length<2) return null;
+  let t1=vm[0].trim();
+  // 오른쪽 팀명 뒤의 랜덤 해시(영숫자 10자+) 제거
+  let t2=vm[1].replace(/[_-][A-Za-z0-9]{8,}$/,'').trim();
+  if(!t1||!t2) return null;
+  const n=x=>x.toUpperCase().replace(/[_-]+/g,'_').replace(/^_|_$/g,'');
+  t1=n(t1); t2=n(t2);
+  return {date, t1, t2, pair:[t1,t2].sort().join('|')};
 }
 function _gamePhase(g){
   // 포스트시즌 여부 (라운드 판별에서 제외)
@@ -2872,49 +2887,57 @@ function computeRounds(){
     const grp=g.groupId||g.groupName||'__all__';
     (byGroup[grp]=byGroup[grp]||[]).push(g);
   });
-  const roundOf={}; const maxRound={};
+  const roundOf={};         // gameId → 라운드 번호 (리그전 정규시즌만)
+  const roundGroup={};      // gameId → 그룹키 (어느 시즌의 라운드인지)
+  const groups=[];          // [{key, name, maxRound, roundGames:{r:[ids]}}]
   Object.entries(byGroup).forEach(([grp,games])=>{
+    // 라운드는 '리그전'에만 의미 — 스크림·이벤트 등은 라운드 미부여
+    const isLeague = games.some(g=>String(g.category||'').toLowerCase()==='league') ||
+                     String(grp).toLowerCase().indexOf('league')>=0;
+    if(!isLeague) return;
     // 정규시즌만 (포스트시즌 제외)
     const reg=games.filter(g=>_gamePhase(g).indexOf('포스트')<0);
-    // 날짜순 정렬 (파싱 실패 시 원순서 유지)
     const withKey=reg.map(g=>({g,k:_gameDateKey(g.name)})).filter(x=>x.k);
+    if(withKey.length<2) return;
     withKey.sort((a,b)=>a.k.date-b.k.date);
     const seen={}; const roundGames={};
     withKey.forEach(({g,k})=>{
       seen[k.pair]=(seen[k.pair]||0)+1;
-      roundOf[g.id]=seen[k.pair];
-      (roundGames[seen[k.pair]]=roundGames[seen[k.pair]]||[]).push(g.id);
+      const rn=seen[k.pair];
+      (roundGames[rn]=roundGames[rn]||[]).push(g.id);
     });
-    // 신뢰할 라운드만: 가장 큰 라운드의 경기수 대비 40% 미만인 꼬리 라운드(포스트시즌·불완전)는 제거
+    // 신뢰할 라운드만: 최대 라운드 경기수 대비 40% 미만 꼬리(포스트시즌·불완전)는 미부여
     const roundNums=Object.keys(roundGames).map(Number).sort((a,b)=>a-b);
     const peak=Math.max(...roundNums.map(r=>roundGames[r].length));
-    let mx=0;
+    let mx=0; const keptRounds={};
     roundNums.forEach(r=>{
-      if(roundGames[r].length >= Math.max(3, peak*0.4)) mx=Math.max(mx,r);
-      else roundGames[r].forEach(id=>{ delete roundOf[id]; }); // 꼬리 라운드는 라운드 미부여
+      if(roundGames[r].length >= Math.max(3, peak*0.4)){ mx=Math.max(mx,r); keptRounds[r]=roundGames[r]; roundGames[r].forEach(id=>{roundOf[id]=r; roundGroup[id]=grp;}); }
     });
-    if(mx>0) maxRound[grp]=mx;
+    if(mx>=2){
+      const name=(games[0]&&(games[0].groupName||games[0].seasonName))||grp.replace(/^league\//,'').replace(/_/g,' ');
+      groups.push({key:grp, name, maxRound:mx, roundGames:keptRounds});
+    }
   });
-  // 라운드가 신뢰할 만한지: 한 그룹이라도 2+ 라운드가 나오면 유효
-  const anyMulti=Object.values(maxRound).some(v=>v>=2);
-  const data={roundOf,maxRound,valid:anyMulti};
+  const data={roundOf, roundGroup, groups, valid:groups.length>0};
   _roundCache={gKey,data};
   return data;
 }
-// 현재 라운드 필터 (null=전체). 그룹 무관하게 "k라운드" 선택.
+// 현재 라운드 필터 (null=전체) 또는 {group, round}
 window._roundFilter=null;
-function setRoundFilter(r){
-  window._roundFilter = (r===window._roundFilter)?null:r;
-  // activeGameIds를 라운드에 맞게 재설정
+function setRoundFilter(group, round){
+  const cur=window._roundFilter;
+  // 같은 버튼 재클릭 → 해제
+  if(cur && group && cur.group===group && cur.round===round){ window._roundFilter=null; }
+  else if(group==null){ window._roundFilter=null; }
+  else { window._roundFilter={group, round}; }
   const R=computeRounds();
   if(window._roundFilter==null){
-    // 전체 복원: 모든 경기 활성
-    GAMES.forEach(g=>activeGameIds.add(g.id));
+    GAMES.forEach(g=>activeGameIds.add(g.id));   // 전체 복원
   }else{
+    const {group:fg, round:fr}=window._roundFilter;
     GAMES.forEach(g=>{
-      const rn=R.roundOf[g.id];
-      // 라운드 미부여(포스트시즌 등)는 전체선택에서만 포함 — 라운드필터 시 제외
-      if(rn===window._roundFilter) activeGameIds.add(g.id); else activeGameIds.delete(g.id);
+      if(R.roundGroup[g.id]===fg && R.roundOf[g.id]===fr) activeGameIds.add(g.id);
+      else activeGameIds.delete(g.id);
     });
   }
   rebuildG(); updateNavInfo(); renderGamesList(); populateSelects(); renderActiveContent();
@@ -2925,9 +2948,15 @@ function _renderRoundFilterBar(){
   const lbl=document.getElementById('dash-round-label');
   const R=computeRounds();
   if(!R.valid){ bar.style.display='none'; if(lbl)lbl.style.display='none'; return; }
-  const maxR=Math.max(...Object.values(R.maxRound));
-  let btns=`<button class="rf-btn${window._roundFilter==null?' active':''}" onclick="setRoundFilter(null)">전체</button>`;
-  for(let r=1;r<=maxR;r++) btns+=`<button class="rf-btn${window._roundFilter===r?' active':''}" onclick="setRoundFilter(${r})">${r}R</button>`;
+  const cur=window._roundFilter;
+  let btns=`<button class="rf-btn${cur==null?' active':''}" onclick="setRoundFilter(null)">전체</button>`;
+  R.groups.forEach(gr=>{
+    btns+=`<span style="font-size:10px;color:var(--muted);margin:0 2px 0 6px">${gr.name}</span>`;
+    for(let r=1;r<=gr.maxRound;r++){
+      const on = cur&&cur.group===gr.key&&cur.round===r;
+      btns+=`<button class="rf-btn${on?' active':''}" onclick="setRoundFilter('${gr.key.replace(/'/g,"\\'")}',${r})">${r}R</button>`;
+    }
+  });
   bar.innerHTML=btns; bar.style.display='inline-flex';
   if(lbl)lbl.style.display='inline';
 }
@@ -15104,7 +15133,7 @@ const CHANGELOG = [
       {icon:'🧬', text:'⭐⭐⭐ <b>플레이 스타일 자동 분류 + 자연어 프로파일</b> — 선수평가 종합 탭 최상단에 신설. <b>실측 데이터 기반</b>(능력치가 아니라 체이스%·초구스윙·ISO·배럴·삼진율 / 투수는 실제 직구 구속·구종 믹스 엔트로피·변화구 헛스윙 유도·볼넷·초구스트라이크)으로 리그 백분위를 내어 유형 판정. 예: "💥 적극적 슬러거", "🎯 선구안 좋은 거포", "🔥 구속 앞세운 파워 피처(제구 불안)", "🎛️ 제구·변화구 기교파". 태그 + 실측 수치를 인용한 서술 문장 자동 생성. (타고 리그라 절대값은 변별 안 돼 전부 리그 상대 비교)'},
       {icon:'📋', text:'⭐⭐⭐ <b>선수 평가 리포트 2차 대폭 강화 — 내용·분석 밀도 확대</b> — 탭을 <b>5개(종합·세부 지표·🗺️존·구종·강약점·비교/추이)</b>로 확장. <b>종합</b>: 5툴 레이더 차트 + <b>서술형 심층 인사이트</b>(RV 득점기여·xOut 운·라운드별 성장/하락·좌우 편차를 문장으로 자동 생성). <b>세부 지표</b>: 백분위 바 + <b>상황별 스플릿 표</b>(vs좌/우·유리/불리 카운트별 타율·HR·헛%·EV). <b>존·구종(신규)</b>: <b>9존 타율 히트맵</b> + 구종그룹별 대응 표. <b>비교/추이</b>: 라운드 추이 + <b>상대전적 하이라이트</b>(강한/약한 상대 top5). 실제 스카우팅 리포트 수준의 정보량으로.'},
       {icon:'📋', text:'⭐⭐ <b>(1차) 선수 평가 탭 분할 + 백분위 바 도입</b> — 한 페이지에 다 쏟아내던 걸 <b>4개 탭(종합·세부 지표·강약점·비교/추이)</b>으로 재구성. <b>「세부 지표」 탭에 스탯티즈식 백분위 바</b> 신설 — 타율/OPS/wRC+/EV/배럴% 등 11개(타자)·ERA/FIP/WHIP/K9 등(투수)를 <b>리그 대비 상위 몇 %인지 색상 막대</b>로. 여기에 <b>xOut 운 분석</b>(실제 vs 기대)과 <b>Run Value</b>도 함께 표시. 종합 탭은 핵심(등급·요약·추천)만 남겨 간결하게.'},
-      {icon:'🔄', text:'⭐⭐ <b>라운드 자동 판별 + 라운드 필터</b> — 풀리그 구조(각 팀과 N번씩 맞붙음)를 <b>업로드 방식 변경 없이 자동 감지</b>. 매치업이 그룹(시즌) 내 몇 번째 대결인지로 라운드 부여(26 Summer=2R, FW=3R 등 자동), 꼬리(포스트시즌 등)는 경기수 기준으로 자동 제외. <b>경기 대시보드 필터 행에 「라운드: 전체/1R/2R…」 필터</b> 신설 — 특정 라운드만 켜서 전체 분석에 적용 가능. <b>선수평가 「비교·추이」 탭</b>에 라운드별 타율·홈런·삼진%·EV 변화 표(이전 라운드 대비 색상).'},
+      {icon:'🔄', text:'⭐⭐ <b>라운드 자동 판별 + 시즌별 라운드 필터</b> — 풀리그 구조(각 팀과 N번씩 맞붙음)를 <b>업로드 방식 변경 없이 자동 감지</b>. <b>리그전에만 부여</b>(스크림·이벤트 제외), <b>시즌별로 분리</b>해 "26 Summer 1R/2R", "FW Season 1R/2R/3R"처럼 시즌을 명시한 버튼 제공. 라운드 선택 시 그 시즌 해당 라운드만 활성화(다른 시즌·스크림은 안 켜짐). 파일명 포맷 2종(짧은 팀명 / 긴 팀명+해시) 모두 파싱. <b>선수평가 「비교·추이」 탭</b>에 라운드별 타율·홈런·삼진%·EV 변화 표. <br><span style="color:var(--muted);font-size:11px">※ 초기 버그 수정: 라운드 선택 시 스크림·이벤트가 같이 켜지던 문제, FW 시즌 파일명(league_ 접두사·긴 팀명) 미인식 문제 해결.</span>'},
       {icon:'📊', text:'⭐⭐ <b>백분위 바를 투수·타자 개인 분석에도</b> — 선수평가 전용이던 스탯티즈식 백분위 바를 <b>투수/타자 분석 C탭</b>에도 추가. 선수 보던 흐름에서 바로 "리그 대비 상위 몇 %"를 RV·xOut 카드와 함께 확인. 선수평가와 동일 계산(공용 함수).'},
       {icon:'📤', text:'⭐⭐ <b>분석 데이터 내보내기에 Run Value·xOut 추가</b> — export 번들에 <code>runValue</code>(RE24 매트릭스 + 선수별 RV)와 <code>xOut</code>(선수별 실제 vs 기대 성적·운) 섹션 신규. schemaVersion 18, appVersion 표기도 V12.0으로 정정.'},
       {icon:'🗂️', text:'⭐⭐⭐ <b>메뉴 구조 전면 재편</b> — 기능이 \"도구\" 한 통에 13개씩 쌓여 찾기 힘들던 걸 성격별로 정리. <b>허브 페이지</b> 3곳 신설(상단 탭으로 전환): <b>📊 심화 분석</b>(Run Value·기대성적/운·구종 분석), <b>🛡️ 수비</b>(팀 수비·수비수 단독·타구 분석), <b>📋 스카우팅</b>(상대 공략·선수 평가). 드롭다운도 <b>⚔️ 전략</b>(비교·매치업·상대전적·팀빌더)·<b>🏅 랭킹</b>·<b>📰 경기</b>로 재분류. 모바일 메뉴도 동일 구조로.'},
@@ -32471,7 +32500,8 @@ function exportAnalyticsBundle(opts){
     rounds:(()=>{ try{
       if(typeof computeRounds!=='function') return null;
       const R=computeRounds(); if(!R.valid) return null;
-      return { note:'풀리그 라운드 자동 판별(매치업 N번째 대결=NR). roundOf=경기ID별 라운드, maxRound=그룹별 최대 라운드. 포스트시즌·꼬리 라운드는 미부여.', roundOf:R.roundOf, maxRound:R.maxRound };
+      const maxRound={}; R.groups.forEach(g=>{maxRound[g.key]=g.maxRound;});
+      return { note:'풀리그 라운드 자동 판별(리그전 한정, 매치업 N번째 대결=NR). roundOf=경기ID별 라운드, roundGroup=경기ID별 시즌, groups=시즌별 라운드 수. 포스트시즌·꼬리·비리그전은 미부여.', roundOf:R.roundOf, roundGroup:R.roundGroup, maxRound, groups:R.groups.map(g=>({key:g.key,name:g.name,maxRound:g.maxRound})) };
     }catch(e){ return null; } })(),
     xOut:(()=>{ try{
       if(typeof getXOutData!=='function') return null;
