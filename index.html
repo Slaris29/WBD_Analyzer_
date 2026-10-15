@@ -361,6 +361,9 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
   /* 기존 topnav 숨김, 모바일 바 표시 */
   #topnav{display:none !important}
   #mobile-topbar{display:flex !important}
+  /* SCOUTLAB/상대공략 2컬럼 그리드 → 모바일 1컬럼 */
+  .sl-grid2{grid-template-columns:1fr !important}
+  #page-scoutlab [style*="grid-template-columns:repeat(4"]{grid-template-columns:repeat(2,1fr) !important}
   #mobile-bottom-tabs{display:flex !important}
   /* 하단 탭바 가리지 않게 페이지 padding-bottom */
   .page{padding-bottom:70px !important}
@@ -610,7 +613,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
   <!-- 모바일 전용 상단 바 (햄버거) -->
   <div id="mobile-topbar" style="display:none">
     <button id="hamburger-btn" onclick="toggleMobileMenu()" aria-label="메뉴">☰</button>
-    <div class="mobile-logo">WBD <span style="font-size:10px;color:var(--muted);margin-left:2px">V12.0</span></div>
+    <div class="mobile-logo" onclick="_scoutLabTap()">WBD <span style="font-size:10px;color:var(--muted);margin-left:2px">V12.0</span></div>
     <button class="mobile-icon-btn" onclick="openGlobalSearch()" title="검색">🔍</button>
     <button class="mobile-icon-btn" onclick="document.getElementById('add-file-input').click()" title="경기 추가" style="color:var(--amber)">+</button>
   </div>
