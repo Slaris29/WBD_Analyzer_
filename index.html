@@ -1080,6 +1080,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
         <div class="card"><div class="card-title">스윙 지표 레이더</div><div id="b-radar"></div></div>
         <div class="card"><div class="card-title">배트 컨택 위치 (hPos)</div><div id="b-hpos"></div></div>
       </div>
+      <div class="card section"><div class="card-title">🏏 배트별 성적</div><div id="b-battype"></div></div>
       <div class="card section"><div class="card-title">구속대별 타격 결과</div><div id="b-spd-band"></div></div>
       <div class="card section">
         <div class="card-title">🎯 상황별 대응 분석 (다중 필터)</div>
@@ -2544,12 +2545,13 @@ function _readGameMeta(rows){
 // 존 좌표계 — 심판 스트라이크 판정 경계 실측(47경기, 루킹 투구).
 //   wide : 기존 좌표. 경계 가로 ±1.475 / 세로 ±1.05 (스트 최대 1.471, 볼 최소 1.482)
 //   local: 스키마 40+(pitchZoneCoordinates=strikeZoneLocal). 경계 가로 ±0.635 / 세로 ±0.61
-//   unit : 경계가 정확히 ±1인 데이터(과거 포맷 대비 안전장치 — 판정 증거가 있을 때만 선택)
+//   early: 2025년 10월 초 빌드. 경계 가로 ±1.22 (스트 최대 1.198, 볼 최소 1.241) — 서버 641경기 점검에서 6경기 확인.
+//          2025-11 ~ 2026-11/6 리그·스크림 전 경기는 wide(스트 최대 1.471)로 확인됨.
 // 모든 분석 코드는 "±1 = 스트라이크존 경계"를 전제로 하므로, 로드 시 한 번 이 척도로 맞춘다(원본은 _zxRaw/_zyRaw).
-const ZONE_SYS={ wide:{x:1.475,y:1.05,label:'기존 좌표'}, local:{x:0.635,y:0.61,label:'strikeZoneLocal'}, unit:{x:1,y:1,label:'±1 좌표'} };
+const ZONE_SYS={ wide:{x:1.475,y:1.05,label:'기존 좌표'}, local:{x:0.635,y:0.61,label:'strikeZoneLocal'}, early:{x:1.22,y:1.05,label:'초기 좌표(25.10)'} };
 function _detectZoneSys(rows,meta){
   if(meta && meta.pitchZoneCoordinates==='strikeZoneLocal') return 'local';
-  // 메타가 없으면 루킹 판정으로 판별: A대역(0.66~1.0)이 볼이면 local, B대역(1.05~1.45)이 볼이면 unit, 스트라이크면 wide
+  // 메타가 없으면 루킹 판정으로 판별: A대역(0.66~1.0)이 볼이면 local, B대역(1.25~1.45)이 볼이면 early, 스트라이크면 wide
   let sA=0,bA=0,sB=0,bB=0;
   for(let i=0;i<rows.length;i++){
     const d=rows[i];
@@ -2558,10 +2560,10 @@ function _detectZoneSys(rows,meta){
     const x=Math.abs(+d.zoneX), y=Math.abs(+d.zoneY);
     if(x!==x || y!==y) continue;
     if(x>0.66 && x<=1.0 && y<0.55){ if(c===0) sA++; else bA++; }
-    else if(x>1.05 && x<=1.45 && y<0.9){ if(c===0) sB++; else bB++; }
+    else if(x>1.25 && x<=1.45 && y<0.9){ if(c===0) sB++; else bB++; }
   }
   if(bA>sA) return 'local';
-  if(bB>sB) return 'unit';
+  if(bB>sB) return 'early';
   return 'wide';
 }
 function _normalizeZone(rows,sysKey){
@@ -2576,6 +2578,41 @@ function _normalizeZone(rows,sysKey){
     d.zoneX=Math.round(d.zoneX/z.x*1e4)/1e4;
     d.zoneY=Math.round(d.zoneY/z.y*1e4)/1e4;
   }
+}
+
+// 기록원 수동 수정 반영 (CSV manual / errPosDelta, 2026-08~).
+//   manual은 "그 투구 뒤에 발생한 수동 조작 종류"만 남기므로(횟수·대상 투구 불명), 해석이 확실한 경우만 적용:
+//     · 자동 안타(인플레이, 1BSafe=1) 행에 BH−만 있음 → 안타 취소. BE+가 같이 있으면 실책 출루(_roe)
+//     · 인플레이 아웃 행에 BH+만 있음 → 안타 인정
+//   BH+와 BH−가 같이 있거나(되돌림) 인플레이가 아닌 행의 BH±, 타수(BA±) 조정은 대상이 불명확해 적용하지 않음.
+//   분석기 전체가 1BSafe로 안타를 보므로 1BSafe 자체를 교정하고 원본은 _raw1BSafe에 보존.
+//   반환: 수비 실책 목록 [{inn,half,pos,delta,name,bName}]
+const _POS_NAME_KEYS=['PName','CName','1BName','2BName','3BName','SSName','LFName','CFName','RFName'];
+const _POS_KR=['투수','포수','1루수','2루수','3루수','유격수','좌익수','중견수','우익수'];
+function _applyScorerFixes(rows){
+  const errs=[];
+  for(let i=0;i<rows.length;i++){
+    const d=rows[i], m=d.manual;
+    if(typeof m==='string' && m){
+      const t=m.split('|'), has=k=>t.indexOf(k)>=0, r=+d.result;
+      if(+d.ev>0 && r!==3 && r!==4){
+        if(+d['1BSafe']===1 && has('BH-') && !has('BH+')){
+          d._raw1BSafe=1; d['1BSafe']=0; d._scNoHit=true;
+          if(has('BE+') && !has('BE-')) d._roe=true;
+        } else if(+d['1BSafe']!==1 && (r===1||r===2) && has('BH+') && !has('BH-')){
+          d._raw1BSafe=+d['1BSafe']||0; d['1BSafe']=1; d._scHit=true;
+        }
+      }
+    }
+    const e=d.errPosDelta;
+    if(e!=null && e!==''){
+      String(e).split(';').forEach(tok=>{
+        const a=tok.split(':'); const pos=+a[0], dv=+a[1];
+        if(a.length===2 && pos>=0 && pos<=8 && dv) errs.push({inn:d.inn, half:d.half, pos:pos, delta:dv, name:String(d[_POS_NAME_KEYS[pos]]||''), bName:d.bName||''});
+      });
+    }
+  }
+  return errs;
 }
 
 // 특수 행(투구 없는 이벤트): 보크 BK · 고의사구 IBB · 피치클락 PCLK_*
@@ -2656,6 +2693,7 @@ function addGame(text,filename,meta){
     if(!pitches.length)throw new Error('데이터 없음');
     const zoneSys=_detectZoneSys(pitches,csvMeta);
     _normalizeZone(pitches,zoneSys);
+    const _fieldErrs=_applyScorerFixes(pitches);   // V12.1: 기록원 수정(안타 취소/인정) + 수비 실책 목록
     _classifyHitTypes(pitches);  // V10.1: 안타 종류 분류 (d._hitBase)
     
     // V10.0: 중복 감지 — 콘텐츠 지문이 같은 기존 게임 찾기
@@ -2706,7 +2744,8 @@ function addGame(text,filename,meta){
       p._groupName=serverMeta.groupName;
       p._serverPath=serverMeta.path;
     });
-    const game={id,name:filename,pitches,_fp:fp,...serverMeta, csvMeta, zoneSys, events:_sp.events};
+    const game={id,name:filename,pitches,_fp:fp,...serverMeta, csvMeta, zoneSys, events:_sp.events, errors:_fieldErrs};
+    _registerGameCsvInfo(game);
     GAMES.push(game);
     window._parseMs = (window._parseMs||0) + (performance.now()-_tAdd);
     activeGameIds.add(id);
@@ -4033,7 +4072,7 @@ function renderPitcherSubTab(idx){
 
 function renderBatterSubTab(idx){
   if(idx===0){renderBatterSpray();renderBarrel();renderBBQuality();renderLdegHist();renderSdegFan();}
-  else if(idx===1){renderSwingRadar();renderHpos();renderSpdBand();renderBatterFilterAnalysis();renderBatterPitchTable();renderTiming();}
+  else if(idx===1){renderSwingRadar();renderHpos();renderBatType();renderSpdBand();renderBatterFilterAnalysis();renderBatterPitchTable();renderTiming();}
   else if(idx===2){renderBatterRVCard();renderBatterXOutCard();renderBatterPctlCard();renderCountTable();renderRunnerTable();renderHeightStats();renderResultPie();}
   else if(idx===3){batterLogPage=0;renderBatterLog();}
   else if(idx===4){renderBatterZoneSummary();renderBatterZoneMap();renderBatterZonePitchFilter();renderBatterZonePitchTable();renderBatterCountCategory();}
@@ -6678,17 +6717,30 @@ function renderSdegFan(){
 /* ─── BATTER TAB B ─── */
 function renderSwingRadar(){
   const all=getBatterDataFiltered();
-  const data=all.filter(d=>d.rotS!=null||d.shS!=null||d.lgS!=null||d.batSpd>0);
+  const data=all.filter(d=>d.rotS!=null||d.shS!=null||d.lgS!=null||d.rotSDeg!=null||d.moveSCm!=null||d.batSpd>0);
   const el=document.getElementById('b-radar');
   if(!data.length){el.innerHTML='<span style="color:var(--muted)">스윙 지표 데이터 없음</span>';return;}
-  const avg=k=>{const v=data.filter(d=>d[k]!=null&&+d[k]!==0).map(d=>Math.abs(+d[k]));return v.length?v.reduce((a,b)=>a+b,0)/v.length:0;};
+  const _vals=k=>data.filter(d=>d[k]!=null&&+d[k]!==0).map(d=>Math.abs(+d[k]));
+  const _mean=v=>v.length?v.reduce((a,b)=>a+b,0)/v.length:0;
   // 5개 축: 배트파워, 짧은회전, 긴회전, 짧은이동, 긴이동
   const labels=['batSpd','rotS','rotL','shS','lgS'];
   const lnames=['배트파워','짧은회전','긴회전','짧은이동','긴이동'];
-  // 상위권 기준 고정 최댓값
-  const maxV={batSpd:170, rotS:250, rotL:20, shS:150, lgS:100};
-  const vals=labels.map(k=>Math.min(1,avg(k)/(maxV[k]||1)));
-  const avgs={};labels.forEach(k=>{avgs[k]=avg(k);});
+  // 상위권 기준 고정 최댓값(리그 상위 3% 수준). 긴회전은 기존 20이라 항상 MAX로 찍히던 것을 실측(p97 204)으로 교정.
+  const maxV={batSpd:170, rotS:250, rotL:205, shS:150, lgS:100};
+  // V12.1: WBD 11/8~ 스윙 측정 방식 변경 — 기존 rotS/rotL/shS/lgS(0~255 지수)가 비고
+  //   회전각(rotSDeg/rotLDeg, °)·손 이동거리(moveSCm/moveLCm, cm)로 대체됨. 단위가 달라 축마다 각자 기준으로 비율을 낸 뒤 합산.
+  const NEWK={rotS:'rotSDeg', rotL:'rotLDeg', shS:'moveSCm', lgS:'moveLCm'};
+  const maxN={rotSDeg:145, rotLDeg:90, moveSCm:65, moveLCm:45};   // 신규 측정 상위 3% 수준(826스윙)
+  const unitN={rotSDeg:'°', rotLDeg:'°', moveSCm:'cm', moveLCm:'cm'};
+  const avgs={}, units={}; let nOld=0, nNew=0;
+  const vals=labels.map(k=>{
+    const ov=_vals(k), nk=NEWK[k], nv=nk?_vals(nk):[];
+    if(k==='rotS'){ nOld=ov.length; nNew=nv.length; }
+    const tot=ov.length+nv.length;
+    if(nv.length>=ov.length && nv.length){ avgs[k]=_mean(nv); units[k]=unitN[nk]; } else { avgs[k]=_mean(ov); units[k]=''; }
+    if(!tot) return 0;
+    return (Math.min(1,_mean(ov)/(maxV[k]||1))*ov.length + (nk?Math.min(1,_mean(nv)/maxN[nk])*nv.length:0)) / tot;
+  });
   // 발사각 통계
   const laData=all.filter(d=>_isInPlay(d)&&d.ldeg!=null).map(d=>+d.ldeg);
   const avgLA=laData.length?(laData.reduce((a,b)=>a+b,0)/laData.length).toFixed(1):'-';
@@ -6711,7 +6763,7 @@ function renderSwingRadar(){
     const lx=CX+(R+26)*Math.cos(a),ly=CY+(R+26)*Math.sin(a);
     const lines=lnames[i].split('\n');
     lines.forEach((l,li)=>items+=sEl('text',{x:lx.toFixed(1),y:(ly+(li-lines.length/2+0.5)*10).toFixed(1),fill:'#9ab','font-size':'8','text-anchor':'middle'},l));
-    const val=avgs[k]>0?avgs[k].toFixed(1):'0';
+    const val=(avgs[k]>0?avgs[k].toFixed(1):'0')+(units[k]||'');
     items+=sEl('text',{x:lx.toFixed(1),y:(ly+lines.length*6+4).toFixed(1),fill:'var(--amber)','font-size':'8','text-anchor':'middle'},val);
   });
   // 오른쪽 발사각 요약 박스
@@ -6721,7 +6773,73 @@ function renderSwingRadar(){
   items+=sEl('text',{x:'283',y:'48',fill:'#3a5a7a','font-size':'7','text-anchor':'middle'},'평균');
   items+=sEl('text',{x:'263',y:'65',fill:'#2196f3','font-size':'8','text-anchor':'middle'},'최저 '+minLAv+'°');
   items+=sEl('text',{x:'305',y:'65',fill:'#ff4560','font-size':'8','text-anchor':'middle'},'최고 '+maxLAv+'°');
-  el.innerHTML=makeSVG(330,235,items);
+  el.innerHTML=makeSVG(330,235,items)
+    + (nNew?`<div style="font-size:10px;color:var(--muted);line-height:1.5;margin-top:4px">회전·이동은 WBD 11/8 업데이트부터 측정 방식이 바뀜(회전각 °·손 이동 cm). ${nOld?`기존 측정 ${nOld}스윙 + 신규 ${nNew}스윙을 각자 기준 비율로 합산, 숫자는 표본이 많은 쪽.`:`신규 측정 ${nNew}스윙 기준.`}</div>`:'');
+}
+
+// ── V12.1: 배트별 성적 ──
+// batType(타격 타입)은 공이 맞은 경우에만 의미가 있음(헛스윙엔 기록되지 않거나 0으로 찍힘) → 인플레이 타구 기준, 번트 제외.
+const BAT_TYPE_NAME={0:'일반',1:'강력 충돌',2:'물리',3:'물리 보정',4:'강제 보정',5:'스윕',6:'PC'};
+const BAT_TYPE_COLOR={0:'#39ff8a',1:'#ff8c44',2:'#7aa2ff',3:'#2196f3',4:'#ffb347',5:'#ffd700',6:'#cc44ff'};
+function _batTypeStats(arr){
+  const m={}; let tot=0;
+  for(let i=0;i<arr.length;i++){
+    const d=arr[i];
+    if(d.batType==null || !_isInPlay(d) || _isBunt(d)) continue;
+    const k=+d.batType; if(k!==k) continue;
+    const s=m[k]||(m[k]={type:k, name:BAT_TYPE_NAME[k]||('타입 '+k), n:0, hits:0, hr:0, tb:0, evS:0, hh:0});
+    s.n++; tot++;
+    if(_isHit(d)){ s.hits++; s.tb+=d._hitBase||(+d.result===4?4:1); }
+    if(+d.result===4) s.hr++;
+    s.evS+=+d.ev; if(_isHardHit(d)) s.hh++;
+  }
+  const rows=Object.values(m).sort((a,b)=>b.n-a.n);
+  rows.forEach(s=>{ s.share=tot?s.n/tot*100:0; s.ba=s.n?s.hits/s.n:0; s.slg=s.n?s.tb/s.n:0; s.hrPct=s.n?s.hr/s.n*100:0; s.ev=s.n?s.evS/s.n:0; s.hhPct=s.n?s.hh/s.n*100:0; });
+  return {total:tot, rows};
+}
+// 월별 배트 비중 추이 (활성 경기 전체)
+function _batTypeTrend(arr){
+  const mm={};
+  for(let i=0;i<arr.length;i++){
+    const d=arr[i];
+    if(d.batType==null || !_isInPlay(d) || _isBunt(d)) continue;
+    const dt=(_parseGameName(d._gameName||'')||{}).date||''; if(!dt) continue;
+    const key=dt.slice(0,7), k=+d.batType;
+    const o=mm[key]||(mm[key]={month:key,n:0,by:{}}); o.n++; o.by[k]=(o.by[k]||0)+1;
+  }
+  return Object.values(mm).sort((a,b)=>a.month<b.month?-1:1);
+}
+function _batTypeTable(st, base){
+  if(!st.total) return '<span style="color:var(--muted);font-size:11px">배트 종류가 기록된 인플레이 타구 없음</span>';
+  const f3=v=>v>=1?v.toFixed(3):'.'+Math.round(v*1000).toString().padStart(3,'0');
+  const conf=n=>n>=60?'':n>=20?' <span style="color:var(--muted)">(표본 보통)</span>':' <span style="color:#ff8c44">(표본 적음)</span>';
+  let h='<table style="width:100%;font-size:11.5px;border-collapse:collapse"><thead><tr style="color:var(--muted);text-align:right"><th style="text-align:left;padding:4px 6px">배트</th><th>타구</th><th>비중</th><th>타율</th><th>장타율</th><th>홈런%</th><th>평균 EV</th><th>하드히트%</th></tr></thead><tbody>';
+  st.rows.forEach(s=>{
+    const lg=base&&base.rows.find(x=>x.type===s.type);
+    const dlt=(v,l,dg)=>lg&&lg.n>=30?` <span style="font-size:9.5px;color:${v-l>0?'#39ff8a':'#ff6b81'}">${v-l>0?'+':''}${(v-l).toFixed(dg)}</span>`:'';
+    h+=`<tr style="border-top:1px solid var(--border);text-align:right"><td style="text-align:left;padding:5px 6px"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${BAT_TYPE_COLOR[s.type]||'#888'};margin-right:6px"></span>${s.name}${conf(s.n)}</td><td style="font-family:var(--mono)">${s.n}</td><td style="font-family:var(--mono)">${s.share.toFixed(0)}%</td><td style="font-family:var(--mono)">${f3(s.ba)}</td><td style="font-family:var(--mono)">${f3(s.slg)}</td><td style="font-family:var(--mono)">${s.hrPct.toFixed(1)}</td><td style="font-family:var(--mono)">${s.ev.toFixed(1)}${dlt(s.ev,lg?lg.ev:0,1)}</td><td style="font-family:var(--mono)">${s.hhPct.toFixed(0)}</td></tr>`;
+  });
+  return h+'</tbody></table>';
+}
+function renderBatType(){
+  const el=document.getElementById('b-battype'); if(!el) return;
+  const mine=_batTypeStats(getBatterDataFiltered());
+  const c=window._cache; if(c._batTypeGen!==c.generation){ c._batTypeLg=_batTypeStats(G); c._batTypeTrend=_batTypeTrend(G); c._batTypeGen=c.generation; }
+  const lg=c._batTypeLg, tr=c._batTypeTrend;
+  let h='<div style="font-size:10.5px;color:var(--muted);line-height:1.5;margin-bottom:8px">인플레이 타구 기준(번트 제외). 헛스윙에는 배트 종류가 기록되지 않아 배트별 헛스윙률은 낼 수 없음. 타율·장타율은 타구당. EV 옆 숫자는 같은 배트의 리그 평균 대비.</div>';
+  h+='<div style="font-size:11px;font-weight:700;margin:4px 0">이 선수</div>'+_batTypeTable(mine,lg);
+  h+='<div style="font-size:11px;font-weight:700;margin:14px 0 4px">리그 전체 (활성 경기)</div>'+_batTypeTable(lg,null);
+  if(tr.length>=2){
+    const types=lg.rows.filter(r=>r.share>=3).map(r=>r.type);
+    h+='<div style="font-size:11px;font-weight:700;margin:14px 0 6px">월별 배트 비중</div>';
+    tr.forEach(m=>{
+      h+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px"><span style="font-family:var(--mono);font-size:10px;color:var(--muted);width:52px">${m.month}</span><div style="flex:1;display:flex;height:14px;border-radius:3px;overflow:hidden;background:var(--card2)">`
+        + types.map(t=>{ const p=(m.by[t]||0)/m.n*100; return p>0?`<div title="${BAT_TYPE_NAME[t]||t} ${p.toFixed(0)}%" style="width:${p.toFixed(1)}%;background:${BAT_TYPE_COLOR[t]||'#888'};font-size:9px;color:#000;text-align:center;line-height:14px;overflow:hidden">${p>=12?p.toFixed(0)+'%':''}</div>`:''; }).join('')
+        + `</div><span style="font-family:var(--mono);font-size:10px;color:var(--muted);width:44px;text-align:right">${m.n}</span></div>`;
+    });
+    h+='<div style="font-size:10px;color:var(--muted);margin-top:6px">'+types.map(t=>`<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${BAT_TYPE_COLOR[t]||'#888'};margin:0 4px 0 8px"></span>${BAT_TYPE_NAME[t]||t}`).join('')+' · 오른쪽 숫자는 타구 수</div>';
+  }
+  el.innerHTML=h;
 }
 
 function renderHpos(){
@@ -10365,7 +10483,7 @@ function calcPitcherGameStats(gamePitches){
           //   - 출루(안타/홈런/볼넷/사구): 타자가 살았으니 아웃 아님 → +0 (끝내기 안타 등)
           //   - 그 외(인플레이 아웃·삼진·뜬공·땅볼): 타자 아웃 → +1
           //     (예: 콜드게임 8회말 1아웃에서 타자주자 아웃+3루주자 득점 → 2아웃 = +1)
-          const isOutPitch = !( (+p.result===4) || (+p['1BSafe']===1&&+p.ev>0) || (+p.result===5) || (+p.result===6) );
+          const isOutPitch = !( (+p.result===4) || (+p['1BSafe']===1&&+p.ev>0) || (+p.result===5) || (+p.result===6) || p._roe );
           s.outs += isOutPitch ? 1 : 0;
         }else{
           s.outs+=Math.max(0, 3-(+p.out||0));  // 이닝 중간 종료: 정상 3아웃까지 채움
@@ -15197,7 +15315,11 @@ const CHANGELOG = [
       {icon:'🚫', text:'⭐⭐ <b>보크·고의사구·피치클락 행을 투구 집계에서 분리</b> — 이름이 비어 있는 이벤트 행(47경기 38개)이 투구로 섞여 타석 종료 판정을 끊고 리그 집계에 들어갔음. → 투구 흐름에서 분리. 버튼을 잘못 눌렀거나 봐준(취소된) 경우가 대부분이라 볼넷/아웃은 <b>다음 투구에서 실제로 주자·아웃이 바뀐 것만</b> 인정하고, 타자명은 타순 스냅샷으로 복원해 타자·투수 기록에 반영. 취소된 피치클락 볼넷 2건이 리그 볼넷에 잡히던 것도 제거.'},
       {icon:'🧾', text:'⭐⭐ <b>CSV 파서 — 따옴표 안 쉼표 보호 + 경기 메타 읽기</b> — END 행 remarks의 JSON에 쉼표가 있고 스키마 35부터 remarks 뒤에 컬럼이 더 붙어, 단순 split으로는 JSON 조각이 뒤 컬럼으로 밀려 들어갔음. 따옴표 인식 분할로 교체하고 메타(스키마 버전·좌표계·경기 시각·팀명·월드)를 경기에 저장.'},
       {icon:'🤖', text:'⭐ <b>AI 선수 제외</b> — 경기용 AI 투수가 던졌거나 AI가 타석에 선 투구는 선수별 기록에서 제외(경기 흐름·스코어 계산에는 유지).'},
-      {icon:'📦', text:'<b>내보내기 스키마 v20</b> — games[]에 csvSchema·zoneSys·events 추가, zoneX/zoneY 정의 변경과 카드 좌표 처리 명시.'},
+      {icon:'✍️', text:'⭐⭐⭐ <b>기록원 수정 반영 — 실책이 안타로 잡히던 한계 해소</b> — CSV에 기록원 수동 조작(manual)이 남는 2026-08 이후 경기 대상. 자동 판정으로 안타였는데 기록원이 안타를 뺀 타구는 <b>안타 취소</b>(실책이 같이 찍혀 있으면 실책 출루), 아웃이었는데 안타를 준 타구는 <b>안타 인정</b>. 서버 641경기 기준 취소 80여 건·인정 10건 안팎. 조작이 되돌려졌거나(BH+·BH− 동시) 어느 타구에 대한 것인지 불명확한 경우는 건드리지 않음. 취소된 타구는 수비수의 아웃 처리로도 치지 않음.'},
+      {icon:'🌀', text:'⭐⭐ <b>스윙 지표 레이더 — 신규 스윙 측정값 연결</b> — WBD 11/8부터 회전·이동 지수(0~255) 대신 회전각(°)·손 이동거리(cm)가 기록돼 레이더의 회전·이동 4축이 비어 있었음. 새 컬럼을 새 기준(상위 3% 수준)으로 연결하고 기존 측정과는 축 비율로 합산. 긴회전 축 최댓값이 20이라 항상 MAX로 찍히던 것도 실측값(205)으로 교정.'},
+      {icon:'🏏', text:'⭐⭐ <b>배트별 성적 (타자 탭 → 스윙 분석)</b> — 일반/물리 보정/스윕 등 배트 종류별 타구 수·비중·타율·장타율·홈런%·평균 EV·하드히트%를 선수·리그 전체로 표시하고 월별 배트 비중 추이를 추가. 인플레이 타구 기준(헛스윙에는 배트 종류가 기록되지 않음). 표본이 적으면 라벨 표시.'},
+      {icon:'🗓️', text:'⭐ <b>경기 메타로 날짜·팀 보완 + 경기 정보·이벤트 로그</b> — 파일명에 날짜·팀이 없으면 CSV 메타의 경기 시각·팀명으로 채움. 경기 리포트 하단에 CSV 스키마·존 좌표계·월드 버전과 보크/고의사구/피치클락 이벤트(적용·취소 여부), 기록원 안타 정정, 수비 실책 기록을 표시.'},
+      {icon:'📦', text:'<b>내보내기 스키마 v20</b> — games[]에 csvSchema·zoneSys·events·errors·scorerFixes, 최상위 batTypes 추가. zoneX/zoneY 정의 변경과 카드 좌표 처리 명시.'},
     ]
   },
   {
@@ -21010,7 +21132,7 @@ function _computeDefenseData(){
     const gameH = gameNameHeight[d._gameId]?.[d.cPlr];
     const tT = (+d.cSec||0)-(+d.hSec||0);
     d._cplr = d.cPlr; d._pos = finalPos; d._moveDist = moveDist;
-    d._isOut = +d['1BSafe'] === 0; d._isHit = +d['1BSafe'] === 1;
+    d._isOut = +d['1BSafe'] === 0 && !d._scNoHit; d._isHit = +d['1BSafe'] === 1 || !!d._scNoHit;   // V12.1: 기록원이 안타를 취소한 타구(실책 등)는 수비 성공으로 치지 않음
     d._ev = +d.ev || 0; d._ldeg = +d.ldeg || 0;
     d._T = (+d.hSec>0 && +d.cSec>0 && tT>0.05 && tT<20) ? tT : null;
     d._hitDistFromHP = _distM(0, -20, lx, lz);
@@ -26037,6 +26159,40 @@ function _slRenderDefMode(roster, st){
 // ═══════════════════════════════════════════════════════════
 window._gameReportState = window._gameReportState || {gameId: null};
 
+// V12.1: 경기 정보(CSV 메타) + 투구 없는 이벤트(보크·고의사구·피치클락) + 기록원 수정 로그
+const _EV_TYPE_KR={BK:'보크', IBB:'고의사구', PCLK_BAT_STRIKE:'피치클락 — 타자 스트라이크', PCLK_BAT_OUT:'피치클락 — 타자 아웃', PCLK_PIT_BALL:'피치클락 — 투수 볼', PCLK_PIT_WALK:'피치클락 — 투수 볼넷', PCLK_CAT_BALL:'피치클락 — 포수 볼', PCLK_CAT_WALK:'피치클락 — 포수 볼넷'};
+function _renderGameCsvInfoCard(game){
+  const m=game.csvMeta||{}, evs=game.events||[], errs=game.errors||[];
+  const sc=game.pitches.filter(d=>d._scNoHit||d._scHit);
+  const esc=v=>String(v==null?'':v).replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
+  const halfKr=h=>+h===0?'초':'말';
+  const chips=[];
+  if(m.schemaVersion!=null) chips.push('CSV 스키마 '+m.schemaVersion);
+  chips.push('존 좌표: '+((ZONE_SYS[game.zoneSys]||{}).label||game.zoneSys||'-'));
+  if(m.gameTimeZeroUtc){ const ms=Date.parse(m.gameTimeZeroUtc); if(ms===ms) chips.push('경기 시작 '+new Date(ms+9*3600*1000).toISOString().slice(0,16).replace('T',' ')+' KST'); }
+  if(m.worldName) chips.push(esc(m.worldName)+(m.expectedWorldVersion!=null?' v'+m.expectedWorldVersion:''));
+  if(m.teamNameA && m.teamNameB) chips.push('팀 '+esc(m.teamNameA)+' / '+esc(m.teamNameB));
+  let h=`<div class="card section"><div class="card-title">🧾 경기 정보 · 이벤트 로그</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">${chips.map(c=>`<span style="font-size:10.5px;background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:3px 9px;color:var(--muted)">${c}</span>`).join('')}</div>`;
+  const line=(l,r,col)=>`<div style="display:flex;justify-content:space-between;gap:10px;font-size:11.5px;padding:5px 8px;border-top:1px solid var(--border)"><span>${l}</span><span style="color:${col||'var(--muted)'};white-space:nowrap">${r}</span></div>`;
+  if(evs.length){
+    h+=`<div style="font-size:11px;font-weight:700;margin:6px 0 2px">투구 없는 이벤트 ${evs.length}건</div>`;
+    evs.forEach(e=>{ h+=line(`${e.inn}회${halfKr(e.half)} · ${_EV_TYPE_KR[e.type]||e.type}${e.bName?' · 타자 '+esc(e.bName):''}${e.pName?' · 투수 '+esc(e.pName):''}`,
+      e.type==='BK'?'주자 진루': e.applied==='BB'?'볼넷으로 기록': e.applied==='K'?'아웃으로 기록': /_WALK$|IBB|BAT_OUT/.test(e.type)?'취소됨(미적용)':'카운트만 변경',
+      e.applied?'#39ff8a':null); });
+  }
+  if(sc.length){
+    h+=`<div style="font-size:11px;font-weight:700;margin:10px 0 2px">기록원 안타 정정 ${sc.length}건</div>`;
+    sc.forEach(d=>{ h+=line(`${d.inn}회${halfKr(d.half)} · ${esc(d.bName)} (투수 ${esc(d.pName)})`, d._scHit?'아웃 → 안타 인정': d._roe?'안타 → 실책 출루':'안타 취소', d._scHit?'#39ff8a':'#ffb347'); });
+  }
+  if(errs.length){
+    h+=`<div style="font-size:11px;font-weight:700;margin:10px 0 2px">수비 실책 기록 ${errs.length}건</div>`;
+    errs.forEach(e=>{ h+=line(`${e.inn}회${halfKr(e.half)} · ${_POS_KR[e.pos]||e.pos}${e.name?' '+esc(e.name):''}`, (e.delta>0?'실책 +':'실책 ')+e.delta, e.delta>0?'#ff6b81':null); });
+  }
+  if(!evs.length && !sc.length && !errs.length) h+='<div style="font-size:11px;color:var(--muted)">보크·고의사구·피치클락 이벤트와 기록원 정정이 없는 경기.</div>';
+  return h+'</div>';
+}
+
 function renderGameReportPage(){
   const out = document.getElementById('gamereport-content');
   if(!out) return;
@@ -26397,6 +26553,7 @@ function renderGameReportPage(){
     </div>`;
   }
   
+  html += _renderGameCsvInfoCard(game);   // V12.1
   html += `<div style="background:var(--card2);padding:10px 14px;border-radius:6px;font-size:10px;color:var(--muted);line-height:1.6;text-align:center">
     📰 자동 리포트 — ${game.pitches.length.toLocaleString()}구 분석 · 데이터 기반 자동 생성
   </div>`;
@@ -33009,11 +33166,14 @@ function exportAnalyticsBundle(opts){
     schemaVersion:20,
     schemaChanges:{
       v20_changes:[
-        '🆕 games[i].csvSchema / zoneSys / events — CSV 스키마 버전(END 메타), 존 좌표계(wide=기존, local=strikeZoneLocal, unit), 투구 없는 이벤트 목록 [{type(BK/IBB/PCLK_*), inn, half, bIdx, bName, pName, applied(BB/K/null)}].',
+        '🆕 games[i].csvSchema / zoneSys / events — CSV 스키마 버전(END 메타), 존 좌표계(wide=기존, local=strikeZoneLocal, early=2025.10 초기 빌드), 투구 없는 이벤트 목록 [{type(BK/IBB/PCLK_*), inn, half, bIdx, bName, pName, applied(BB/K/null)}].',
         '📌 zoneX/zoneY 정의 변경: 로드 시 "±1 = 실제 스트라이크 판정 경계"로 정규화. 기존 좌표는 가로 ÷1.475·세로 ÷1.05, strikeZoneLocal(WBD 11/8~, 스키마 40+)은 가로 ÷0.635·세로 ÷0.61. 원본은 pitches[]._zxRaw/_zyRaw. 존%·체이스·존 스윙·코스(zone9)·보더라인·크게 빠진 공 등 존 기반 값이 이전 내보내기와 달라짐(기존 경기 리그 존% 약 36→52, 체이스 약 65→61).',
         '📌 카드 능력치(card.stats 제구·선구·컨택)는 리그 앵커가 기존 좌표 기준이라 기존 척도 좌표(_zxL/_zyL)로 계산 — 기존 경기 값 불변, strikeZoneLocal 경기는 기존 척도로 환산.',
         '📌 보크·고의사구·피치클락 행은 pitches[]에서 제외. 실제 적용이 확인된 볼넷/아웃만 투구 없는 타석 종료 행(_noPitch:true, _evType)으로 남음. 취소된 피치클락 볼넷이 리그 볼넷에 잡히던 것 제거.',
         '📌 AI(pName/bName="AI")가 낀 투구는 선수별 집계에서 제외.',
+        '🆕 기록원 수정 반영: CSV manual의 BH−(자동 안타 행)→안타 취소, BH+(인플레이 아웃 행)→안타 인정. pitches[]의 1BSafe를 교정하고 원본은 _raw1BSafe, 플래그 _scNoHit/_scHit/_roe(실책 출루). games[i].scorerFixes, games[i].errors(errPosDelta 기반 수비 실책 [{inn,half,pos,delta,name}]). 2026-08 이후 경기의 안타·타율이 이전 내보내기보다 소폭 낮아짐.',
+        '🆕 batTypes — 배트 종류별 성적 {league[], trend[{month,n,by}], batters{name:[]}} (type 0 일반/2 물리/3 물리 보정/5 스윕 …).',
+        '📌 날짜·팀: 파일명에서 못 읽으면 END 메타(gameTimeZeroUtc→KST 날짜, teamNameA/B; 기본값 Red/Blue 제외)로 보완.',
       ],
       v19_changes:[
         '🆕 scouting — 스카우팅 도시에 + 공략 엔진 산출물. batters/pitchers[name] = {ofp, tools{key:{grade,pct,note}}, attack{summary,weaknesses[],strengths[],sequence[],insights[],takeNotes[]}, risk[]}. 타자 approach/battedBall 서사, 투수 repertoire(구속·무브·존%·헛%·피안타·초구/2S 사용)·sequencing(카운트별 구종)·predictability·stamina(투구수/이닝 구간) 추가.',
@@ -33651,6 +33811,11 @@ function exportAnalyticsBundle(opts){
     awards,
     teamReports,
     scoutReports,
+    batTypes:(()=>{ try{   // V12.1
+      const pack=st=>st.rows.map(s=>({type:s.type,name:s.name,n:s.n,share:+s.share.toFixed(1),ba:+s.ba.toFixed(3),slg:+s.slg.toFixed(3),hrPct:+s.hrPct.toFixed(1),ev:+s.ev.toFixed(1),hhPct:+s.hhPct.toFixed(1)}));
+      const bat={}; bNames.forEach(n=>{ const st=_batTypeStats(getBatterDataByName(n)); if(st.total>=10) bat[n]=pack(st); });
+      return { note:'배트 종류(batType)별 성적. 인플레이 타구 기준·번트 제외, 타율/장타율은 타구당. 헛스윙에는 배트 종류가 기록되지 않음. 활성 경기 기준.', league:pack(_batTypeStats(G)), trend:_batTypeTrend(G).map(m=>({month:m.month,n:m.n,by:m.by})), batters:bat };
+    }catch(e){ return null; } })(),
     runValue:(()=>{ try{
       if(typeof getRunValueData!=='function') return null;
       const D=getRunValueData();
@@ -34077,6 +34242,8 @@ function exportFullBackup(){
       csvSchema:(g.csvMeta&&g.csvMeta.schemaVersion)||null,   // V12.1
       zoneSys:g.zoneSys||null,
       events:g.events||[],
+      errors:g.errors||[],
+      scorerFixes:g.pitches.filter(d=>d._scNoHit||d._scHit).map(d=>({inn:d.inn,half:d.half,bName:d.bName,pName:d.pName,fix:d._scHit?'hitAdded':(d._roe?'reachedOnError':'hitRemoved')})),
       // raw 투구 데이터까지 (용량 ↑)
       pitches:g.pitches
     })),
@@ -35865,7 +36032,27 @@ function _wbdNicePart(s){
 }
 
 // 파일명 파싱 강화: bundle 안에서는 f.name이 확장자 없이 들어와도 팀명 파싱되게 처리
+// V12.1: 파일명에서 날짜·팀을 못 읽은 경기는 CSV END 메타(경기 시각·팀명)로 보완.
+window._gameCsvInfo = window._gameCsvInfo || {};
+function _registerGameCsvInfo(g){
+  const m=g && g.csvMeta; if(!m) return;
+  const info={};
+  const t=m.gameTimeZeroUtc||m.exportedAtUtc;
+  if(t){ const ms=Date.parse(t); if(ms===ms) info.date=new Date(ms+9*3600*1000).toISOString().slice(0,10); }   // KST 기준 날짜
+  const a=m.teamNameA, b=m.teamNameB;
+  if(a && b && !(String(a)==='Red' && String(b)==='Blue')){ info.teamA=String(a); info.teamB=String(b); }   // 기본값 Red/Blue는 무시
+  if(info.date || info.teamA){ window._gameCsvInfo[String(g.name||'')]=info; if(g.path) window._gameCsvInfo[String(g.path)]=info; }
+}
 function _parseGameName(filename){
+  const r=_parseGameNameFile(filename);
+  const m=window._gameCsvInfo[String(filename||'')];
+  if(m){
+    if(!r.date && m.date) r.date=m.date;
+    if(r.teamA==='Team A' && r.teamB==='Team B' && m.teamA){ r.teamA=m.teamA; r.teamB=m.teamB; }
+  }
+  return r;
+}
+function _parseGameNameFile(filename){
   const original=String(filename||'');
   const file=_wbdShortFileName(original);
   const base=_wbdNoExt(file);
