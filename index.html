@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <!-- V10.1: 외부 이미지(WBD 프로필) hotlinking 방지 우회 - Referer 헤더 차단 -->
 <meta name="referrer" content="no-referrer">
-<title>WBD Baseball Analyzer V12.0</title>
+<title>WBD Baseball Analyzer V12.1</title>
 <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -573,7 +573,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
 <!-- ════ UPLOAD PAGE ════ -->
 <div id="upload-page">
   <div class="logo-big">WBD</div>
-  <div class="logo-sub">BASEBALL ANALYZER · V12.0</div>
+  <div class="logo-sub">BASEBALL ANALYZER · V12.1</div>
   <div id="server-library-box" style="width:100%;max-width:640px;margin-bottom:16px;background:var(--card);border:1px solid rgba(245,166,35,0.35);border-radius:12px;padding:20px 22px;display:none;box-shadow:0 0 32px rgba(245,166,35,0.05);text-align:left">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap">
       <div>
@@ -613,7 +613,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
   <!-- 모바일 전용 상단 바 (햄버거) -->
   <div id="mobile-topbar" style="display:none">
     <button id="hamburger-btn" onclick="toggleMobileMenu()" aria-label="메뉴">☰</button>
-    <div class="mobile-logo">WBD <span style="font-size:10px;color:var(--muted);margin-left:2px">V12.0</span></div>
+    <div class="mobile-logo">WBD <span style="font-size:10px;color:var(--muted);margin-left:2px">V12.1</span></div>
     <button class="mobile-icon-btn" onclick="openGlobalSearch()" title="검색">🔍</button>
     <button class="mobile-icon-btn" onclick="document.getElementById('add-file-input').click()" title="경기 추가" style="color:var(--amber)">+</button>
   </div>
@@ -631,7 +631,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
   <div id="mobile-menu-overlay" style="display:none" onclick="closeMobileMenu(event)">
     <div id="mobile-menu-panel" onclick="event.stopPropagation()">
       <div class="mobile-menu-header">
-        <div class="mobile-logo" style="font-size:16px;cursor:pointer" onclick="closeMobileMenu();openChangelogModal()" title="업데이트 내역 보기">WBD <span style="background:#ffd700;color:#000;font-size:11px;padding:1px 5px;border-radius:3px;font-weight:700;margin-left:2px">V12.0</span></div>
+        <div class="mobile-logo" style="font-size:16px;cursor:pointer" onclick="closeMobileMenu();openChangelogModal()" title="업데이트 내역 보기">WBD <span style="background:#ffd700;color:#000;font-size:11px;padding:1px 5px;border-radius:3px;font-weight:700;margin-left:2px">V12.1</span></div>
         <button class="mobile-icon-btn" onclick="closeMobileMenu()" style="font-size:20px">✕</button>
       </div>
       <div class="mobile-menu-section">
@@ -696,7 +696,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
   </div>
 
   <div id="topnav">
-    <div class="nav-logo">WBD <span style="font-size:11px;color:var(--muted);letter-spacing:1px;margin-left:4px">V12.0</span></div>
+    <div class="nav-logo">WBD <span style="font-size:11px;color:var(--muted);letter-spacing:1px;margin-left:4px">V12.1</span></div>
     <button class="nav-btn active" onclick="showPage('home')">🏠 홈</button>
     <button class="nav-btn" onclick="showPage('pitcher')">⚾ 투수</button>
     <button class="nav-btn" onclick="showPage('batter')">🏏 타자</button>
@@ -2312,6 +2312,8 @@ function _rebuildCaches(){
     const tB = _normalizeTeam(info.teamB);
     g.pitches.forEach(d => {
       // 선수별 인덱스
+      // V12.1: AI 투수/AI 타자가 낀 투구는 선수 기록에서 제외 (경기 흐름·스코어 계산에는 남김)
+      if(_isAIName(d.pName) || _isAIName(d.bName)) return;
       if(d.pName){
         const k = _canonPlayer(d.pName);  // V11.1: 닉변/계정변경 병합
         if(!c.pitcherData[k]) c.pitcherData[k] = [];
@@ -2523,11 +2525,137 @@ function _totalBases(arr){
   return tb;
 }
 
+// ═══════════════════════════════════════════════════════════
+// V12.1: 신규 CSV(스키마 34~51) 대응 — 경기 메타 · 존 좌표 정규화 · 특수 행 · AI
+// ═══════════════════════════════════════════════════════════
+// END 행 remarks(JSON)의 경기 메타: schemaVersion, pitchZoneCoordinates, gameTimeZeroUtc, teamNameA/B, worldName …
+function _readGameMeta(rows){
+  for(let i=rows.length-1;i>=0;i--){
+    const d=rows[i];
+    if(String(d.type||'').toUpperCase()!=='END') continue;
+    const cand=[d.remarks];
+    for(const k in d){ const v=d[k]; if(typeof v==='string' && v.charAt(0)==='{' && v.indexOf('"schemaVersion"')>0) cand.push(v); }  // 일부 빌드는 JSON이 다른 칸에 기록됨
+    for(const r of cand){ if(typeof r==='string' && r.charAt(0)==='{'){ try{ return JSON.parse(r)||{}; }catch(e){} } }
+    return {};
+  }
+  return {};
+}
+
+// 존 좌표계 — 심판 스트라이크 판정 경계 실측(47경기, 루킹 투구).
+//   wide : 기존 좌표. 경계 가로 ±1.475 / 세로 ±1.05 (스트 최대 1.471, 볼 최소 1.482)
+//   local: 스키마 40+(pitchZoneCoordinates=strikeZoneLocal). 경계 가로 ±0.635 / 세로 ±0.61
+//   unit : 경계가 정확히 ±1인 데이터(과거 포맷 대비 안전장치 — 판정 증거가 있을 때만 선택)
+// 모든 분석 코드는 "±1 = 스트라이크존 경계"를 전제로 하므로, 로드 시 한 번 이 척도로 맞춘다(원본은 _zxRaw/_zyRaw).
+const ZONE_SYS={ wide:{x:1.475,y:1.05,label:'기존 좌표'}, local:{x:0.635,y:0.61,label:'strikeZoneLocal'}, unit:{x:1,y:1,label:'±1 좌표'} };
+function _detectZoneSys(rows,meta){
+  if(meta && meta.pitchZoneCoordinates==='strikeZoneLocal') return 'local';
+  // 메타가 없으면 루킹 판정으로 판별: A대역(0.66~1.0)이 볼이면 local, B대역(1.05~1.45)이 볼이면 unit, 스트라이크면 wide
+  let sA=0,bA=0,sB=0,bB=0;
+  for(let i=0;i<rows.length;i++){
+    const d=rows[i];
+    if(d.type || d.bSwing===1 || d.bSwing===true) continue;
+    const c=+d.call; if(c!==0 && c!==1) continue;
+    const x=Math.abs(+d.zoneX), y=Math.abs(+d.zoneY);
+    if(x!==x || y!==y) continue;
+    if(x>0.66 && x<=1.0 && y<0.55){ if(c===0) sA++; else bA++; }
+    else if(x>1.05 && x<=1.45 && y<0.9){ if(c===0) sB++; else bB++; }
+  }
+  if(bA>sA) return 'local';
+  if(bB>sB) return 'unit';
+  return 'wide';
+}
+function _normalizeZone(rows,sysKey){
+  const z=ZONE_SYS[sysKey]||ZONE_SYS.wide;
+  for(let i=0;i<rows.length;i++){
+    const d=rows[i];
+    if(typeof d.zoneX!=='number' || typeof d.zoneY!=='number') continue;
+    d._zxRaw=d.zoneX; d._zyRaw=d.zoneY;
+    // 카드 산정식용 '기존 척도' 좌표: 기존 좌표계 경기는 원본 그대로, strikeZoneLocal 경기는 기존 척도로 환산
+    if(sysKey==='local'){ d._zxL=d.zoneX/z.x*ZONE_SYS.wide.x; d._zyL=d.zoneY/z.y*ZONE_SYS.wide.y; }
+    else { d._zxL=d.zoneX; d._zyL=d.zoneY; }
+    d.zoneX=Math.round(d.zoneX/z.x*1e4)/1e4;
+    d.zoneY=Math.round(d.zoneY/z.y*1e4)/1e4;
+  }
+}
+
+// 특수 행(투구 없는 이벤트): 보크 BK · 고의사구 IBB · 피치클락 PCLK_*
+// 선수 카드 산정식 전용 좌표. 카드의 리그 앵커(제구·선구·컨택)는 기존 좌표(원본 ±1 박스) 분포로 보정돼 있어,
+// 승인 없이 카드 값이 바뀌지 않도록 카드만 기존 척도 좌표로 계산한다. (그 외 모든 분석은 정규화된 zoneX/zoneY 사용)
+function _zLX(d){ return d._zxL!=null ? d._zxL : +d.zoneX; }
+function _zLY(d){ return d._zyL!=null ? d._zyL : +d.zoneY; }
+function _isSpecialType(t){ return t==='BK' || t==='IBB' || t.indexOf('PCLK_')===0; }
+function _isAIName(n){ return n==='AI'; }   // 경기용 AI 투수·야수·주자 (WBD 11/20~)
+
+// 특수 행을 투구 흐름에서 분리한다. (이름이 비어 있고 투구 데이터가 없어 타석 종료 판정·리그 집계를 오염시켰음)
+//  - 버튼을 잘못 누르거나 봐준(취소된) 경우가 많아, 볼넷/아웃은 "다음 투구에서 실제로 상태가 바뀐 것"만 인정:
+//      볼넷(IBB, PCLK_*_WALK): 다음 투구의 타자가 바뀌고 1루에 주자가 있음
+//      아웃(PCLK_BAT_OUT)   : 다음 투구의 타자가 바뀌고 아웃카운트가 반영됨(또는 3아웃으로 이닝 종료)
+//  - 인정된 것만 투구 없는 타석 종료 행(_noPitch)으로 흐름에 남겨 타자·투수 기록에 반영. 타자명은 타순 스냅샷(orderNName)으로 복원.
+//  반환: {rows: 정리된 행 배열, events: [{type,inn,half,bIdx,bName,applied}]}
+function _extractSpecialRows(all){
+  const rows=[], evs=[], cur=['','','','','','','','',''];
+  for(let i=0;i<all.length;i++){
+    const d=all[i], t=String(d.type||'').toUpperCase();
+    if(t!=='END'){
+      for(let k=0;k<9;k++){ const v=d['order'+(k+1)+'Name']; if(v!=='=') cur[k]=(v==null?'':String(v)); }
+    }
+    if(_isSpecialType(t)){ const bi=+d.bIdx; evs.push({d, t, pos:rows.length, bName:(bi>=0&&bi<9&&cur[bi])||''}); }
+    else rows.push(d);
+  }
+  if(!evs.length) return {rows:all, events:[]};
+  const isPitch=d=>!!d && !d.type;
+  const NAMEKEYS=['pName','PName','CName','1BName','2BName','3BName','SSName','LFName','CFName','RFName'];
+  const events=[];
+  for(let n=evs.length-1;n>=0;n--){
+    const e=evs[n], d=e.d, t=e.t, bi=+d.bIdx;
+    let pv=rows[e.pos-1], nx=rows[e.pos];
+    const after=nx;   // 이닝 종료 확인용(SIDE·다른 half 포함)
+    if(!isPitch(pv) || pv.inn!==d.inn || pv.half!==d.half) pv=null;
+    if(!isPitch(nx) || nx._noPitch || nx.inn!==d.inn || nx.half!==d.half) nx=null;
+    const samePA = !!pv && +pv.bIdx===bi;
+    // 직전 투구로 이미 타석이 끝났는데 뒤늦게 찍힌 이벤트는 인정하지 않음
+    const pvEnded = samePA && ((+pv.ev>0 && +pv.result!==3) || (+pv.result>=4 && +pv.result<=6) || (+pv.strk===2 && (+pv.call===0 || +pv.call===4)));
+    let kind=null;
+    if(!pvEnded){
+      if(t==='IBB' || t==='PCLK_PIT_WALK' || t==='PCLK_CAT_WALK'){
+        if(nx && +nx.bIdx!==bi && (+nx.b1===1 || nx.b1===true)) kind='BB';
+      } else if(t==='PCLK_BAT_OUT'){
+        if(nx){ if(+nx.bIdx!==bi && +nx.out===+d.out) kind='K'; }
+        else if(+d.out>=3 && (!after || !isPitch(after) || after.inn!==d.inn || after.half!==d.half)) kind='K';
+      }
+    }
+    const bName = e.bName || (samePA ? pv.bName : '');
+    const src = pv || nx;
+    let applied=null;
+    if(kind && bName && src && src.pName){
+      const s={inn:d.inn, half:d.half, bIdx:d.bIdx, id:d.id, pSec:d.pSec, bName:bName,
+               _noPitch:true, _evType:t, bSwing:0};
+      for(const k of NAMEKEYS){ if(src[k]!=null) s[k]=src[k]; }
+      const st = samePA ? pv : d;   // 주자 상태
+      for(const k of ['b1','b2','b3','b1Idx','b2Idx','b3Idx']){ if(st[k]!=null) s[k]=st[k]; }
+      if(samePA){ if(pv.bZone!=null) s.bZone=pv.bZone; if(pv.bHCm!=null) s.bHCm=pv.bHCm; }
+      if(kind==='BB'){ s.result=5; s.call=1; s.ball=3; s.strk=samePA?(+pv.strk||0):0; s.out=samePA?pv.out:(nx?nx.out:d.out); }
+      else { s.result=0; s.call=0; s.strk=2; s.ball=samePA?(+pv.ball||0):0; s.out=Math.max(0,(+d.out||1)-1); }
+      rows.splice(e.pos,0,s);
+      applied=kind;
+    }
+    events.unshift({type:t, inn:d.inn, half:d.half, bIdx:d.bIdx, bName:bName, pName:(src&&src.pName)||'', applied:applied});
+  }
+  return {rows, events};
+}
+
 function addGame(text,filename,meta){
   const _tAdd = performance.now();
   try{
-    const pitches=parseCSV(text);
+    const _rawRows=parseCSV(text);
+    if(!_rawRows.length)throw new Error('데이터 없음');
+    // V12.1: 경기 메타 → 특수 행 분리 → 존 좌표 정규화 (이후 모든 분석은 ±1=존 경계 전제 그대로)
+    const csvMeta=_readGameMeta(_rawRows);
+    const _sp=_extractSpecialRows(_rawRows);
+    const pitches=_sp.rows;
     if(!pitches.length)throw new Error('데이터 없음');
+    const zoneSys=_detectZoneSys(pitches,csvMeta);
+    _normalizeZone(pitches,zoneSys);
     _classifyHitTypes(pitches);  // V10.1: 안타 종류 분류 (d._hitBase)
     
     // V10.0: 중복 감지 — 콘텐츠 지문이 같은 기존 게임 찾기
@@ -2578,7 +2706,7 @@ function addGame(text,filename,meta){
       p._groupName=serverMeta.groupName;
       p._serverPath=serverMeta.path;
     });
-    const game={id,name:filename,pitches,_fp:fp,...serverMeta};
+    const game={id,name:filename,pitches,_fp:fp,...serverMeta, csvMeta, zoneSys, events:_sp.events};
     GAMES.push(game);
     window._parseMs = (window._parseMs||0) + (performance.now()-_tAdd);
     activeGameIds.add(id);
@@ -2602,6 +2730,27 @@ function _fastCell(s){
   const c1=s.charCodeAt(a), c2=s.charCodeAt(b-1);
   if((c1===34&&c2===34)||(c1===39&&c2===39)){a++;b--;}
   return a===0&&b===s.length?s:s.substring(a,b);
+}
+
+// V12.1: 따옴표 인식 줄 분할. 따옴표가 없으면 기존 빠른 split 그대로.
+//   신규 CSV는 END 행 remarks에 JSON(쉼표 포함)이 들어가고, v35부터 remarks 뒤에 컬럼이 더 붙어
+//   단순 split이면 JSON 조각이 뒤 컬럼으로 밀려 들어갔음.
+function _splitCsvLine(line){
+  if(line.indexOf('"')<0) return line.split(',');
+  const out=[]; let cur='', q=false, st=0;
+  for(let i=0;i<line.length;i++){
+    const ch=line.charCodeAt(i);
+    if(q){
+      if(ch===34){
+        cur+=line.substring(st,i);
+        if(line.charCodeAt(i+1)===34){ cur+='"'; i++; st=i+1; }
+        else { q=false; st=i+1; }
+      }
+    } else if(ch===34){ cur+=line.substring(st,i); q=true; st=i+1; }
+    else if(ch===44){ out.push(cur+line.substring(st,i)); cur=''; st=i+1; }
+  }
+  out.push(cur+line.substring(st));
+  return out;
 }
 
 function parseCSV(text){
@@ -2629,7 +2778,8 @@ function parseCSV(text){
   for(let j=0;j<numHeaders;j++){
     // pName, bName, gameID 등 문자열로 둘 컬럼
     const h=headers[j];
-    stringHeaders[j]=(h==='pName'||h==='bName'||h==='gameID'||h==='date'||h==='_gameId'||h==='_gameName');
+    stringHeaders[j]=(h==='pName'||h==='bName'||h==='gameID'||h==='date'||h==='_gameId'||h==='_gameName'
+      ||h==='type'||h==='remarks'||h==='manual'||h==='errPosDelta'||h==='foulReason');  // V12.1: 신규 문자열 컬럼
     numericHeaders[j]=!stringHeaders[j];
   }
   
@@ -2645,7 +2795,7 @@ function parseCSV(text){
     if(!line||line==='\r')continue;
     
     // split 한 번
-    const vals=line.split(',');
+    const vals=_splitCsvLine(line);  // V12.1: 따옴표 안 쉼표(END 행 remarks JSON) 보호
     const row={};
     const cellLen=Math.min(vals.length,numHeaders);
     for(let j=0;j<cellLen;j++){
@@ -7339,7 +7489,7 @@ function _calcPitcherCardImpl(name){
   const bbScore=Math.min(115,Math.max(30,Math.pow(Math.max(0,4.0-bbPct)/4.0,1.0)*78+38));
   let midCnt=0, sltCnt=0, gdCnt=0, brdCnt=0;
   pd.filter(d=>d.zoneX!=null).forEach(d=>{
-    const zx=Math.abs(+d.zoneX||0), zy=Math.abs(+d.zoneY||0);
+    const zx=Math.abs(_zLX(d)||0), zy=Math.abs(_zLY(d)||0);   // V12.1: 기존 척도 좌표(값 불변)
     const rmax=Math.max(zx,zy);
     if(rmax<=1 && rmax<=0.4)midCnt++;
     else if(rmax>=0.85 && rmax<=1.15)brdCnt++;
@@ -7543,12 +7693,12 @@ function _calcBatterCardImpl(name){
   const whiff=all.filter(d=>_isSwing(d)&&(!d.ev||+d.ev===0)).length;
   const whiffPct=swings>0?whiff/swings:0.35;
   // 존 안 컨택률 (리그 p50=78%, p90=92%)
-  const izAll=all.filter(d=>d.zoneX!=null&&Math.abs(+d.zoneX)<=1&&Math.abs(+d.zoneY||0)<=1);
+  const izAll=all.filter(d=>d.zoneX!=null&&Math.abs(_zLX(d))<=1&&Math.abs(_zLY(d)||0)<=1);   // V12.1: 카드는 기존 척도 좌표
   const izSwAll=izAll.filter(_isSwing);
   const izContAll=izSwAll.filter(d=>+d.ev>0);
   const izContPct=izSwAll.length?izContAll.length/izSwAll.length*100:75;
   // 존 밖 컨택률 (체이스 했을 때 컨택, 리그 p50=60%, p90=75%)
-  const ozAll=all.filter(d=>d.zoneX!=null&&(Math.abs(+d.zoneX)>1||Math.abs(+d.zoneY||0)>1));
+  const ozAll=all.filter(d=>d.zoneX!=null&&(Math.abs(_zLX(d))>1||Math.abs(_zLY(d)||0)>1));
   const ozSwAll=ozAll.filter(_isSwing);
   const ozContAll=ozSwAll.filter(d=>+d.ev>0);
   const ozContPct=ozSwAll.length?ozContAll.length/ozSwAll.length*100:60;
@@ -7556,7 +7706,7 @@ function _calcBatterCardImpl(name){
   const CON=pw(conScore,31.06,58.44,0.8); // V12.0 재보정 (p10 58/p50 77/p90 91/max 112 — 타격왕급은 100+ 가능)
 
   // 선구: 존밖스윙률(50%) + BB%(50%) 정규화 통합 [수정]
-  const outZone=all.filter(d=>d.zoneX!=null&&(Math.abs(+d.zoneX)>1||Math.abs(+(d.zoneY||0))>1));
+  const outZone=all.filter(d=>d.zoneX!=null&&(Math.abs(_zLX(d))>1||Math.abs(_zLY(d)||0)>1));
   const bbAll=all.filter(d=>d.result===5).length; // 볼넷만(HBP 제외)
   const bbPctEye=PA?bbAll/PA*100:0;   // V12.0: 타석당 BB% (이전엔 투구당이라 BB 기여가 체이스의 1/6 수준이었음)
   let eyeVal,eyeDetail;
@@ -9824,6 +9974,7 @@ function _isDummyPitch(d){
   //   이닝 계산에서 "그 이닝의 마지막 투구"로 잡혀 3아웃 채우기가 누락됨(5이닝→3.2이닝 오류).
   const _t = d.type == null ? '' : String(d.type).toUpperCase();
   if(_t === 'SIDE' || _t === 'END') return true;
+  if(_isSpecialType(_t)) return true;   // V12.1: 보크·고의사구·피치클락 행(로드 시 분리되지만 방어적으로)
   // ball/strk/call이 모두 null이면 더미
   if(d.ball == null && d.strk == null && d.call == null) return true;
   return false;
@@ -15034,6 +15185,21 @@ function openThemeModal(){
 //   - 버저닝: V9.x (소수점) → 누적되면 V10
 //   - title은 한 줄 핵심 요약, changes는 항목별 (icon + text)
 const CHANGELOG = [
+  {
+    version: 'V12.1',
+    date: '2026-11',
+    title: '🛠️ WBD 11월 업데이트 대응 — 존 좌표계 변경·신규 CSV(스키마 34~51)',
+    badge: '#ffb347',
+    changes: [
+      {icon:'🎯', text:'⭐⭐⭐ <b>스트라이크존 좌표 정규화 — 11/8 이후 경기 존 수치 오류 수정</b> — WBD가 11/8(스키마 40)부터 투구 좌표를 <b>strikeZoneLocal</b>로 바꿔 실제 판정 경계가 가로 ±0.635 / 세로 ±0.61이 됐는데, 분석기는 ±1 박스 고정이라 볼이 전부 존 안으로 잡혔음(존% 36%→80%, 존 안 루킹 스트라이크 99%→51~65%). → 경기를 불러올 때 좌표계를 판별해 <b>±1 = 실제 판정 경계</b>로 한 번 정규화(원본은 보존). 좌표계는 END 메타로 읽고, 메타가 없으면 루킹 판정 분포로 자동 판별(47경기 전부 정확히 분류). 존%·체이스·존 스윙·5×5 존맵·코스 공략·보더라인·크게 빠진 공 등 존 기반 화면 전체에 적용.'},
+      {icon:'📏', text:'⭐⭐⭐ <b>기존 좌표 경기의 존 경계도 실측값으로 교정</b> — 루킹 판정을 실측하니 기존 좌표도 경계가 ±1이 아니라 <b>가로 ±1.475 / 세로 ±1.05</b>(스트라이크 최대 1.471, 볼 최소 1.482). 가로 1.0~1.47의 스트라이크를 "볼"로 보고 있어 존%가 낮고 체이스가 높게 나왔음. 교정 후 리그 존% 36%→52%, 체이스 65%→61%(37경기 기준). 선수 간 상대 순위는 대체로 유지.'},
+      {icon:'🃏', text:'⭐⭐ <b>선수 카드는 값 유지</b> — 카드의 제구·선구·컨택은 리그 앵커가 기존 좌표 분포로 보정돼 있어, 승인 없이 값이 바뀌지 않도록 카드만 <b>기존 척도 좌표</b>로 계산. 기존 경기는 카드 값 그대로(검증: 71명 중 피치클락 볼넷이 반영된 2명만 변동), 11/8 이후 경기는 기존 척도로 환산해 제구가 30 근처에 눌리던 문제 해소. 실제 경계 기준으로 카드를 재보정하는 건 전체 데이터 점검 때 별도 진행.'},
+      {icon:'🚫', text:'⭐⭐ <b>보크·고의사구·피치클락 행을 투구 집계에서 분리</b> — 이름이 비어 있는 이벤트 행(47경기 38개)이 투구로 섞여 타석 종료 판정을 끊고 리그 집계에 들어갔음. → 투구 흐름에서 분리. 버튼을 잘못 눌렀거나 봐준(취소된) 경우가 대부분이라 볼넷/아웃은 <b>다음 투구에서 실제로 주자·아웃이 바뀐 것만</b> 인정하고, 타자명은 타순 스냅샷으로 복원해 타자·투수 기록에 반영. 취소된 피치클락 볼넷 2건이 리그 볼넷에 잡히던 것도 제거.'},
+      {icon:'🧾', text:'⭐⭐ <b>CSV 파서 — 따옴표 안 쉼표 보호 + 경기 메타 읽기</b> — END 행 remarks의 JSON에 쉼표가 있고 스키마 35부터 remarks 뒤에 컬럼이 더 붙어, 단순 split으로는 JSON 조각이 뒤 컬럼으로 밀려 들어갔음. 따옴표 인식 분할로 교체하고 메타(스키마 버전·좌표계·경기 시각·팀명·월드)를 경기에 저장.'},
+      {icon:'🤖', text:'⭐ <b>AI 선수 제외</b> — 경기용 AI 투수가 던졌거나 AI가 타석에 선 투구는 선수별 기록에서 제외(경기 흐름·스코어 계산에는 유지).'},
+      {icon:'📦', text:'<b>내보내기 스키마 v20</b> — games[]에 csvSchema·zoneSys·events 추가, zoneX/zoneY 정의 변경과 카드 좌표 처리 명시.'},
+    ]
+  },
   {
     version: 'V12.0',
     date: '2026-10',
@@ -32839,9 +33005,16 @@ function exportAnalyticsBundle(opts){
   // 1) 메타 정보
   const meta={
     generatedAt:new Date().toISOString(),
-    appVersion:'V12.0',
-    schemaVersion:19,
+    appVersion:'V12.1',
+    schemaVersion:20,
     schemaChanges:{
+      v20_changes:[
+        '🆕 games[i].csvSchema / zoneSys / events — CSV 스키마 버전(END 메타), 존 좌표계(wide=기존, local=strikeZoneLocal, unit), 투구 없는 이벤트 목록 [{type(BK/IBB/PCLK_*), inn, half, bIdx, bName, pName, applied(BB/K/null)}].',
+        '📌 zoneX/zoneY 정의 변경: 로드 시 "±1 = 실제 스트라이크 판정 경계"로 정규화. 기존 좌표는 가로 ÷1.475·세로 ÷1.05, strikeZoneLocal(WBD 11/8~, 스키마 40+)은 가로 ÷0.635·세로 ÷0.61. 원본은 pitches[]._zxRaw/_zyRaw. 존%·체이스·존 스윙·코스(zone9)·보더라인·크게 빠진 공 등 존 기반 값이 이전 내보내기와 달라짐(기존 경기 리그 존% 약 36→52, 체이스 약 65→61).',
+        '📌 카드 능력치(card.stats 제구·선구·컨택)는 리그 앵커가 기존 좌표 기준이라 기존 척도 좌표(_zxL/_zyL)로 계산 — 기존 경기 값 불변, strikeZoneLocal 경기는 기존 척도로 환산.',
+        '📌 보크·고의사구·피치클락 행은 pitches[]에서 제외. 실제 적용이 확인된 볼넷/아웃만 투구 없는 타석 종료 행(_noPitch:true, _evType)으로 남음. 취소된 피치클락 볼넷이 리그 볼넷에 잡히던 것 제거.',
+        '📌 AI(pName/bName="AI")가 낀 투구는 선수별 집계에서 제외.',
+      ],
       v19_changes:[
         '🆕 scouting — 스카우팅 도시에 + 공략 엔진 산출물. batters/pitchers[name] = {ofp, tools{key:{grade,pct,note}}, attack{summary,weaknesses[],strengths[],sequence[],insights[],takeNotes[]}, risk[]}. 타자 approach/battedBall 서사, 투수 repertoire(구속·무브·존%·헛%·피안타·초구/2S 사용)·sequencing(카운트별 구종)·predictability·stamina(투구수/이닝 구간) 추가.',
         '   · tools 등급: 리그 백분위→20-80, 비율지표는 표본 수축(shrinkage). 타자 hit(수축 타율·컨택·EV 블렌드)/power(EV·배럴·하드히트·ISO)/contact/eye(체이스 85·볼넷 15)/kav(삼진 회피)/swing, 투수 velo/mov(구종별 리그대비·구사량 가중)/stuff(헛스윙 70·K% 30)/cmd(실투 60·구석 40=코스 정확도)/ctrl(존 투구율 60·초구S 40=스트라이크 능력)/hitSup(피장타 60·피안타 40)',
@@ -33901,6 +34074,9 @@ function exportFullBackup(){
       active:activeGameIds.has(g.id),
       pitchCount:g.pitches.length,
       info:g.info||null,
+      csvSchema:(g.csvMeta&&g.csvMeta.schemaVersion)||null,   // V12.1
+      zoneSys:g.zoneSys||null,
+      events:g.events||[],
       // raw 투구 데이터까지 (용량 ↑)
       pitches:g.pitches
     })),
