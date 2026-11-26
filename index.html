@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <!-- V10.1: 외부 이미지(WBD 프로필) hotlinking 방지 우회 - Referer 헤더 차단 -->
 <meta name="referrer" content="no-referrer">
-<title>WBD Baseball Analyzer V12.3</title>
+<title>WBD Baseball Analyzer V12.4</title>
 <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -573,7 +573,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
 <!-- ════ UPLOAD PAGE ════ -->
 <div id="upload-page">
   <div class="logo-big">WBD</div>
-  <div class="logo-sub">BASEBALL ANALYZER · V12.3</div>
+  <div class="logo-sub">BASEBALL ANALYZER · V12.4</div>
   <div id="server-library-box" style="width:100%;max-width:640px;margin-bottom:16px;background:var(--card);border:1px solid rgba(245,166,35,0.35);border-radius:12px;padding:20px 22px;display:none;box-shadow:0 0 32px rgba(245,166,35,0.05);text-align:left">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap">
       <div>
@@ -613,7 +613,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
   <!-- 모바일 전용 상단 바 (햄버거) -->
   <div id="mobile-topbar" style="display:none">
     <button id="hamburger-btn" onclick="toggleMobileMenu()" aria-label="메뉴">☰</button>
-    <div class="mobile-logo">WBD <span style="font-size:10px;color:var(--muted);margin-left:2px">V12.3</span></div>
+    <div class="mobile-logo">WBD <span style="font-size:10px;color:var(--muted);margin-left:2px">V12.4</span></div>
     <button class="mobile-icon-btn" onclick="openGlobalSearch()" title="검색">🔍</button>
     <button class="mobile-icon-btn" onclick="document.getElementById('add-file-input').click()" title="경기 추가" style="color:var(--amber)">+</button>
   </div>
@@ -631,7 +631,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
   <div id="mobile-menu-overlay" style="display:none" onclick="closeMobileMenu(event)">
     <div id="mobile-menu-panel" onclick="event.stopPropagation()">
       <div class="mobile-menu-header">
-        <div class="mobile-logo" style="font-size:16px;cursor:pointer" onclick="closeMobileMenu();openChangelogModal()" title="업데이트 내역 보기">WBD <span style="background:#ffd700;color:#000;font-size:11px;padding:1px 5px;border-radius:3px;font-weight:700;margin-left:2px">V12.3</span></div>
+        <div class="mobile-logo" style="font-size:16px;cursor:pointer" onclick="closeMobileMenu();openChangelogModal()" title="업데이트 내역 보기">WBD <span style="background:#ffd700;color:#000;font-size:11px;padding:1px 5px;border-radius:3px;font-weight:700;margin-left:2px">V12.4</span></div>
         <button class="mobile-icon-btn" onclick="closeMobileMenu()" style="font-size:20px">✕</button>
       </div>
       <div class="mobile-menu-section">
@@ -696,7 +696,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
   </div>
 
   <div id="topnav">
-    <div class="nav-logo">WBD <span style="font-size:11px;color:var(--muted);letter-spacing:1px;margin-left:4px">V12.3</span></div>
+    <div class="nav-logo">WBD <span style="font-size:11px;color:var(--muted);letter-spacing:1px;margin-left:4px">V12.4</span></div>
     <button class="nav-btn active" onclick="showPage('home')">🏠 홈</button>
     <button class="nav-btn" onclick="showPage('pitcher')">⚾ 투수</button>
     <button class="nav-btn" onclick="showPage('batter')">🏏 타자</button>
@@ -1350,6 +1350,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
         <option value="p-mistake">🎯 실투율 (낮은순)</option>
         <option value="p-border">✨ 보더라인% (높은순)</option>
         <option value="p-safe">📐 안전존% (높은순)</option>
+        <option value="p-edge">🌓 보더라인 승부율 (높은순)</option>
         <option value="p-strike">🎯 스트라이크%</option>
         <option value="p-fps">🔵 초구 스트라이크%</option>
         <option value="p-ppa">⏱️ 이닝당 투구수 (낮은순, 효율)</option>
@@ -4985,7 +4986,7 @@ function renderPitcherHeader(pitcherName,pd){
   const whipVal=totalIp>0?_pSeas.whip.toFixed(2):'-';
   const ipDisp=totalIp>0?_pSeas.ipDisp:'-';
 
-  // 존내 제구 지표 (V7.15 수정): zoneX/Y 둘 다 -1~1 대칭, 공 반지름 감안해서 보더 0.85~1.15
+  // 존내 제구 지표 — V12.4: 존 = ±1 하나로 통일(보더 = 존 안 가장자리 0.85~1.0). 존율은 선수 평가·스카우팅의 존 투구율과 같은 값.
   const zAllH=pd.filter(d=>d.zoneX!=null);
   let midN=0, sltN=0, gdN=0, brdN=0, ballN=0;
   zAllH.forEach(d=>{
@@ -5001,6 +5002,7 @@ function renderPitcherHeader(pitcherName,pd){
     bRateInZH=(brdN/inZoneH*100).toFixed(1);
     if(zAllH.length>0)zonePctH=(inZoneH/zAllH.length*100).toFixed(0);
   }
+  const _edgeH=_edgeStats(zAllH), _edgeLH=_edgeLabel(_edgeH);
 
   // 초구 스트라이크% 및 이닝당 투구수 (P/IP)
   const firstPitches=pd.filter(d=>d.ball===0&&d.strk===0);
@@ -5133,7 +5135,8 @@ function renderPitcherHeader(pitcherName,pd){
           <div class="ph-stat"><div class="ph-stat-label" style="color:#f5d923">굿존</div><div class="ph-stat-val" style="font-size:14px;color:#f5d923">${gRateInZH}${gRateInZH==='-'?'':'%'}</div></div>
           <div class="ph-stat"><div class="ph-stat-label" style="color:#39ff8a">보더</div><div class="ph-stat-val" style="font-size:14px;color:#39ff8a">${bRateInZH}${bRateInZH==='-'?'':'%'}</div></div>
         </div>
-        <div style="font-size:9px;color:var(--muted);margin-top:-2px">실투/살짝/굿존/보더 (스트존 ±1 · 공반지름 감안 · 볼 제외 존안 기준)</div>
+        <div style="font-size:9px;color:var(--muted);margin-top:-2px">실투/살짝/굿존/보더 = 존 안(±1) 투구 중 비율 · 보더 = 존 안 가장자리</div>
+        ${_edgeLH?`<div style="font-size:10px;color:var(--muted)">보더라인 승부 <b style="color:${_edgeLH.color};font-family:var(--mono)">${_edgeH.pct.toFixed(1)}%</b> <span style="color:${_edgeLH.color}">${_edgeLH.name}</span>${_edgeLH.conf} · 걸친 공 ${_edgeH.inPct.toFixed(1)}% + 아슬한 볼 ${_edgeH.outPct.toFixed(1)}%</div>`:''}
       </div>
     </div>`;
 }
@@ -7624,7 +7627,8 @@ function _calcPitcherCardImpl(name){
   let midCnt=0, sltCnt=0, gdCnt=0, brdCnt=0;
   pd.filter(d=>d.zoneX!=null).forEach(d=>{
     const c=_precisionClass(d);   // V12.3: 제구 구간 공용 함수(구간 정의 동일)
-    if(c==='middle')midCnt++; else if(c==='border')brdCnt++; else if(c==='slight')sltCnt++; else if(c==='good')gdCnt++;
+    // V12.4: 화면 쪽 분류는 존 ±1로 통일했지만, 카드 제구는 보호 공식이라 승인 전까지 기존 보더 구간(0.85~1.15 = border+near)을 그대로 사용 → 카드 값 불변.
+    if(c==='middle')midCnt++; else if(c==='border'||c==='near')brdCnt++; else if(c==='slight')sltCnt++; else if(c==='good')gdCnt++;
   });
   const inZoneN=midCnt+sltCnt+gdCnt+brdCnt;
   let goodZoneScore=70, badMistScore=70, inZoneRatio=0, mRateInZ=0, bRateInZ=0, gRateInZ=0, sRateInZ=0;
@@ -7921,7 +7925,7 @@ const STAT_INFO={
     label:'제구 (Control)',
     icon:'🎯',
     desc:'볼넷 비율(25%) + 굿존+보더 활용(40%) + 실투/살짝 회피(35%) 가중 평균',
-    formula:'볼넷점수×0.25 + 굿존점수×0.4 + 실투회피점수×0.35 → pw(score, 49.98, 95.91, 0.9) + ERA 보너스 [V12.0 스케일 통일]. 볼넷점수=(4 − BB%)/4×78+38, 굿존=굿존+보더 비율, 실투=한가운데+살짝×0.5. [V12.2] 존 구간을 실제 심판 판정 경계 기준으로 계산(가로 폭 교정, 세로는 타자 키 반영), 굿존점수=(굿존%−49.67)/29.50, 실투회피=(42.02−실투%)/30.86',
+    formula:'볼넷점수×0.25 + 굿존점수×0.4 + 실투회피점수×0.35 → pw(score, 49.98, 95.91, 0.9) + ERA 보너스 [V12.0 스케일 통일]. 볼넷점수=(4 − BB%)/4×78+38, 굿존=굿존+존 끝 ±0.15 공(걸친 공+아슬한 볼, 0.85~1.15) 비율, 실투=한가운데+살짝×0.5 (분모는 존 끝 +0.15까지의 투구). [V12.2] 존 구간을 실제 심판 판정 경계 기준으로 계산(가로 폭 교정, 세로는 타자 키 반영), 굿존점수=(굿존%−49.67)/29.50, 실투회피=(42.02−실투%)/30.86',
     detail:'구성은 그대로(볼넷·존 위치), 다른 능력치와 같은 30~115 매핑으로 통일. V12.0: p10 58 / 중앙 79 / p90 98 / 최대 102. ※ 크게 빠지는 공은 이 리그에선 의도된 유인구가 많아 감점 항목으로 넣지 않음.'
   },
   '구변':{
@@ -10985,22 +10989,41 @@ function renderBatterCountCategory(){
 
 // ───── 투수 E-1: 제구 영역 분류 ─────
 function _precisionClass(d){
-  // WBD 스트라이크존: zoneX/zoneY 둘 다 -1~1 (공 반지름 ±0.06 고려로 경계 넘어도 스트라이크 가능)
-  // 공 반지름 감안해서 보더라인은 0.85~1.15까지 포함 (공이 존 경계에 걸쳐있는 경우)
+  // V12.4: 존은 ±1(심판 판정 경계) 하나로 통일. 판정 검증(리그전 144경기, 안 휘두른 공 11,432개): 1.0 이하 스트라이크 99.5%, 1.0~1.15 스트라이크 1%.
+  //   이전엔 '공 반지름 감안'으로 보더라인을 0.85~1.15까지 존 안으로 셌음 → 1.0~1.15는 사실상 전부 볼이라 존율·존안 분모가 부풀려졌음.
+  //   middle ≤0.4 · slight ≤0.6 · good <0.85 · border 0.85~1.0(존 안 가장자리) · near 1.0~1.15(존 바로 밖, 볼) · ball >1.15
   const zx=Math.abs(+d.zoneX), zy=Math.abs(+d.zoneY);
   if(isNaN(zx)||isNaN(zy)) return null;   // V12.3: 위치 없는 투구는 분류하지 않음(이전엔 좌표 0 → '실투'로 잡힘)
   const rmax=Math.max(zx,zy);
-  const isInZone=rmax<=1;
-  // 중앙 실투: 존 깊숙이
-  if(isInZone && rmax<=0.4)return 'middle';
-  // 보더라인: 존 경계 (0.85~1.15, 공 반지름 고려)
-  if(rmax>=0.85 && rmax<=1.15)return 'border';
-  // 존 안: 살짝 / 굿존
-  if(isInZone){
-    if(rmax<=0.6)return 'slight';
-    return 'good';
-  }
+  if(rmax<=0.4) return 'middle';
+  if(rmax<=0.6) return 'slight';
+  if(rmax<0.85) return 'good';
+  if(rmax<=1) return 'border';
+  if(rmax<=1.15) return 'near';
   return 'ball';
+}
+// ── V12.4: 보더라인 승부 — 존 끝에서 ±0.15 안에 던진 공(걸친 공 0.85~1.0 + 아슬한 볼 1.0~1.15) ──
+//   검증(서버 630경기, 200구 이상 89명): 리그 중앙 18.9% (p10 15.5 / p90 21.9), 홀짝 반분 반복성 r .51 (±0.10은 .35, ±0.20은 .58).
+//   존 투구율과 상관 .18(별개 성향), 볼넷율 −.30. 아슬한 볼은 타자가 68% 휘두르고(존 안 67%와 같음) 안 휘두르면 98.5% 볼.
+function _edgeStats(pd){
+  let loc=0,inN=0,outN=0,outSw=0,ip=0,hit=0;
+  pd.forEach(d=>{ const c=_precisionClass(d); if(c==null) return; loc++;
+    if(c!=='border' && c!=='near') return;
+    if(c==='border') inN++; else { outN++; if(_isSwing(d)) outSw++; }
+    if(_isInPlay(d)){ ip++; if(_isHit(d)) hit++; } });
+  const n=inN+outN;
+  return {loc, n, inN, outN, ip, pct:loc?n/loc*100:null, inPct:loc?inN/loc*100:null, outPct:loc?outN/loc*100:null,
+          nearChase:outN>=10?outSw/outN*100:null, ba:ip>=10?hit/ip:null};
+}
+// 보더라인 승부 성향 라벨(리그 백분위) + 표본 신뢰도. 비율 폭이 좁아(15~22%) 300구 미만은 표본 오차가 선수 간 차이만큼 큼.
+function _edgeLabel(e){
+  if(!e || e.pct==null || e.loc<40) return null;
+  const top=_srPctile(e.pct,_lgZoneDist().pEdge,false);   // 리그에서 이 값보다 낮은 투수 비율
+  const hi=e.pct>=_lgQ('pEdge',.8), lo=e.pct<=_lgQ('pEdge',.2);
+  return { name: hi?'보더라인 승부형':lo?'보더라인 적게 씀':'보더라인 보통', color: hi?'#39ff8a':lo?'#88ccff':'var(--text)',
+           desc: hi?'들어갈 듯 말 듯한 공이 많음':lo?'확실한 스트라이크 아니면 확실한 볼':'리그 평균 수준',
+           rank: top==null?'':(top>=50?`리그 상위 ${Math.max(1,Math.round(100-top))}%`:`리그 하위 ${Math.max(1,Math.round(top))}%`),
+           conf: e.loc>=700?'':e.loc>=300?' <span style="color:var(--muted)">(표본 보통)</span>':' <span style="color:#ff8c44">(표본 적음)</span>' };
 }
 function renderPitcherPrecisionSummary(){
   const el=document.getElementById('p-precision-summary');
@@ -11010,8 +11033,9 @@ function renderPitcherPrecisionSummary(){
     middle:{label:'🎯 중앙 실투',color:'#ff4560',desc:'존 한가운데 (|x|,|y|≤0.4)',explain:'가장 치기 좋은 코스. 실투 위험 매우 높음.'},
     slight:{label:'💢 살짝 몰림',color:'#ff8c44',desc:'중앙 근처 (0.4~0.6)',explain:'실투는 아니지만 치기 쉬운 위치. 주의 필요.'},
     good:{label:'✅ 굿존',color:'#f5d923',desc:'존 안쪽 양호구간 (0.6~0.85)',explain:'스트라이크면서 안전한 구간. 무난한 피칭.'},
-    border:{label:'✨ 보더라인',color:'#39ff8a',desc:'존 경계 (0.85~1.15, 공반지름 포함)',explain:'경계선을 아슬하게 찌른 공. 타자가 치기 가장 어려움.'},
-    ball:{label:'⚫ 볼(존밖)',color:'#5a7a9a',desc:'스트라이크 존 바깥 (>1.15)',explain:'유인구 의도 or 실투 구분 불가. 존 안 기준에서 제외.'}
+    border:{label:'✨ 보더라인',color:'#39ff8a',desc:'존 안 가장자리 (0.85~1.0)',explain:'존 끝에 걸친 스트라이크. 타자가 치기 가장 어려움.'},
+    near:{label:'🌓 아슬한 볼',color:'#7fd1c0',desc:'존 바로 밖 (1.0~1.15)',explain:'들어갈 듯 말 듯한 볼. 타자가 존 안 공만큼 자주 휘두름.'},
+    ball:{label:'⚫ 볼(존밖)',color:'#5a7a9a',desc:'존에서 떨어진 볼 (>1.15)',explain:'유인구 의도 or 실투 구분 불가. 존 안 기준에서 제외.'}
   };
   const stats={};
   Object.keys(classes).forEach(k=>stats[k]={pitches:0,swings:0,whiffs:0,batted:0,hits:0,hrs:0,evSum:0,evCnt:0});
@@ -11035,18 +11059,18 @@ function renderPitcherPrecisionSummary(){
   // 설명 박스
   let html=`<div style="margin-bottom:12px;padding:10px 12px;background:var(--card2);border-left:3px solid #cc44ff;border-radius:4px;font-size:11px;line-height:1.6;color:var(--muted)">
     <div style="font-weight:700;color:#cc44ff;margin-bottom:4px">📖 제구 영역 분류란?</div>
-    스트라이크존은 <b>zoneX, zoneY 둘 다 -1~1</b>. 공 반지름을 감안해 경계를 살짝 넘어가도 스트라이크가 됩니다. 5단계로 분류:<br>
-    <span style="color:#ff4560;font-weight:700">🎯 중앙실투</span>(≤0.4, 위험) → <span style="color:#ff8c44;font-weight:700">💢 살짝몰림</span>(0.4~0.6) → <span style="color:#f5d923;font-weight:700">✅ 굿존</span>(0.6~0.85, 안전) → <span style="color:#39ff8a;font-weight:700">✨ 보더라인</span>(0.85~1.15, 공반지름 포함) → <span style="color:#5a7a9a;font-weight:700">⚫ 볼</span>(>1.15)<br>
+    스트라이크존은 <b>zoneX, zoneY 둘 다 -1~1</b>(심판 판정 경계). 1을 넘으면 볼입니다. 6단계로 분류:<br>
+    <span style="color:#ff4560;font-weight:700">🎯 중앙실투</span>(≤0.4, 위험) → <span style="color:#ff8c44;font-weight:700">💢 살짝몰림</span>(0.4~0.6) → <span style="color:#f5d923;font-weight:700">✅ 굿존</span>(0.6~0.85, 안전) → <span style="color:#39ff8a;font-weight:700">✨ 보더라인</span>(0.85~1.0, 존 안 끝) → <span style="color:#7fd1c0;font-weight:700">🌓 아슬한 볼</span>(1.0~1.15) → <span style="color:#5a7a9a;font-weight:700">⚫ 볼</span>(>1.15)<br>
     <span style="color:var(--amber);font-weight:700">큰 수치</span>는 <b>전체 투구 대비</b> · <span style="color:#cc88ff;font-weight:700">괄호 안</span>은 <b>볼 제외, 존 안 투구 중 비율</b>
     ${filterNotice}
   </div>`;
-  html+='<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px">';
+  html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(138px,1fr));gap:12px">';
   Object.entries(classes).forEach(([k,c])=>{
     const s=stats[k];
     const avg=s.batted>0?(s.hits/s.batted).toFixed(3).replace(/^0/,''):'-';
     const evAvg=s.evCnt>0?(s.evSum/s.evCnt).toFixed(1):'-';
     const isBad=k==='middle'||k==='slight';
-    const isBall=k==='ball';
+    const isBall=k==='ball'||k==='near';
     const inZonePct=(!isBall&&inZoneTotal>0)?(s.pitches/inZoneTotal*100).toFixed(1)+'%':null;
     const mainPct=_pct(s.pitches,total);
     html+=`<div class="card" style="border-left:3px solid ${c.color};padding:10px">
@@ -11073,8 +11097,21 @@ function renderPitcherPrecisionSummary(){
   html+='</div>';
   html+=`<div style="margin-top:14px;padding:12px;background:#0a1828;border:1px solid var(--border);border-radius:6px;font-size:12px">
     <span style="color:var(--muted)">실투율 평가(존 안 기준): </span><span style="color:var(--amber);font-weight:700">${grade}</span>
-    <span style="color:var(--muted);margin-left:14px">존내 실투율 ${mistakeInZoneRate.toFixed(1)}% <span style="color:#666">· 리그 평균 15.1%</span> · 낮을수록 제구가 좋음</span>
+    <span style="color:var(--muted);margin-left:14px">존내 실투율 ${mistakeInZoneRate.toFixed(1)}% <span style="color:#666">· 리그 중앙 ${_lgQf('pMist',.5,1)}%</span> · 낮을수록 제구가 좋음</span>
   </div>`;
+  // V12.4: 보더라인 승부 — 존 끝 ±0.15 안(걸친 공 + 아슬한 볼)
+  const eg=_edgeStats(all), egL=_edgeLabel(eg);
+  if(egL){
+    const inW=eg.n?eg.inN/eg.n*100:0;
+    html+=`<div style="margin-top:10px;padding:12px;background:#0a1828;border:1px solid var(--border);border-radius:6px;font-size:12px;line-height:1.7">
+      <div><span style="color:var(--muted)">🌓 보더라인 승부: </span><span style="font-family:var(--mono);font-size:16px;color:var(--amber)">${eg.pct.toFixed(1)}%</span>
+        <span style="color:${egL.color};font-weight:700;margin-left:8px">${egL.name}</span>${egL.conf}
+        <span style="color:var(--muted);margin-left:8px">${egL.desc} · ${egL.rank} · 리그 중앙 ${_lgQf('pEdge',.5,1)}%</span></div>
+      <div style="display:flex;height:8px;border-radius:4px;overflow:hidden;margin:6px 0;max-width:420px;background:var(--card2)"><div style="width:${inW.toFixed(1)}%;background:#39ff8a"></div><div style="width:${(100-inW).toFixed(1)}%;background:#7fd1c0"></div></div>
+      <div style="color:var(--muted);font-size:11px">✨ 걸친 공(존 안 끝) <b style="color:var(--text)">${eg.inPct.toFixed(1)}%</b> ${eg.inN}구 · 🌓 아슬한 볼(존 바로 밖) <b style="color:var(--text)">${eg.outPct.toFixed(1)}%</b> ${eg.outN}구${eg.nearChase!=null?` · 아슬한 볼에 타자 스윙 <b style="color:var(--text)">${eg.nearChase.toFixed(0)}%</b> (리그 중앙 ${_lgQf('pNearChase',.5,0)}%)`:''}${eg.ba!=null?` · 경계 피안타율 <b style="color:var(--text)">${eg.ba.toFixed(3).replace(/^0/,'')}</b> (${eg.ip}타구)`:''}</div>
+      <div style="color:#666;font-size:10px">존 끝에서 ±0.15 안에 던진 공의 비율(전체 투구 대비). 제구가 좋다는 뜻이 아니라 승부하는 방식을 보여주는 성향 지표.</div>
+    </div>`;
+  }
   el.innerHTML=html;
 }
 
@@ -11832,6 +11869,7 @@ function renderLeaderboard(){
       else if(cat==='p-mistake'){v=-mistakePct;display=mistakePct.toFixed(1)+'%';}
       else if(cat==='p-border'){v=borderPct;display=borderPct.toFixed(1)+'%';}
       else if(cat==='p-safe'){v=safePct;display=safePct.toFixed(1)+'%';}
+      else if(cat==='p-edge'){const eg=_edgeStats(pd); v=eg.pct||0; display=eg.pct!=null?eg.pct.toFixed(1)+'%':'-';}
       else if(cat==='p-strike'){v=strikePct;display=strikePct.toFixed(1)+'%';}
       else if(cat==='p-fps'){v=fpsPct;display=fpsPct.toFixed(1)+'%';}
       else if(cat==='p-ppa'){v=-ppPA;display=ppPA.toFixed(1);}
@@ -11986,7 +12024,7 @@ function renderLeaderboard(){
     'p-era':'ERA (방어율)','p-eraplus':'ERA+ (리그평균 대비)','p-whip':'WHIP','p-ip':'이닝 (IP)','p-runs':'실점','p-ra9':'RA9 (9이닝당 실점)',
     'p-ba':'피안타율','p-bb':'BB%','p-hr':'피홈런','p-hrrate':'피홈런%',
     'p-whiff':'헛스윙%','p-ev':'평균 피EV','p-hh':'피하드히트%','p-hhp':'피HH+%(≥125)','p-barrel':'피배럴%','p-brlp':'피배럴+%(≥125&LA20~40)',
-    'p-zwhiff':'존내 헛스윙%','p-ozwhiff':'존밖 헛스윙%','p-mistake':'실투율','p-border':'보더라인%','p-safe':'안전존%',
+    'p-zwhiff':'존내 헛스윙%','p-ozwhiff':'존밖 헛스윙%','p-mistake':'실투율','p-border':'보더라인%','p-safe':'안전존%','p-edge':'보더라인 승부율 (존 끝 ±0.15)',
     'p-strike':'스트라이크%','p-fps':'초구 스트라이크%','p-ppa':'이닝당 투구수',
     'p-chase':'체이스 유도%','p-var':'구종 다양성','p-ovr':'투수 OVR',
     'b-avg':'타율','b-slg':'장타율','b-ops':'OPS','b-obp':'출루율','b-iso':'ISO','b-hr':'홈런','b-hrrate':'홈런%','b-hits':'안타',
@@ -13059,7 +13097,7 @@ function renderTeamPit(){
                 {l:'실투',   v:t.pMidPct,    c:'#ff4560', d:'존 중앙 깊숙이 — 장타 위험'},
                 {l:'살짝몰림',v:t.pSlightPct, c:'#ff8c44', d:'중앙~중간'},
                 {l:'굿존',   v:t.pGoodPct-t.pBorderPct, c:'#ffd700', d:'존 바깥쪽'},
-                {l:'보더라인',v:t.pBorderPct, c:'#39ff8a', d:'존 경계 — 최적 제구'}
+                {l:'보더라인',v:t.pBorderPct, c:'#39ff8a', d:'존 안 가장자리 — 최적 제구'}
               ];
               const tot=segs.reduce((s,x)=>s+Math.max(0,x.v),0)||1;
               const bar=segs.map(s=>`<div title="${s.l}: ${s.v.toFixed(1)}% — ${s.d}" style="width:${Math.max(0,s.v)/tot*100}%;background:${s.c};opacity:0.8"></div>`).join('');
@@ -15305,6 +15343,21 @@ function openThemeModal(){
 //   - title은 한 줄 핵심 요약, changes는 항목별 (icon + text)
 const CHANGELOG = [
   {
+    version: 'V12.4',
+    date: '2026-11',
+    title: '🎯 존 기준 하나로 통일 (보더라인 = 존 안 가장자리) + 🌓 보더라인 승부율 신설',
+    badge: '#39ff8a',
+    changes: [
+      {icon:'🎯', text:'⭐⭐⭐ <b>"보더+존"과 "존 투구율"이 서로 다른 숫자였던 것 통일</b> — 제구 분류의 보더라인이 <code>0.85~1.15</code>(공 반지름 감안)라서, 투수 헤더 "존율"과 제구 정밀도 탭의 "존안" 비율은 존 바로 밖 공까지 존으로 세고 있었음. 존 경계를 몰랐을 때 스트라이크를 놓치지 않으려 넓혀둔 여유분인데, V12.2에서 경계를 정확히 찾은 뒤에도 남아 있었음. <b>검증</b>(리그전 144경기, 안 휘두른 공 11,432개): 0.95 이하 스트라이크 100%, 0.95~1.0 93.8%, <b>1.0~1.05 3.1%, 1.05~1.15 0%</b>. 즉 1.0~1.15(전체 투구의 9.4%)는 사실상 전부 볼. → 존 = ±1 하나로 통일, 보더라인은 <b>존 안 가장자리(0.85~1.0)</b>만. 예: Slaris 26 Summer 헤더 존율 49% → 35%(선수 평가·스카우팅 존 투구율과 같은 값).'},
+      {icon:'🧮', text:'⭐⭐ <b>같이 바뀌는 곳</b> — 투수 헤더(존율·실투/살짝/굿존/보더 비율), E. 제구 정밀도(5단계 → 6단계: <b>🌓 아슬한 볼 1.0~1.15</b> 신설, "존안중" 분모), 구종별 보더라인율, 리더보드 실투율·보더라인%·안전존%, 강점/약점 리포트의 존내 실투·보더라인·안전존 문구, 팀 제구(보더라인%)와 팀 투수 탭 분포 막대, 최근 폼 보더%. 라벨 기준은 리그 백분위라 자동으로 따라옴. 표본 부족 시 쓰는 예비 기준값은 서버 630경기로 다시 뽑음(존내 실투 중앙 16.0 → 19.2%, 보더라인 중앙 34.1 → 22.4%, 안전존 64.0 → 57.4%).'},
+      {icon:'🌓', text:'⭐⭐ <b>보더라인 승부율 신설</b> — 존 끝에서 <b>±0.15 안</b>에 던진 공의 비율(전체 투구 대비). <b>걸친 공</b>(존 안 끝 0.85~1.0, 스트라이크) + <b>아슬한 볼</b>(존 바로 밖 1.0~1.15). 들어갈 듯 말 듯한 공으로 승부하는 투수를 가려내는 <b>성향 지표</b>(제구의 좋고 나쁨이 아님). 표시 위치: 투수 헤더, E. 제구 정밀도, 스카우팅 투수 공략(패턴), 리더보드 "보더라인 승부율". 라벨은 리그 백분위: 상위 20% <b>보더라인 승부형</b> / 하위 20% <b>보더라인 적게 씀</b> / 나머지 보통.'},
+      {icon:'🔬', text:'⭐ <b>보더라인 승부율 검증</b>(서버 630경기) — 리그 중앙 18.7% (하위 10% 15.2 / 상위 10% 22.0, 103명). 반복성: 홀짝 반분 r .51, 경기 단위 반분 r .48(존 투구율 .55와 비슷한 수준). 폭 ±0.10은 r .35로 불안정, ±0.20은 .58이지만 "경계"의 의미가 흐려져 ±0.15 채택. 존 투구율과 상관 .18(별개 성향), 볼넷율 −.30. <b>아슬한 볼은 타자가 68% 휘두름</b>(존 안 공 67%와 같은 수준)인데 안 휘두르면 98.5% 볼, 경계 공 피안타율 .44~.45(한가운데 .48), 헛스윙 29~30%(한가운데 24%). 걸친 공/아슬한 볼 각각의 비율은 반복성이 낮아(.13/.34) 라벨에 쓰지 않고 참고 수치로만 표시. 비율 폭이 좁아 300구 미만은 "표본 적음", 700구 미만은 "표본 보통" 표시.'},
+      {icon:'🔧', text:'⭐ <b>제구 정밀도 탭의 "리그 평균 15.1%" 고정 숫자 제거</b> — V12.3 정리 때 놓친 고정값. 활성 경기의 리그 중앙값으로 바꿈.'},
+      {icon:'🃏', text:'⭐ <b>카드 제구는 그대로</b> — 보호 공식이라 기존 구간(0.85~1.15 = 걸친 공 + 아슬한 볼)을 유지해 카드 값은 V12.3과 완전히 동일(630경기 투수 114명·타자 179명 전원 일치). 존 안(±1)만 쓰는 후보를 만들어 비교함: 제구 변화 표준편차 2~3, 범위 −7~+8, OVR ±1. 경기 단위 반복성은 현재 구간이 더 높고(굿존 성분 .66 vs .58, 실투 성분 .68 vs .63), 다음 절반 피안타율 예측력은 같음(−.14). 변경은 승인 후에만 반영.'},
+      {icon:'📦', text:'<b>내보내기 schema v23</b> — 제구 구간 정의 변경 명시, <code>scouting.pitchers[name].edge</code> 추가(pct·inPct·outPct·nearChasePct·located), borderPct 정의 갱신.'},
+    ]
+  },
+  {
     version: 'V12.3',
     date: '2026-11',
     title: '🧭 존 기준 일괄 정리 — 라벨 기준을 리그 백분위로, 5×5 존맵을 실제 존에 맞춤',
@@ -16341,7 +16394,6 @@ function findSimilarPlayers(card, topN=3){
 // WBD 리그 기준치 (63경기 실측):
 // - 리그 평균 피안타율(인플레이·파울 제외): 0.455 / AB 기반 0.382 (V11.1 305경기 재실측)
 // - 투수 실투율(중앙몰림) 평균: 5.4%, p90=9.8%
-// - 보더라인 비율 평균: 35%
 // - 타자 헛스윙률 평균: 24%, p90=34%
 // ─── 💪 강점 리포트 (V7.12) ─────
 // 실측 기반 상위 25%/10% 임계값을 넘는 항목을 자동 탐지
@@ -16411,7 +16463,7 @@ function generateStrengthReport(card){
       if(hhPctA<=32)reports.push({icon:'🛑',text:`피하드히트 ${hhPctA.toFixed(1)}% (${battedQ.length}타구 · 강타 억제 상위 10% · 평균 39.6%)${bTag}`,color:'#39ff8a'});
       else if(hhPctA<=36)reports.push({icon:'🛑',text:`피하드히트 ${hhPctA.toFixed(1)}% (${battedQ.length}타구 · 강타 억제 상위 25%)${bTag}`,color:'#88cc44'});
     }
-    // 5) 제구 (5영역 · V7.15: zoneX/Y 둘 다 -1~1 · 보더 공반지름 감안 0.85~1.15)
+    // 5) 제구 (V12.4: 존 = ±1, 보더 = 존 안 가장자리 0.85~1.0)
     let midS=0, sltS=0, gdS=0, brdS=0, inZS=0;
     pd.filter(d=>d.zoneX!=null).forEach(d=>{
       const c=_precisionClass(d);   // V12.3: 제구 구간 공용 함수
@@ -16633,7 +16685,7 @@ function generateWeaknessReport(card){
         else if(hrRate>=11)reports.push({icon:'💥',text:`${g} 피홈런 ${v.hrs}개 / ${v.batted}타구 (${hrRate.toFixed(1)}% · 리그 상위 25%)${lowTag}`,color:'#ff8800'});
       }
     });
-    // 제구 영역 분석 (V7.15: zoneX/Y 둘 다 -1~1 · 공반지름 감안 보더 0.85~1.15)
+    // 제구 영역 분석 (V12.4: 존 = ±1, 보더 = 존 안 가장자리 0.85~1.0)
     let midW=0, sltW=0, gdW=0, brdW=0, inZW=0;
     pd.filter(d=>d.zoneX!=null).forEach(d=>{
       const c=_precisionClass(d);   // V12.3: 제구 구간 공용 함수
@@ -18075,6 +18127,7 @@ function _scoutCollectPitcher__raw(name){
     midHitRate: midPitches.length>0 ? midHits/midPitches.length*100 : 0,
     midHardHitRate: midPitches.length>0 ? midHardHit/midPitches.length*100 : 0,
     midN: midPitches.length,
+    edge: _edgeStats(all),   // V12.4: 보더라인 승부
     // V9.7 신규: 살짝 몰림 비율
     slightPct: all.length>0 ? slightPitches.length/all.length*100 : 0,
     slightN: slightPitches.length,
@@ -18940,6 +18993,10 @@ function _scoutGeneratePitcherReport(data){
     else mLabel = '<span style="color:#39ff8a">실투 적음 (정밀 제구)</span>';
     
     patterns.push(`<b>실투 패턴</b>: 한가운데 칸 비율 ${data.midPitchPct.toFixed(1)}% — ${mLabel}<br><span style="color:var(--muted);font-size:11px">실투 시 피안타율 ${fmt3(data.midHitRate/100)} · 하드힛 ${data.midHardHitRate.toFixed(0)}% (${midDangerLabel})</span>`);
+  }
+  // V12.4: 보더라인 승부 성향
+  { const eg=data.edge, egL=_edgeLabel(eg);
+    if(egL) patterns.push(`<b>보더라인 승부</b>: 존 끝 ±0.15 안 ${eg.pct.toFixed(1)}% — <span style="color:${egL.color}">${egL.name}</span>${egL.conf} (${egL.desc} · 리그 중앙 ${_lgQf('pEdge',.5,1)}%)<br><span style="color:var(--muted);font-size:11px">걸친 공 ${eg.inPct.toFixed(1)}% · 아슬한 볼 ${eg.outPct.toFixed(1)}%${eg.nearChase!=null?` · 아슬한 볼에 타자 스윙 ${eg.nearChase.toFixed(0)}% (리그 중앙 ${_lgQf('pNearChase',.5,0)}%)`:''}</span>`);
   }
   
   if(data.splits.vsL.n >= 30 && data.splits.vsR.n >= 30){
@@ -25868,7 +25925,7 @@ function _slLeagueDist(){
 function _lgZoneDist(){
   const key=_gameStatsKey();
   if(window._lzDist && window._lzDist._k===key) return window._lzDist;
-  const D={_k:key, batChase:[], batOzCon:[], pMist:[], pSlt:[], pBad:[], pBrd:[], pSafe:[], pCenter:[], pBadZone:[], gInZ:[], gChase:[], gMid:[], gMist:[]};
+  const D={_k:key, batChase:[], batOzCon:[], pMist:[], pSlt:[], pBad:[], pBrd:[], pSafe:[], pCenter:[], pBadZone:[], pEdge:[], pNearChase:[], gInZ:[], gChase:[], gMid:[], gMist:[]};
   const isCenter=d=>{ const x=+d.zoneX, y=+d.zoneY; return x>=-0.33&&x<=0.33&&y>=-0.33&&y<=0.33; };
   (window._cache.pitcherNames||[]).forEach(n=>{
     const pd=getPitcherDataByName(n); if(pd.length<100) return;
@@ -25884,6 +25941,7 @@ function _lgZoneDist(){
       // 스카우팅 제구 등급의 '실투+살짝×0.7' (전체 투구 대비; 살짝 = 중심에서 0.33~0.6)
       const sl=pd.filter(d=>{ const x=Math.abs(+d.zoneX), y=Math.abs(+d.zoneY); if(isNaN(x)||isNaN(y)) return false; const r=Math.max(x,y); return r>0.33&&r<=0.6; }).length/pd.length*100;
       D.pBadZone.push(cen+sl*0.7);
+      const eg=_edgeStats(pd); D.pEdge.push(eg.pct); if(eg.outN>=20) D.pNearChase.push(eg.nearChase);   // V12.4
     }
     const byG={}; pd.forEach(d=>{ const g=pitchGroup(d.pType,d); (byG[g]=byG[g]||[]).push(d); });
     for(const g in byG){ const a=byG[g]; if(a.length<15) continue;
@@ -25904,8 +25962,9 @@ function _lgZoneDist(){
 // 분포 key의 p 분위값(0~1). 분포가 10개 미만이면 fb.
 const _LZ_FB={   // 서버 641경기(2025-10~2026-11) 기준 — 활성 경기 표본이 부족할 때만 사용
   batChase:{.1:45.7,.2:49.9,.25:51.2,.4:55.3,.5:59.5,.8:67,.9:70.6},
-  pMist:{.1:11.7,.25:13.9,.4:15.3,.5:16,.75:19.5,.9:23.1}, pSlt:{.5:18.8,.9:22.4}, pBad:{.5:36,.9:43.8},
-  pBrd:{.1:28,.5:34.1,.75:38.2,.9:41.3}, pSafe:{.1:56.2,.5:64,.75:68.6,.9:72.7},
+  pMist:{.1:14.3,.25:16.9,.4:18.2,.5:19.2,.75:22.8,.9:27.4}, pSlt:{.5:22.7,.9:26.5}, pBad:{.5:42.6,.9:50.9},   // V12.4: 존 안 = ±1 기준으로 다시 뽑음
+  pBrd:{.1:17.7,.5:22.4,.75:24.5,.9:26.7}, pSafe:{.1:49.1,.5:57.4,.75:61.9,.9:66.7},
+  pEdge:{.2:16.2,.5:18.7,.8:21}, pNearChase:{.5:67.4},
   pCenter:{.1:3.6,.2:4.6,.25:4.9,.5:6.1,.75:7.6,.9:9.7},
   gInZ:{.25:33.7,.6:47.6,.75:53.3,.85:57.4,.9:60.5}, gChase:{.5:57.9,.75:64.8}, gMid:{.25:2.6,.85:10.3,.9:11.9,.95:14.6},
   batOzCon:{.4:57.4}, pBadZone:{.01:8.3,.06:10,.34:14,.73:17.7,.96:21.5,.995:24.7}, gMist:{.5:8,.9:15.9} };
@@ -27643,7 +27702,7 @@ function _computeTeamProfiles(){
       if(_isSwing(d))T.pSw++;
       if(_isWhiff(d))T.pWh++;
       if(_isInZone(d))T.pZin++;
-      // V11.3: 제구 세분화 (실투/살짝몰림/굿존/보더라인/볼)
+      // V11.3: 제구 세분화 (실투/살짝몰림/굿존/보더라인/볼) · V12.4: 보더라인 = 존 안 가장자리(0.85~1.0)
       if(d.zoneX!=null){
         T.pLoc++;
         const pc=_precisionClass(d);
@@ -33217,9 +33276,14 @@ function exportAnalyticsBundle(opts){
   // 1) 메타 정보
   const meta={
     generatedAt:new Date().toISOString(),
-    appVersion:'V12.3',
-    schemaVersion:22,
+    appVersion:'V12.4',
+    schemaVersion:23,
     schemaChanges:{
+      v23_changes:[
+        '📌 제구 구간 정의 변경: 존 = ±1 하나로 통일. 보더라인은 0.85~1.15(공 반지름 감안) → 0.85~1.0(존 안 가장자리)만. 1.0~1.15는 "아슬한 볼(near)"로 분리(심판 판정상 99% 볼). teams[].pitching.borderPct와 팀 제구 점수, 리더보드 실투율·보더라인%·안전존%(존 안 분모)가 v22와 다름.',
+        '🆕 scouting.pitchers[name].edge = {pct, inPct, outPct, nearChasePct, located} — 보더라인 승부율: 존 끝 ±0.15 안에 던진 공의 비율(전체 위치 기록 투구 대비). inPct = 걸친 공(0.85~1.0), outPct = 아슬한 볼(1.0~1.15), nearChasePct = 아슬한 볼에 타자가 스윙한 비율. 성향 지표(반복성 r 약 .5)이며 300구 미만은 표본 오차가 큼.',
+        '📌 card.stats 제구는 v22와 동일(보호 공식 — 기존 0.85~1.15 구간 유지).'
+      ],
       v22_changes:[
         '📌 위치 없는 투구(zoneX/zoneY 없음)는 존 안/밖 어느 쪽에도 넣지 않음 — 이전엔 일부 집계(구종별·팀·스카우팅 체이스 등)에서 존 밖으로 잡혀 체이스율 분모에 들어갔음. 해당 체이스·존 비율이 v21과 소폭 다름.',
         '📌 5×5 존 칸 정의 변경: 가운데 3×3 = 실제 스트라이크존(±1, 경계 포함), 바깥 칸 = 존 밖 전체(이전: 칸 폭 0.8, ±1.2까지 가운데 칸).',
@@ -33916,7 +33980,7 @@ function exportAnalyticsBundle(opts){
         const tools={}; D.T.forEach(t=>{ if(t.grade!=null) tools[t.key]={grade:t.grade,pct:t.pct!=null?+t.pct.toFixed(0):null,note:t.note}; });
         pit[n]={ofp:D.ofp, tools, repertoire:D.rep.map(r=>({pitch:r.g,usagePct:+r.pct.toFixed(1),velo:r.velo!=null?+r.velo.toFixed(1):null,veloMax:r.veloMax,movH:r.sH!=null?+r.sH.toFixed(1):null,movV:r.sV!=null?+r.sV.toFixed(1):null,zonePct:r.zone!=null?+r.zone.toFixed(1):null,whiffPct:r.whiff!=null?+r.whiff.toFixed(1):null,baa:r.baa!=null?+r.baa.toFixed(3):null,slgA:r.slg!=null?+r.slg.toFixed(3):null,firstPitchUse:r.fpUse!=null?+r.fpUse.toFixed(1):null,twoStrikeUse:r.k2Use!=null?+r.k2Use.toFixed(1):null})),
           sequencing:D.seqRows.map(r=>({count:r.c,n:r.n,top:r.top.map(t=>({pitch:t.g,pct:+t.pct.toFixed(1)}))})), predictability:D.predict!=null?+D.predict.toFixed(1):null,
-          command:D.cmdN, stamina:{byPitchCount:D.stamPC.map(r=>({bucket:r.k,n:r.n,velo:r.velo!=null?+r.velo.toFixed(1):null,baa:r.baa!=null?+r.baa.toFixed(3):null,whiffPct:r.whiff!=null?+r.whiff.toFixed(1):null,bbPct:r.bb!=null?+r.bb.toFixed(1):null})),byInning:D.stamInn.map(r=>({bucket:r.k,n:r.n,velo:r.velo!=null?+r.velo.toFixed(1):null,baa:r.baa!=null?+r.baa.toFixed(3):null})),notes:D.stamN},
+          command:D.cmdN, edge:(e=>e.pct!=null?{pct:+e.pct.toFixed(1),inPct:+e.inPct.toFixed(1),outPct:+e.outPct.toFixed(1),nearChasePct:e.nearChase!=null?+e.nearChase.toFixed(1):null,located:e.loc}:null)(_edgeStats(getPitcherDataByName(n))), stamina:{byPitchCount:D.stamPC.map(r=>({bucket:r.k,n:r.n,velo:r.velo!=null?+r.velo.toFixed(1):null,baa:r.baa!=null?+r.baa.toFixed(3):null,whiffPct:r.whiff!=null?+r.whiff.toFixed(1):null,bbPct:r.bb!=null?+r.bb.toFixed(1):null})),byInning:D.stamInn.map(r=>({bucket:r.k,n:r.n,velo:r.velo!=null?+r.velo.toFixed(1):null,baa:r.baa!=null?+r.baa.toFixed(3):null})),notes:D.stamN},
           risk:D.risk, attack:{summary:A.summary, weaknesses:A.weaknesses.map(strip), strengths:A.strengths.map(s=>({title:s.title,why:s.why,how:s.how})), sequence:A.sequence, splitLR:A.splitLR||null}, profile:(()=>{try{const R=_srProfilePitcher(n);return R?{arch:R.arch,tags:R.tags.map(t=>t.label),paras:R.paras,verdict:R.verdict,conf:R.conf}:null;}catch(e){return null;}})()}; });
       return { note:'스카우팅 도시에 + 공략 엔진. tools=20-80 등급(리그 백분위 기반, pct=백분위, note=근거). ofp=종합(가중). attack=상대 입장 공략(약점은 "약함+스윙함+유도됨" 3단 검증, tier ✅강력/△범타/참고, conf=표본 신뢰도). sequence=승부 시퀀스. 투수 repertoire/sequencing(카운트별 구종)/stamina(투구수·이닝 구간). 코스 판정은 존 안 9칸 기준(존 밖 볼은 별도). 모든 약점 판정은 리그가 아닌 본인 전체 대비.', batters:bat, pitchers:pit };
     }catch(e){ return null; } })(),
@@ -34175,7 +34239,8 @@ function exportAnalyticsBundle(opts){
       chasePct:'체이스% — 존 밖 투구에 스윙한 비율(존 = 실제 심판 판정 경계). 낮을수록 선구안 좋음',
       zSwingPct:'존내 스윙% — 스트라이크존 안 투구에 스윙한 비율. 적극성 지표(유형에 따라 갈려 보조 비중만 사용)',
       middlePct:'실투율 — 존 중앙 깊숙이(중심에서 0.4 이내) 들어간 투구 비율. 투수는 낮을수록 좋음',
-      borderPct:'보더라인% — 존 경계(0.85~1.15)에 던진 비율. 스트라이크·볼이 갈리는 지점으로, 높을수록 제구가 정밀함',
+      borderPct:'보더라인% — 존 안 가장자리(0.85~1.0)에 던진 비율(전체 투구 대비). 존 끝에 걸친 스트라이크로, 높을수록 제구가 정밀함. v22까지는 0.85~1.15(존 밖 포함)',
+      edge:'보더라인 승부율 — 존 끝에서 ±0.15 안(걸친 공 0.85~1.0 + 아슬한 볼 1.0~1.15)에 던진 공의 비율. 제구의 좋고 나쁨이 아니라 승부 방식(성향)',
       teamGrade:'팀 등급 — 타격45% + 투수45% + 수비10%. 타격=컨택35/파워40/선구25, 투수=구위35/제구25/결과40. 각 영역은 리그 백분위 기반이며 S+~D로 표기',
       clutch:'클러치 — 득점권(2·3루 주자) OPS를 리그 평균과 비교. 타자는 높을수록/투수는 낮을수록 좋음. 표본 변동이 커서 종합 등급에는 미반영(참고 지표)',
       'HH+':'하드힛 플러스 = EV 125km/h 이상 인플레이 타구 비율. WBD 실측: BA .485→.650 점프 지점. 기존 HH(110+)보다 상위 강타 변별. 타자=높을수록/투수=낮을수록 좋음',
@@ -35431,7 +35496,7 @@ function renderRecentForm(){
     const inZ=pd.filter(d=>_isInZone(d));
     const mistake=inZ.filter(d=>_precisionClass(d)==='middle').length;   // V12.3: 제구 구간 공용 함수
     const mistakePct=inZ.length?mistake/inZ.length*100:0;
-    // 보더라인% (존 외곽)
+    // 보더라인% (존 안 가장자리 0.85~1.0, 전체 투구 대비)
     const border=pd.filter(d=>_precisionClass(d)==='border').length;
     const borderPct=pd.length?border/pd.length*100:0;
     // 체이스 유도%
